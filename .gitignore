@@ -1,0 +1,36 @@
+/target
+
+# Infrastructure
+.env
+.terraform
+terraform.tfstate
+terraform.tfstate.backup
+aws-packer-config.json
+override.install.sh
+
+# Ignore the google cloud auth creds created in Actions workflows
+gha-creds-*.json
+crane
+tok
+
+# IDE
+/.idea
+/.vscode
+
+# Benchmarks
+/results
+
+# cli markdown output
+cli.md
+
+# precommit hooks
+.editorconfig
+.markdownlint-cli2.jsonc
+.pre-commit-config.yaml
+.prettierrc
+.shellcheckrc
+
+# example outputs
+/image-cache
+
+/out
