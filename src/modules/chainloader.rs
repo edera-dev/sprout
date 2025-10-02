@@ -1,4 +1,6 @@
 use crate::config::ChainloaderConfiguration;
+use log::info;
+use uefi::proto::loaded_image::LoadedImage;
 use uefi::{
     CString16,
     proto::device_path::{
@@ -24,7 +26,7 @@ pub fn chainloader(configuration: ChainloaderConfiguration) {
     let sprout_image = uefi::boot::image_handle();
     let image_device_path_protocol =
         uefi::boot::open_protocol_exclusive::<LoadedImageDevicePath>(sprout_image)
-            .expect("unable to open loaded image protocol");
+            .expect("unable to open loaded image device path protocol");
 
     let image_device_path: &DevicePath = &image_device_path_protocol;
     let mut full_path = image_device_path
@@ -45,7 +47,7 @@ pub fn chainloader(configuration: ChainloaderConfiguration) {
     full_path.push('/');
     full_path.push_str(&configuration.path);
 
-    println!("chainloader: path={}", full_path);
+    info!("path={}", full_path);
 
     let device_path = text_to_device_path(&full_path);
 
@@ -57,5 +59,11 @@ pub fn chainloader(configuration: ChainloaderConfiguration) {
         },
     )
     .expect("failed to load image");
+
+    let image_device_path_protocol = uefi::boot::open_protocol_exclusive::<LoadedImage>(image)
+        .expect("unable to open loaded image protocol");
+
+    let (base, size) = image_device_path_protocol.info();
+    info!("loaded image base={:#x} size={:#x}", base.addr(), size);
     uefi::boot::start_image(image).expect("failed to start image");
 }

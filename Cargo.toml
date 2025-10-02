@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 toml = "0.9.7"
+log = "0.4.28"
 
 [dependencies.serde]
 version = "1.0.228"
@@ -12,4 +13,18 @@ features = ["derive"]
 
 [dependencies.uefi]
 version =  "0.35.0"
-features = ["alloc"]
+features = ["alloc", "logger"]
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
+
+[profile.release-debuginfo]
+inherits = "release"
+strip = "none"
+debug = 1
+
+[profile.dev-fast]
+inherits = "dev"
+strip = "debuginfo"
+debug = 0

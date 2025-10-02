@@ -13,4 +13,6 @@ pub fn init() {
             .expect("unable to resolve image handle");
         uefi::boot::set_image_handle(handle);
     }
+
+    uefi::helpers::init().expect("failed to initialize uefi");
 }
