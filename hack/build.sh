@@ -73,6 +73,7 @@ if [ "${SKIP_VM_BUILD}" != "1" ]; then
 	echo "[vm build] ${TARGET_ARCH} ${RUST_PROFILE}"
 	docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}:${DOCKER_TAG}" -f vm/Dockerfile.ovmf "${FINAL_DIR}"
 	copy_from_image "${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}" "ovmf.fd" "${FINAL_DIR}/ovmf.fd"
+	copy_from_image "${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}" "shell.efi" "${FINAL_DIR}/shell.efi"
 fi
 
 if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
@@ -83,6 +84,9 @@ if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
 	cp "${FINAL_DIR}/sprout.efi" "${FINAL_DIR}/efi/EFI/BOOT/${EFI_NAME}.EFI"
 	if [ -f "${FINAL_DIR}/kernel.efi" ]; then
 		cp "${FINAL_DIR}/kernel.efi" "${FINAL_DIR}/efi/EFI/BOOT/KERNEL.EFI"
+	fi
+	if [ -f "${FINAL_DIR}/shell.efi" ]; then
+		cp "${FINAL_DIR}/shell.efi" "${FINAL_DIR}/efi/EFI/BOOT/SHELL.EFI"
 	fi
 	cp "hack/configs/kernel.sprout.toml" "${FINAL_DIR}/efi/SPROUT.TOML"
 fi

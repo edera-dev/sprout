@@ -8,6 +8,7 @@ WORKDIR /work
 COPY sprout.efi /work/${EFI_NAME}.EFI
 COPY sprout.toml /work/SPROUT.TOML
 COPY kernel.efi /work/KERNEL.EFI
+COPY shell.efi /work/SHELL.EFI
 RUN truncate -s256MiB sprout.img && \
     parted --script sprout.img mklabel gpt > /dev/null 2>&1 && \
     parted --script sprout.img mkpart primary fat32 1MiB 100% > /dev/null 2>&1 && \
@@ -17,6 +18,7 @@ RUN truncate -s256MiB sprout.img && \
     mmd -i sprout.img ::/EFI/BOOT && \
     mcopy -i sprout.img ${EFI_NAME}.EFI ::/EFI/BOOT/ && \
     mcopy -i sprout.img KERNEL.EFI ::/EFI/BOOT/ && \
+    mcopy -i sprout.img SHELL.EFI ::/EFI/BOOT/ && \
     mcopy -i sprout.img SPROUT.TOML ::/ && \
     mv sprout.img /sprout.img
 

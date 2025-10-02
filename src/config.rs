@@ -16,6 +16,8 @@ pub struct ModuleConfiguration {
 #[derive(Serialize, Deserialize, Default)]
 pub struct ChainloaderConfiguration {
     pub path: String,
+    #[serde(default)]
+    pub options: Vec<String>,
 }
 
 pub fn load() -> RootConfiguration {

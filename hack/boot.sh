@@ -22,7 +22,19 @@ set -- "${@}" -smp 2 -m 4096
 if [ "${NO_GRAPHICAL_BOOT}" = "1" ]; then
 	set -- "${@}" -nographic
 else
-	set -- "${@}" -serial stdio -vga none -device "virtio-gpu,edid=on,xres=1024,yres=768"
+	set -- "${@}" \
+		-device virtio-serial-pci,id=vs0 \
+		-chardev stdio,id=stdio0 \
+		-device virtconsole,chardev=stdio0,id=console0
+
+	if [ "${TARGET_ARCH}" = "x86_64" ]; then
+		set -- "${@}" \
+			-vga std
+	else
+		set -- "${@}" \
+			-vga none \
+			-device "virtio-gpu,edid=on,xres=1024,yres=768"
+	fi
 fi
 
 rm -f "${FINAL_DIR}/ovmf-boot.fd"
