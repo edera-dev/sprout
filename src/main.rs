@@ -2,10 +2,13 @@
 pub mod config;
 pub mod modules;
 pub mod setup;
+pub mod utils;
 
 fn main() {
     setup::init();
 
     let config = config::load();
-    modules::execute(config.modules);
+    for module in config.modules {
+        modules::execute(module);
+    }
 }

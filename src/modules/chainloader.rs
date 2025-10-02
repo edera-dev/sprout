@@ -1,26 +1,11 @@
 use crate::config::ChainloaderConfiguration;
+use crate::utils::text_to_device_path;
 use log::info;
-use uefi::proto::loaded_image::LoadedImage;
-use uefi::{
-    CString16,
-    proto::device_path::{
-        DevicePath, LoadedImageDevicePath, PoolDevicePath,
-        text::{AllowShortcuts, DevicePathFromText, DisplayOnly},
-    },
+use uefi::proto::device_path::{
+    DevicePath, LoadedImageDevicePath,
+    text::{AllowShortcuts, DisplayOnly},
 };
-
-fn text_to_device_path(path: &str) -> PoolDevicePath {
-    let path = CString16::try_from(path).expect("unable to convert path to CString16");
-    let device_path_from_text = uefi::boot::open_protocol_exclusive::<DevicePathFromText>(
-        uefi::boot::get_handle_for_protocol::<DevicePathFromText>()
-            .expect("no device path from text protocol"),
-    )
-    .expect("unable to open device path from text protocol");
-
-    device_path_from_text
-        .convert_text_to_device_path(&path)
-        .expect("unable to convert text to device path")
-}
+use uefi::proto::loaded_image::LoadedImage;
 
 pub fn chainloader(configuration: ChainloaderConfiguration) {
     let sprout_image = uefi::boot::image_handle();
