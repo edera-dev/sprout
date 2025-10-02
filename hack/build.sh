@@ -25,8 +25,36 @@ fi
 mkdir -p "${FINAL_DIR}"
 
 if [ "${SKIP_KERNEL_BUILD}" != "1" ] || [ "${SKIP_VM_BUILD}" != "1" ] || [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
-	docker build -t "${DOCKER_PREFIX}/sprout-utils-copy:${DOCKER_TAG}" -f hack/utils/Dockerfile.copy hack
+	docker build -t "${DOCKER_PREFIX}/sprout-utils-copy-direct:${DOCKER_TAG}" -f hack/utils/Dockerfile.copy-direct hack
 fi
+
+copy_from_image_direct() {
+	IMAGE="${1}"
+	SOURCE="${2}"
+	TARGET="${3}"
+
+	docker run --rm -i \
+		--mount="type=image,source=${IMAGE},target=/image" \
+		"${DOCKER_PREFIX}/sprout-utils-copy-direct:${DOCKER_TAG}" cat "/image/${SOURCE}" >"${TARGET}" 2>/dev/null
+}
+
+copy_from_image_polyfill() {
+	IMAGE="${1}"
+	SOURCE="${2}"
+	TARGET="${3}"
+
+	docker build -t "${IMAGE}-copy-polyfill:${DOCKER_TAG}" --build-arg "TARGET_IMAGE=${IMAGE}:${DOCKER_TAG}" \
+		-f hack/utils/Dockerfile.copy-polyfill hack
+	# note: the -w '//' is a workaround for Git Bash where / is magically rewritten.
+	docker run --rm -i -w '//' "${IMAGE}-copy-polyfill:${DOCKER_TAG}" cat "image/${SOURCE}" >"${TARGET}"
+}
+
+copy_from_image() {
+	if ! copy_from_image_direct "${@}" 2>/dev/null; then
+		echo "[warn] image mounts not supported, falling back to polyfill"
+		copy_from_image_polyfill "${@}"
+	fi
+}
 
 if [ "${SKIP_KERNEL_BUILD}" != "1" ]; then
 	echo "[kernel build] ${TARGET_ARCH} ${RUST_PROFILE}"
@@ -37,26 +65,20 @@ if [ "${SKIP_KERNEL_BUILD}" != "1" ]; then
 		build kernel
 	fi
 
-	docker run --rm -i \
-		--mount="type=image,source=${DOCKER_PREFIX}/sprout-kernel-${TARGET_ARCH}:${DOCKER_TAG},target=/image" \
-		"${DOCKER_PREFIX}/sprout-utils-copy:${DOCKER_TAG}" cat /image/kernel.efi >"${FINAL_DIR}/kernel.efi"
+	copy_from_image "${DOCKER_PREFIX}/sprout-kernel-${TARGET_ARCH}" "kernel.efi" "${FINAL_DIR}/kernel.efi"
 	cp hack/configs/kernel.sprout.toml "${FINAL_DIR}/sprout.toml"
 fi
 
 if [ "${SKIP_VM_BUILD}" != "1" ]; then
 	echo "[vm build] ${TARGET_ARCH} ${RUST_PROFILE}"
 	docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}:${DOCKER_TAG}" -f vm/Dockerfile.ovmf "${FINAL_DIR}"
-	docker run --rm -i \
-		--mount="type=image,source=${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}:${DOCKER_TAG},target=/image" \
-		"${DOCKER_PREFIX}/sprout-utils-copy:${DOCKER_TAG}" cat /image/ovmf.fd >"${FINAL_DIR}/ovmf.fd"
+	copy_from_image "${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}" "ovmf.fd" "${FINAL_DIR}/ovmf.fd"
 fi
 
 if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
 	echo "[sprout build] ${TARGET_ARCH} ${RUST_PROFILE}"
 	docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-${TARGET_ARCH}:${DOCKER_TAG}" --build-arg="RUST_TARGET_SUBDIR=${RUST_TARGET_SUBDIR}" -f Dockerfile .
-	docker run --rm -i \
-		--mount="type=image,source=${DOCKER_PREFIX}/sprout-${TARGET_ARCH}:${DOCKER_TAG},target=/image" \
-		"${DOCKER_PREFIX}/sprout-utils-copy:${DOCKER_TAG}" cat /image/sprout.efi >"${FINAL_DIR}/sprout.efi"
+	copy_from_image "${DOCKER_PREFIX}/sprout-${TARGET_ARCH}" "sprout.efi" "${FINAL_DIR}/sprout.efi"
 	mkdir -p "${FINAL_DIR}/efi/EFI/BOOT"
 	cp "${FINAL_DIR}/sprout.efi" "${FINAL_DIR}/efi/EFI/BOOT/${EFI_NAME}.EFI"
 	if [ -f "${FINAL_DIR}/kernel.efi" ]; then
@@ -68,7 +90,5 @@ fi
 if [ "${SKIP_BOOT_BUILD}" != "1" ]; then
 	echo "[boot build] ${TARGET_ARCH} ${RUST_PROFILE}"
 	docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-boot-${TARGET_ARCH}:${DOCKER_TAG}" --build-arg "EFI_NAME=${EFI_NAME}" -f boot/Dockerfile "${FINAL_DIR}"
-	docker run --rm -i \
-		--mount="type=image,source=${DOCKER_PREFIX}/sprout-boot-${TARGET_ARCH}:${DOCKER_TAG},target=/image" \
-		"${DOCKER_PREFIX}/sprout-utils-copy:${DOCKER_TAG}" cat /image/sprout.img >"${FINAL_DIR}/sprout.img"
+	copy_from_image "${DOCKER_PREFIX}/sprout-boot-${TARGET_ARCH}" "sprout.img" "${FINAL_DIR}/sprout.img"
 fi
