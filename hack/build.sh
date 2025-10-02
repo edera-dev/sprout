@@ -40,6 +40,7 @@ if [ "${SKIP_KERNEL_BUILD}" != "1" ]; then
 	docker run --rm -i \
 		--mount="type=image,source=${DOCKER_PREFIX}/sprout-kernel-${TARGET_ARCH}:${DOCKER_TAG},target=/image" \
 		"${DOCKER_PREFIX}/sprout-utils-copy:${DOCKER_TAG}" cat /image/kernel.efi >"${FINAL_DIR}/kernel.efi"
+	cp hack/configs/kernel.sprout.toml "${FINAL_DIR}/sprout.toml"
 fi
 
 if [ "${SKIP_VM_BUILD}" != "1" ]; then
@@ -61,6 +62,7 @@ if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
 	if [ -f "${FINAL_DIR}/kernel.efi" ]; then
 		cp "${FINAL_DIR}/kernel.efi" "${FINAL_DIR}/efi/EFI/BOOT/KERNEL.EFI"
 	fi
+	cp "hack/configs/kernel.sprout.toml" "${FINAL_DIR}/efi/SPROUT.TOML"
 fi
 
 if [ "${SKIP_BOOT_BUILD}" != "1" ]; then

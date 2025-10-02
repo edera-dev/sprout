@@ -1,0 +1,2 @@
+[[modules]]
+chainloader = { path = "\\EFI\\BOOT\\KERNEL.EFI" }

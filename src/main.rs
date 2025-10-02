@@ -1,10 +1,11 @@
 #![feature(uefi_std)]
-pub mod chainload;
+pub mod config;
+pub mod modules;
 pub mod setup;
-
-const CHAINLOADER_TARGET: &str = "\\EFI\\BOOT\\KERNEL.efi";
 
 fn main() {
     setup::init();
-    chainload::chainload(CHAINLOADER_TARGET);
+
+    let config = config::load();
+    modules::execute(config.modules);
 }

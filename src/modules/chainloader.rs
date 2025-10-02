@@ -1,3 +1,4 @@
+use crate::config::ChainloaderConfiguration;
 use uefi::{
     CString16,
     proto::device_path::{
@@ -19,7 +20,7 @@ fn text_to_device_path(path: &str) -> PoolDevicePath {
         .expect("unable to convert text to device path")
 }
 
-pub fn chainload(path: &str) {
+pub fn chainloader(configuration: ChainloaderConfiguration) {
     let sprout_image = uefi::boot::image_handle();
     let image_device_path_protocol =
         uefi::boot::open_protocol_exclusive::<LoadedImageDevicePath>(sprout_image)
@@ -42,9 +43,9 @@ pub fn chainload(path: &str) {
         .collect::<Vec<_>>()
         .join("/");
     full_path.push('/');
-    full_path.push_str(path);
+    full_path.push_str(&configuration.path);
 
-    println!("chainload: {}", full_path);
+    println!("chainloader: path={}", full_path);
 
     let device_path = text_to_device_path(&full_path);
 
@@ -57,5 +58,4 @@ pub fn chainload(path: &str) {
     )
     .expect("failed to load image");
     uefi::boot::start_image(image).expect("failed to start image");
-    panic!("chainloaded image exited");
 }

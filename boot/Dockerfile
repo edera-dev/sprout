@@ -6,6 +6,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -
       rm -rf /var/lib/apt/lists/*
 WORKDIR /work
 COPY sprout.efi /work/${EFI_NAME}.EFI
+COPY sprout.toml /work/SPROUT.TOML
 COPY kernel.efi /work/KERNEL.EFI
 RUN truncate -s256MiB sprout.img && \
     parted --script sprout.img mklabel gpt > /dev/null 2>&1 && \
@@ -16,6 +17,7 @@ RUN truncate -s256MiB sprout.img && \
     mmd -i sprout.img ::/EFI/BOOT && \
     mcopy -i sprout.img ${EFI_NAME}.EFI ::/EFI/BOOT/ && \
     mcopy -i sprout.img KERNEL.EFI ::/EFI/BOOT/ && \
+    mcopy -i sprout.img SPROUT.TOML ::/ && \
     mv sprout.img /sprout.img
 
 FROM scratch AS final
