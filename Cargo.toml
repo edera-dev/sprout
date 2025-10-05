@@ -7,6 +7,12 @@ edition = "2024"
 toml = "0.9.7"
 log = "0.4.28"
 
+[dependencies.image]
+version = "0.25.6"
+default-features = false
+features = ["png"]
+optional = true
+
 [dependencies.serde]
 version = "1.0.228"
 features = ["derive"]
@@ -19,6 +25,10 @@ features = ["alloc", "logger"]
 lto = "thin"
 strip = "symbols"
 
+[features]
+default = ["splash"]
+splash = ["dep:image"]
+
 [profile.release-debuginfo]
 inherits = "release"
 strip = "none"
@@ -28,3 +38,9 @@ debug = 1
 inherits = "dev"
 strip = "debuginfo"
 debug = 0
+
+[patch.crates-io.simd-adler32]
+path = "deps/simd-adler32"
+
+[patch.crates-io.moxcms]
+path = "deps/moxcms"

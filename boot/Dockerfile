@@ -9,6 +9,7 @@ COPY sprout.efi /work/${EFI_NAME}.EFI
 COPY sprout.toml /work/SPROUT.TOML
 COPY kernel.efi /work/KERNEL.EFI
 COPY shell.efi /work/SHELL.EFI
+COPY edera-splash.png /work/EDERA-SPLASH.PNG
 RUN truncate -s256MiB sprout.img && \
     parted --script sprout.img mklabel gpt > /dev/null 2>&1 && \
     parted --script sprout.img mkpart primary fat32 1MiB 100% > /dev/null 2>&1 && \
@@ -20,6 +21,7 @@ RUN truncate -s256MiB sprout.img && \
     mcopy -i sprout.img KERNEL.EFI ::/EFI/BOOT/ && \
     mcopy -i sprout.img SHELL.EFI ::/EFI/BOOT/ && \
     mcopy -i sprout.img SPROUT.TOML ::/ && \
+    mcopy -i sprout.img EDERA-SPLASH.PNG ::/ && \
     mv sprout.img /sprout.img
 
 FROM scratch AS final

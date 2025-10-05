@@ -24,6 +24,9 @@ pub struct ActionDeclaration {
     pub chainload: Option<ChainloadConfiguration>,
     #[serde(default)]
     pub print: Option<PrintConfiguration>,
+    #[serde(default)]
+    #[cfg(feature = "splash")]
+    pub splash: Option<SplashConfiguration>,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -74,6 +77,19 @@ pub struct ChainloadConfiguration {
 pub struct PrintConfiguration {
     #[serde(default)]
     pub text: String,
+}
+
+#[cfg(feature = "splash")]
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct SplashConfiguration {
+    pub image: String,
+    #[serde(default = "default_splash_time")]
+    pub time: u32,
+}
+
+#[cfg(feature = "splash")]
+pub fn default_splash_time() -> u32 {
+    5
 }
 
 pub fn load() -> RootConfiguration {

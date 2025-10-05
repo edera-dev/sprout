@@ -6,6 +6,10 @@ default-options = "tty=hvc0"
 [actions.welcome]
 print.text = "Welcome to Sprout!"
 
+[actions.splash]
+splash.image = "edera-splash.png"
+splash.time = 5
+
 [actions.chainload-kernel]
 chainload.path = "$path"
 chainload.options = ["$default-options"]
@@ -17,4 +21,4 @@ entry.actions = ["chainload-kernel"]
 values.name = ["kernel.efi"]
 
 [[phases.startup]]
-actions = ["welcome"]
+actions = ["splash", "welcome"]

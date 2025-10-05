@@ -71,6 +71,7 @@ if [ "${SKIP_KERNEL_BUILD}" != "1" ]; then
 
 	copy_from_image "${DOCKER_PREFIX}/sprout-kernel-${TARGET_ARCH}" "kernel.efi" "${FINAL_DIR}/kernel.efi"
 	cp "hack/configs/${SPROUT_CONFIG_NAME}.sprout.toml" "${FINAL_DIR}/sprout.toml"
+	cp "hack/assets/edera-splash.png" "${FINAL_DIR}/edera-splash.png"
 fi
 
 if [ "${SKIP_VM_BUILD}" != "1" ]; then
@@ -100,6 +101,7 @@ if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
 		cp "${FINAL_DIR}/shell.efi" "${FINAL_DIR}/efi/EFI/BOOT/SHELL.EFI"
 	fi
 	cp "${FINAL_DIR}/sprout.toml" "${FINAL_DIR}/efi/SPROUT.TOML"
+	cp "${FINAL_DIR}/edera-splash.png" "${FINAL_DIR}/efi/EDERA-SPLASH.PNG"
 fi
 
 if [ "${SKIP_BOOT_BUILD}" != "1" ]; then
