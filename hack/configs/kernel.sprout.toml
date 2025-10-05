@@ -1,2 +1,14 @@
-[[modules]]
-chainloader = { path = "\\EFI\\BOOT\\KERNEL.EFI", options = ["tty=hvc0"] }
+version = 1
+
+[values]
+default-options = "tty=hvc0"
+
+[actions.chainload-kernel]
+chainload.path = "$path"
+chainload.options = ["$default-options"]
+
+[generators.kernels.matrix]
+entry.title = "Boot Kernel $name"
+entry.values.path = "\\EFI\\BOOT\\$name"
+entry.actions = ["chainload-kernel"]
+values.name = ["kernel.efi"]

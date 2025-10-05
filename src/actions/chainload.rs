@@ -1,18 +1,21 @@
-use crate::config::ChainloaderConfiguration;
+use crate::config::ChainloadConfiguration;
+use crate::context::Context;
 use crate::utils;
 use log::info;
+use std::rc::Rc;
 use uefi::CString16;
 use uefi::proto::device_path::LoadedImageDevicePath;
 use uefi::proto::loaded_image::LoadedImage;
 
-pub fn chainloader(configuration: ChainloaderConfiguration) {
+pub fn chainload(context: Rc<Context>, configuration: &ChainloadConfiguration) {
     let sprout_image = uefi::boot::image_handle();
     let image_device_path_protocol =
         uefi::boot::open_protocol_exclusive::<LoadedImageDevicePath>(sprout_image)
             .expect("unable to open loaded image device path protocol");
 
     let mut full_path = utils::device_path_root(&image_device_path_protocol);
-    full_path.push_str(&configuration.path);
+
+    full_path.push_str(&context.stamp(&configuration.path));
 
     info!("path={}", full_path);
 
@@ -30,7 +33,12 @@ pub fn chainloader(configuration: ChainloaderConfiguration) {
     let mut loaded_image_protocol = uefi::boot::open_protocol_exclusive::<LoadedImage>(image)
         .expect("unable to open loaded image protocol");
 
-    let options = configuration.options.join(" ");
+    let options = configuration
+        .options
+        .iter()
+        .map(|item| context.stamp(item))
+        .collect::<Vec<_>>()
+        .join(" ");
     if !options.is_empty() {
         let options = Box::new(
             CString16::try_from(&options[..])
