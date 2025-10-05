@@ -2,6 +2,7 @@
 
 use crate::config::PhaseConfiguration;
 use crate::context::{Context, RootContext};
+use log::info;
 use std::rc::Rc;
 
 pub mod actions;
@@ -18,10 +19,6 @@ fn phase(context: Rc<Context>, phase: &[PhaseConfiguration]) {
         let context = context.freeze();
 
         for action in item.actions.iter() {
-            let Some(action) = context.root().actions().get(action) else {
-                panic!("unknown action: {}", action);
-            };
-
             actions::execute(context.clone(), action);
         }
     }
@@ -31,6 +28,11 @@ fn main() {
     setup::init();
 
     let config = config::load();
+
+    if config.version > config::latest_version() {
+        panic!("unsupported configuration version: {}", config.version);
+    }
+
     let mut root = RootContext::new();
     root.actions_mut().extend(config.actions.clone());
 
@@ -63,31 +65,18 @@ fn main() {
         final_entries.push((context, entry));
     }
 
-    println!("Boot Entries:");
+    info!("entries:");
     for (index, (context, entry)) in final_entries.iter().enumerate() {
         let title = context.stamp(&entry.title);
-        println!("  Entry {}: {}", index + 1, title);
+        info!("  entry {}: {}", index + 1, title);
     }
 
-    // let mut input = String::new();
-    // std::io::stdin().read_line(&mut input).expect("failed to read line");
-    // let input = input.trim();
-    // let Some(index) = input.parse::<usize>().ok().and_then(|value| if value > final_entries.len() {
-    //     None
-    // } else {
-    //     Some(value)
-    // }) else {
-    //     eprintln!("invalid entry number");
-    //     continue;
-    // };
     let index = 1;
 
     let (context, entry) = &final_entries[index - 1];
 
     for action in &entry.actions {
-        let Some(action) = context.root().actions().get(action) else {
-            panic!("unknown action: {}", action);
-        };
+        let action = context.stamp(action);
         actions::execute(context.clone(), action);
     }
 }

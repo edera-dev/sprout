@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct RootConfiguration {
-    #[serde(default = "default_version")]
+    #[serde(default = "latest_version")]
     pub version: u32,
     #[serde(default)]
     pub values: BTreeMap<String, String>,
@@ -22,6 +22,8 @@ pub struct RootConfiguration {
 pub struct ActionDeclaration {
     #[serde(default)]
     pub chainload: Option<ChainloadConfiguration>,
+    #[serde(default)]
+    pub print: Option<PrintConfiguration>,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -68,11 +70,17 @@ pub struct ChainloadConfiguration {
     pub options: Vec<String>,
 }
 
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct PrintConfiguration {
+    #[serde(default)]
+    pub text: String,
+}
+
 pub fn load() -> RootConfiguration {
     let content = utils::read_file_contents("sprout.toml");
     toml::from_slice(&content).expect("unable to parse sprout.toml file")
 }
 
-pub fn default_version() -> u32 {
+pub fn latest_version() -> u32 {
     1
 }

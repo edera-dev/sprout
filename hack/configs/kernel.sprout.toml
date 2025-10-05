@@ -3,6 +3,9 @@ version = 1
 [values]
 default-options = "tty=hvc0"
 
+[actions.welcome]
+print.text = "Welcome to Sprout!"
+
 [actions.chainload-kernel]
 chainload.path = "$path"
 chainload.options = ["$default-options"]
@@ -12,3 +15,6 @@ entry.title = "Boot Kernel $name"
 entry.values.path = "\\EFI\\BOOT\\$name"
 entry.actions = ["chainload-kernel"]
 values.name = ["kernel.efi"]
+
+[[phases.startup]]
+actions = ["welcome"]
