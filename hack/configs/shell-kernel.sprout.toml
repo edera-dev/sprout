@@ -1,2 +1,5 @@
 [[modules]]
+chainloader = { path = "\\EFI\\BOOT\\SHELL.EFI" }
+
+[[modules]]
 chainloader = { path = "\\EFI\\BOOT\\KERNEL.EFI", options = ["tty=hvc0"] }

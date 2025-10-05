@@ -10,6 +10,10 @@ if [ "${TARGET_ARCH}" = "aarch64" ]; then
 	EFI_NAME="BOOTAA64"
 fi
 
+if [ -z "${SPROUT_CONFIG_NAME}" ]; then
+	SPROUT_CONFIG_NAME="kernel"
+fi
+
 echo "[build] ${TARGET_ARCH} ${RUST_PROFILE}"
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -66,7 +70,7 @@ if [ "${SKIP_KERNEL_BUILD}" != "1" ]; then
 	fi
 
 	copy_from_image "${DOCKER_PREFIX}/sprout-kernel-${TARGET_ARCH}" "kernel.efi" "${FINAL_DIR}/kernel.efi"
-	cp hack/configs/kernel.sprout.toml "${FINAL_DIR}/sprout.toml"
+	cp "hack/configs/${SPROUT_CONFIG_NAME}.sprout.toml" "${FINAL_DIR}/sprout.toml"
 fi
 
 if [ "${SKIP_VM_BUILD}" != "1" ]; then
@@ -78,8 +82,15 @@ fi
 
 if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
 	echo "[sprout build] ${TARGET_ARCH} ${RUST_PROFILE}"
-	docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-${TARGET_ARCH}:${DOCKER_TAG}" --build-arg="RUST_TARGET_SUBDIR=${RUST_TARGET_SUBDIR}" -f Dockerfile .
-	copy_from_image "${DOCKER_PREFIX}/sprout-${TARGET_ARCH}" "sprout.efi" "${FINAL_DIR}/sprout.efi"
+
+	if [ "${SPROUT_BUILD_LOCAL}" = "1" ]; then
+		cargo build --target "${RUST_TARGET}" --profile "${RUST_PROFILE}" --bin sprout
+		cp "target/${RUST_TARGET}/${RUST_TARGET_SUBDIR}/sprout.efi" "${FINAL_DIR}/sprout.efi"
+	else
+		docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-${TARGET_ARCH}:${DOCKER_TAG}" --build-arg="RUST_TARGET_SUBDIR=${RUST_TARGET_SUBDIR}" -f Dockerfile .
+		copy_from_image "${DOCKER_PREFIX}/sprout-${TARGET_ARCH}" "sprout.efi" "${FINAL_DIR}/sprout.efi"
+	fi
+
 	mkdir -p "${FINAL_DIR}/efi/EFI/BOOT"
 	cp "${FINAL_DIR}/sprout.efi" "${FINAL_DIR}/efi/EFI/BOOT/${EFI_NAME}.EFI"
 	if [ -f "${FINAL_DIR}/kernel.efi" ]; then
@@ -88,7 +99,7 @@ if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
 	if [ -f "${FINAL_DIR}/shell.efi" ]; then
 		cp "${FINAL_DIR}/shell.efi" "${FINAL_DIR}/efi/EFI/BOOT/SHELL.EFI"
 	fi
-	cp "hack/configs/kernel.sprout.toml" "${FINAL_DIR}/efi/SPROUT.TOML"
+	cp "${FINAL_DIR}/sprout.toml" "${FINAL_DIR}/efi/SPROUT.TOML"
 fi
 
 if [ "${SKIP_BOOT_BUILD}" != "1" ]; then
