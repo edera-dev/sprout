@@ -1,7 +1,7 @@
 version = 1
 
 [values]
-default-options = "tty=hvc0"
+default-options = "console=hvc0"
 
 [actions.welcome]
 print.text = "Welcome to Sprout!"
