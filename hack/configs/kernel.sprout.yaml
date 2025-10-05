@@ -1,0 +1,29 @@
+version: 1
+
+values:
+  default-options: "tty=hvc0"
+
+phases:
+  startup:
+  - actions: ["welcome"]
+
+actions:
+  welcome:
+    print:
+      text: "Welcome to Sprout!"
+  chainload-kernel:
+    chainload:
+      path: "$path"
+      options:
+      - "$default-options"
+
+generators:
+  kernels:
+    matrix:
+      entry:
+        title: "Boot Kernel $name"
+        values:
+          path: "\\EFI\\BOOT\\$name"
+        actions: ["chainload-kernel"]
+      values:
+        name: ["kernel.efi"]
