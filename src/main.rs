@@ -54,19 +54,40 @@ fn main() {
         }
     }
 
-    println!("{} entries", all_entries.len());
-    for (index, (context, entry)) in all_entries.iter().enumerate() {
+    let mut final_entries = Vec::new();
+    for (context, entry) in all_entries {
         let mut context = context.fork();
         context.insert(&entry.values);
         let context = context.finalize().freeze();
 
-        println!("Entry {}:", index + 1);
-        println!("  Title: {}", entry.title);
-        println!("  Actions: {:?}", entry.actions);
-        println!("  Values: {:?}", context.all_values());
+        final_entries.push((context, entry));
     }
 
-    loop {
-        std::thread::sleep(std::time::Duration::from_secs(5));
+    println!("Boot Entries:");
+    for (index, (context, entry)) in final_entries.iter().enumerate() {
+        let title = context.stamp(&entry.title);
+        println!("  Entry {}: {}", index + 1, title);
+    }
+
+    // let mut input = String::new();
+    // std::io::stdin().read_line(&mut input).expect("failed to read line");
+    // let input = input.trim();
+    // let Some(index) = input.parse::<usize>().ok().and_then(|value| if value > final_entries.len() {
+    //     None
+    // } else {
+    //     Some(value)
+    // }) else {
+    //     eprintln!("invalid entry number");
+    //     continue;
+    // };
+    let index = 1;
+
+    let (context, entry) = &final_entries[index - 1];
+
+    for action in &entry.actions {
+        let Some(action) = context.root().actions().get(action) else {
+            panic!("unknown action: {}", action);
+        };
+        actions::execute(context.clone(), action);
     }
 }
