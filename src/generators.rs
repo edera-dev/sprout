@@ -1,6 +1,8 @@
 use crate::config::EntryDeclaration;
-use crate::context::Context;
+use crate::context::SproutContext;
 use crate::generators::matrix::MatrixConfiguration;
+use anyhow::Result;
+use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 
@@ -13,12 +15,12 @@ pub struct GeneratorDeclaration {
 }
 
 pub fn generate(
-    context: Rc<Context>,
+    context: Rc<SproutContext>,
     generator: &GeneratorDeclaration,
-) -> Vec<(Rc<Context>, EntryDeclaration)> {
+) -> Result<Vec<(Rc<SproutContext>, EntryDeclaration)>> {
     if let Some(matrix) = &generator.matrix {
         matrix::generate(context, matrix)
     } else {
-        panic!("unknown action configuration");
+        bail!("unknown action configuration");
     }
 }

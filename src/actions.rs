@@ -1,4 +1,5 @@
-use crate::context::Context;
+use crate::context::SproutContext;
+use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 
@@ -19,25 +20,25 @@ pub struct ActionDeclaration {
     pub splash: Option<splash::SplashConfiguration>,
 }
 
-pub fn execute(context: Rc<Context>, name: impl AsRef<str>) {
+pub fn execute(context: Rc<SproutContext>, name: impl AsRef<str>) -> Result<()> {
     let Some(action) = context.root().actions().get(name.as_ref()) else {
-        panic!("unknown action: {}", name.as_ref());
+        bail!("unknown action '{}'", name.as_ref());
     };
     let context = context.finalize().freeze();
 
     if let Some(chainload) = &action.chainload {
-        chainload::chainload(context.clone(), chainload);
-        return;
+        chainload::chainload(context.clone(), chainload)?;
+        return Ok(());
     } else if let Some(print) = &action.print {
-        print::print(context.clone(), print);
-        return;
+        print::print(context.clone(), print)?;
+        return Ok(());
     }
 
     #[cfg(feature = "splash")]
     if let Some(splash) = &action.splash {
-        splash::splash(context.clone(), splash);
-        return;
+        splash::splash(context.clone(), splash)?;
+        return Ok(());
     }
 
-    panic!("unknown action configuration");
+    bail!("unknown action configuration");
 }

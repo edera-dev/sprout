@@ -1,5 +1,6 @@
-use crate::context::Context;
+use crate::context::SproutContext;
 use crate::utils;
+use anyhow::{Context, Result, bail};
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
@@ -14,19 +15,19 @@ pub struct ChainloadConfiguration {
     pub options: Vec<String>,
 }
 
-pub fn chainload(context: Rc<Context>, configuration: &ChainloadConfiguration) {
+pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfiguration) -> Result<()> {
     let sprout_image = uefi::boot::image_handle();
     let image_device_path_protocol =
         uefi::boot::open_protocol_exclusive::<LoadedImageDevicePath>(sprout_image)
-            .expect("unable to open loaded image device path protocol");
+            .context("unable to open loaded image device path protocol")?;
 
-    let mut full_path = utils::device_path_root(&image_device_path_protocol);
+    let mut full_path = utils::device_path_root(&image_device_path_protocol)?;
 
     full_path.push_str(&context.stamp(&configuration.path));
 
     info!("path={}", full_path);
 
-    let device_path = utils::text_to_device_path(&full_path);
+    let device_path = utils::text_to_device_path(&full_path)?;
 
     let image = uefi::boot::load_image(
         sprout_image,
@@ -35,10 +36,10 @@ pub fn chainload(context: Rc<Context>, configuration: &ChainloadConfiguration) {
             boot_policy: uefi::proto::BootPolicy::ExactMatch,
         },
     )
-    .expect("failed to load image");
+    .context("failed to load image")?;
 
     let mut loaded_image_protocol = uefi::boot::open_protocol_exclusive::<LoadedImage>(image)
-        .expect("unable to open loaded image protocol");
+        .context("unable to open loaded image protocol")?;
 
     let options = configuration
         .options
@@ -49,12 +50,12 @@ pub fn chainload(context: Rc<Context>, configuration: &ChainloadConfiguration) {
     if !options.is_empty() {
         let options = Box::new(
             CString16::try_from(&options[..])
-                .expect("unable to convert chainloader options to CString16"),
+                .context("unable to convert chainloader options to CString16")?,
         );
         info!("options={}", options);
 
         if options.num_bytes() > u32::MAX as usize {
-            panic!("chainloader options too large");
+            bail!("chainloader options too large");
         }
 
         // SAFETY: options size is checked to validate it is safe to pass.
@@ -68,5 +69,6 @@ pub fn chainload(context: Rc<Context>, configuration: &ChainloadConfiguration) {
 
     let (base, size) = loaded_image_protocol.info();
     info!("loaded image base={:#x} size={:#x}", base.addr(), size);
-    uefi::boot::start_image(image).expect("failed to start image");
+    uefi::boot::start_image(image).context("failed to start image")?;
+    Ok(())
 }

@@ -21,13 +21,13 @@ impl RootContext {
     }
 }
 
-pub struct Context {
+pub struct SproutContext {
     root: Rc<RootContext>,
-    parent: Option<Rc<Context>>,
+    parent: Option<Rc<SproutContext>>,
     values: BTreeMap<String, String>,
 }
 
-impl Context {
+impl SproutContext {
     pub fn new(root: RootContext) -> Self {
         Self {
             root: Rc::new(root),
@@ -80,7 +80,7 @@ impl Context {
         }
     }
 
-    pub fn fork(self: &Rc<Context>) -> Self {
+    pub fn fork(self: &Rc<SproutContext>) -> Self {
         Self {
             root: self.root.clone(),
             parent: Some(self.clone()),
@@ -88,11 +88,11 @@ impl Context {
         }
     }
 
-    pub fn freeze(self) -> Rc<Context> {
+    pub fn freeze(self) -> Rc<SproutContext> {
         Rc::new(self)
     }
 
-    pub fn finalize(&self) -> Context {
+    pub fn finalize(&self) -> SproutContext {
         let mut current_values = self.all_values();
 
         loop {

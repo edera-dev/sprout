@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use uefi::proto::console::gop::{BltOp, BltPixel, BltRegion, GraphicsOutput};
 
 pub struct Framebuffer {
@@ -19,13 +20,14 @@ impl Framebuffer {
         self.pixels.get_mut(y * self.width + x)
     }
 
-    pub fn blit(&self, gop: &mut GraphicsOutput) {
+    pub fn blit(&self, gop: &mut GraphicsOutput) -> Result<()> {
         gop.blt(BltOp::BufferToVideo {
             buffer: &self.pixels,
             src: BltRegion::Full,
             dest: (0, 0),
             dims: (self.width, self.height),
         })
-        .expect("failed to blit framebuffer");
+        .context("failed to blit framebuffer")?;
+        Ok(())
     }
 }

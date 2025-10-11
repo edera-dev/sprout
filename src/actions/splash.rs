@@ -1,6 +1,7 @@
-use crate::context::Context;
+use crate::context::SproutContext;
 use crate::utils::framebuffer::Framebuffer;
 use crate::utils::read_file_contents;
+use anyhow::{Context, Result};
 use image::imageops::{FilterType, resize};
 use image::math::Rect;
 use image::{DynamicImage, ImageBuffer, ImageFormat, ImageReader, Rgba};
@@ -22,11 +23,11 @@ pub fn default_splash_time() -> u32 {
     5
 }
 
-fn setup_graphics() -> ScopedProtocol<GraphicsOutput> {
+fn setup_graphics() -> Result<ScopedProtocol<GraphicsOutput>> {
     let gop_handle = uefi::boot::get_handle_for_protocol::<GraphicsOutput>()
-        .expect("failed to get graphics output");
+        .context("failed to get graphics output")?;
     uefi::boot::open_protocol_exclusive::<GraphicsOutput>(gop_handle)
-        .expect("failed to open graphics output")
+        .context("failed to open graphics output")
 }
 
 fn fit_to_frame(image: &DynamicImage, frame: Rect) -> Rect {
@@ -67,8 +68,8 @@ fn resize_to_fit(image: &DynamicImage, frame: Rect) -> ImageBuffer<Rgba<u8>, Vec
     resize(&image, frame.width, frame.height, FilterType::Lanczos3)
 }
 
-fn draw(image: DynamicImage) {
-    let mut gop = setup_graphics();
+fn draw(image: DynamicImage) -> Result<()> {
+    let mut gop = setup_graphics()?;
     let (width, height) = gop.current_mode_info().resolution();
     let display_frame = Rect {
         x: 0,
@@ -89,15 +90,17 @@ fn draw(image: DynamicImage) {
         fb.blue = pixel[2];
     }
 
-    framebuffer.blit(&mut gop);
+    framebuffer.blit(&mut gop)?;
+    Ok(())
 }
 
-pub fn splash(context: Rc<Context>, configuration: &SplashConfiguration) {
+pub fn splash(context: Rc<SproutContext>, configuration: &SplashConfiguration) -> Result<()> {
     let image = context.stamp(&configuration.image);
-    let image = read_file_contents(&image);
+    let image = read_file_contents(&image)?;
     let image = ImageReader::with_format(Cursor::new(image), ImageFormat::Png)
         .decode()
-        .expect("failed to decode splash image");
-    draw(image);
+        .context("failed to decode splash image")?;
+    draw(image)?;
     std::thread::sleep(Duration::from_secs(configuration.time as u64));
+    Ok(())
 }

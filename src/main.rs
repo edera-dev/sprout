@@ -1,7 +1,8 @@
 #![feature(uefi_std)]
 
 use crate::config::PhaseConfiguration;
-use crate::context::{Context, RootContext};
+use crate::context::{RootContext, SproutContext};
+use anyhow::{Context, Result, bail};
 use log::info;
 use std::rc::Rc;
 
@@ -12,35 +13,37 @@ pub mod generators;
 pub mod setup;
 pub mod utils;
 
-fn phase(context: Rc<Context>, phase: &[PhaseConfiguration]) {
+fn phase(context: Rc<SproutContext>, phase: &[PhaseConfiguration]) -> Result<()> {
     for item in phase {
         let mut context = context.fork();
         context.insert(&item.values);
         let context = context.freeze();
 
         for action in item.actions.iter() {
-            actions::execute(context.clone(), action);
+            actions::execute(context.clone(), action)
+                .context(format!("failed to execute action '{}'", action))?;
         }
     }
+    Ok(())
 }
 
-fn main() {
-    setup::init();
+fn main() -> Result<()> {
+    setup::init()?;
 
-    let config = config::load();
+    let config = config::load()?;
 
-    if config.version > config::latest_version() {
-        panic!("unsupported configuration version: {}", config.version);
+    if config.version != config::latest_version() {
+        bail!("unsupported configuration version: {}", config.version);
     }
 
     let mut root = RootContext::new();
     root.actions_mut().extend(config.actions.clone());
 
-    let mut context = Context::new(root);
+    let mut context = SproutContext::new(root);
     context.insert(&config.values);
     let context = context.freeze();
 
-    phase(context.clone(), &config.phases.startup);
+    phase(context.clone(), &config.phases.startup)?;
 
     let mut all_entries = Vec::new();
 
@@ -51,7 +54,7 @@ fn main() {
     for (_name, generator) in config.generators {
         let context = context.fork().freeze();
 
-        for entry in generators::generate(context.clone(), &generator) {
+        for entry in generators::generate(context.clone(), &generator)? {
             all_entries.push(entry);
         }
     }
@@ -77,6 +80,8 @@ fn main() {
 
     for action in &entry.actions {
         let action = context.stamp(action);
-        actions::execute(context.clone(), action);
+        actions::execute(context.clone(), &action)
+            .context(format!("failed to execute action '{}'", action))?;
     }
+    Ok(())
 }

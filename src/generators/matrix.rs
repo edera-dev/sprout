@@ -1,5 +1,6 @@
 use crate::config::EntryDeclaration;
-use crate::context::Context;
+use crate::context::SproutContext;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -34,9 +35,9 @@ fn build_matrix(input: &BTreeMap<String, Vec<String>>) -> Vec<BTreeMap<String, S
 }
 
 pub fn generate(
-    context: Rc<Context>,
+    context: Rc<SproutContext>,
     matrix: &MatrixConfiguration,
-) -> Vec<(Rc<Context>, EntryDeclaration)> {
+) -> Result<Vec<(Rc<SproutContext>, EntryDeclaration)>> {
     let combinations = build_matrix(&matrix.values);
     let mut entries = Vec::new();
 
@@ -55,5 +56,5 @@ pub fn generate(
         entries.push((context, entry));
     }
 
-    entries
+    Ok(entries)
 }

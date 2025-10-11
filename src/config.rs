@@ -1,6 +1,8 @@
 use crate::actions::ActionDeclaration;
 use crate::generators::GeneratorDeclaration;
 use crate::utils;
+use anyhow::Context;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -43,9 +45,12 @@ pub struct PhaseConfiguration {
     pub values: BTreeMap<String, String>,
 }
 
-pub fn load() -> RootConfiguration {
-    let content = utils::read_file_contents("sprout.toml");
-    toml::from_slice(&content).expect("unable to parse sprout.toml file")
+pub fn load() -> Result<RootConfiguration> {
+    let content =
+        utils::read_file_contents("sprout.toml").context("unable to read sprout.toml file")?;
+    let config: RootConfiguration =
+        toml::from_slice(&content).context("unable to parse sprout.toml file")?;
+    Ok(config)
 }
 
 pub fn latest_version() -> u32 {
