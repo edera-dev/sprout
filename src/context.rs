@@ -1,11 +1,10 @@
-use crate::config::{ActionDeclaration, EntryDeclaration};
+use crate::actions::ActionDeclaration;
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 #[derive(Default)]
 pub struct RootContext {
     actions: BTreeMap<String, ActionDeclaration>,
-    entries: BTreeMap<String, (Rc<Context>, EntryDeclaration)>,
 }
 
 impl RootContext {
@@ -19,14 +18,6 @@ impl RootContext {
 
     pub fn actions_mut(&mut self) -> &mut BTreeMap<String, ActionDeclaration> {
         &mut self.actions
-    }
-
-    pub fn entries(&self) -> &BTreeMap<String, (Rc<Context>, EntryDeclaration)> {
-        &self.entries
-    }
-
-    pub fn entries_mut(&mut self) -> &mut BTreeMap<String, (Rc<Context>, EntryDeclaration)> {
-        &mut self.entries
     }
 }
 

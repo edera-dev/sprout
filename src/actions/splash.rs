@@ -1,43 +1,25 @@
-use crate::config::SplashConfiguration;
 use crate::context::Context;
+use crate::utils::framebuffer::Framebuffer;
 use crate::utils::read_file_contents;
 use image::imageops::{FilterType, resize};
 use image::math::Rect;
 use image::{DynamicImage, ImageBuffer, ImageFormat, ImageReader, Rgba};
+use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use std::rc::Rc;
 use std::time::Duration;
 use uefi::boot::ScopedProtocol;
-use uefi::proto::console::gop::{BltOp, BltPixel, BltRegion, GraphicsOutput};
+use uefi::proto::console::gop::GraphicsOutput;
 
-struct Framebuffer {
-    width: usize,
-    height: usize,
-    pixels: Vec<BltPixel>,
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct SplashConfiguration {
+    pub image: String,
+    #[serde(default = "default_splash_time")]
+    pub time: u32,
 }
 
-impl Framebuffer {
-    fn new(width: usize, height: usize) -> Self {
-        Framebuffer {
-            width,
-            height,
-            pixels: vec![BltPixel::new(0, 0, 0); width * height],
-        }
-    }
-
-    fn pixel(&mut self, x: usize, y: usize) -> Option<&mut BltPixel> {
-        self.pixels.get_mut(y * self.width + x)
-    }
-
-    fn blit(&self, gop: &mut GraphicsOutput) {
-        gop.blt(BltOp::BufferToVideo {
-            buffer: &self.pixels,
-            src: BltRegion::Full,
-            dest: (0, 0),
-            dims: (self.width, self.height),
-        })
-        .expect("failed to blit framebuffer");
-    }
+pub fn default_splash_time() -> u32 {
+    5
 }
 
 fn setup_graphics() -> ScopedProtocol<GraphicsOutput> {

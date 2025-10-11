@@ -4,6 +4,8 @@ use uefi::proto::device_path::text::{AllowShortcuts, DevicePathFromText, Display
 use uefi::proto::device_path::{DevicePath, PoolDevicePath};
 use uefi::proto::media::fs::SimpleFileSystem;
 
+pub mod framebuffer;
+
 pub fn text_to_device_path(path: &str) -> PoolDevicePath {
     let path = CString16::try_from(path).expect("unable to convert path to CString16");
     let device_path_from_text = uefi::boot::open_protocol_exclusive::<DevicePathFromText>(

@@ -1,7 +1,16 @@
-use crate::config::{EntryDeclaration, MatrixConfiguration};
+use crate::config::EntryDeclaration;
 use crate::context::Context;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::rc::Rc;
+
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct MatrixConfiguration {
+    #[serde(default)]
+    pub entry: EntryDeclaration,
+    #[serde(default)]
+    pub values: BTreeMap<String, Vec<String>>,
+}
 
 fn build_matrix(input: &BTreeMap<String, Vec<String>>) -> Vec<BTreeMap<String, String>> {
     let items: Vec<(String, Vec<String>)> = input.clone().into_iter().collect();

@@ -1,11 +1,18 @@
-use crate::config::ChainloadConfiguration;
 use crate::context::Context;
 use crate::utils;
 use log::info;
+use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use uefi::CString16;
 use uefi::proto::device_path::LoadedImageDevicePath;
 use uefi::proto::loaded_image::LoadedImage;
+
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct ChainloadConfiguration {
+    pub path: String,
+    #[serde(default)]
+    pub options: Vec<String>,
+}
 
 pub fn chainload(context: Rc<Context>, configuration: &ChainloadConfiguration) {
     let sprout_image = uefi::boot::image_handle();

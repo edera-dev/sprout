@@ -1,3 +1,5 @@
+use crate::actions::ActionDeclaration;
+use crate::generators::GeneratorDeclaration;
 use crate::utils;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -19,29 +21,12 @@ pub struct RootConfiguration {
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
-pub struct ActionDeclaration {
-    #[serde(default)]
-    pub chainload: Option<ChainloadConfiguration>,
-    #[serde(default)]
-    pub print: Option<PrintConfiguration>,
-    #[serde(default)]
-    #[cfg(feature = "splash")]
-    pub splash: Option<SplashConfiguration>,
-}
-
-#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct EntryDeclaration {
     pub title: String,
     #[serde(default)]
     pub actions: Vec<String>,
     #[serde(default)]
     pub values: BTreeMap<String, String>,
-}
-
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct GeneratorDeclaration {
-    #[serde(default)]
-    pub matrix: Option<MatrixConfiguration>,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -56,40 +41,6 @@ pub struct PhaseConfiguration {
     pub actions: Vec<String>,
     #[serde(default)]
     pub values: BTreeMap<String, String>,
-}
-
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct MatrixConfiguration {
-    #[serde(default)]
-    pub entry: EntryDeclaration,
-    #[serde(default)]
-    pub values: BTreeMap<String, Vec<String>>,
-}
-
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct ChainloadConfiguration {
-    pub path: String,
-    #[serde(default)]
-    pub options: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct PrintConfiguration {
-    #[serde(default)]
-    pub text: String,
-}
-
-#[cfg(feature = "splash")]
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct SplashConfiguration {
-    pub image: String,
-    #[serde(default = "default_splash_time")]
-    pub time: u32,
-}
-
-#[cfg(feature = "splash")]
-pub fn default_splash_time() -> u32 {
-    5
 }
 
 pub fn load() -> RootConfiguration {

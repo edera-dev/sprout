@@ -1,4 +1,5 @@
 use crate::context::Context;
+use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 
 pub mod chainload;
@@ -6,6 +7,17 @@ pub mod print;
 
 #[cfg(feature = "splash")]
 pub mod splash;
+
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct ActionDeclaration {
+    #[serde(default)]
+    pub chainload: Option<chainload::ChainloadConfiguration>,
+    #[serde(default)]
+    pub print: Option<print::PrintConfiguration>,
+    #[serde(default)]
+    #[cfg(feature = "splash")]
+    pub splash: Option<splash::SplashConfiguration>,
+}
 
 pub fn execute(context: Rc<Context>, name: impl AsRef<str>) {
     let Some(action) = context.root().actions().get(name.as_ref()) else {
