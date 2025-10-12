@@ -27,14 +27,9 @@ else
 		-chardev stdio,id=stdio0 \
 		-device virtconsole,chardev=stdio0,id=console0
 
-	if [ "${TARGET_ARCH}" = "x86_64" ]; then
-		set -- "${@}" \
-			-vga std
-	else
-		set -- "${@}" \
-			-vga none \
-			-device "virtio-gpu,edid=on,xres=1024,yres=768"
-	fi
+	set -- "${@}" \
+		-vga none \
+		-device "virtio-gpu,edid=on,xres=1024,yres=768"
 fi
 
 rm -f "${FINAL_DIR}/ovmf-boot.fd"

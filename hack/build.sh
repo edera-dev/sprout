@@ -79,6 +79,8 @@ if [ "${SKIP_VM_BUILD}" != "1" ]; then
 	docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}:${DOCKER_TAG}" -f vm/Dockerfile.ovmf "${FINAL_DIR}"
 	copy_from_image "${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}" "ovmf.fd" "${FINAL_DIR}/ovmf.fd"
 	copy_from_image "${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}" "shell.efi" "${FINAL_DIR}/shell.efi"
+	docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-initramfs-${TARGET_ARCH}:${DOCKER_TAG}" -f vm/Dockerfile.initramfs "${FINAL_DIR}"
+	copy_from_image "${DOCKER_PREFIX}/sprout-initramfs-${TARGET_ARCH}" "initramfs" "${FINAL_DIR}/initramfs"
 fi
 
 if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
@@ -102,6 +104,7 @@ if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
 	fi
 	cp "${FINAL_DIR}/sprout.toml" "${FINAL_DIR}/efi/SPROUT.TOML"
 	cp "${FINAL_DIR}/edera-splash.png" "${FINAL_DIR}/efi/EDERA-SPLASH.PNG"
+	cp "${FINAL_DIR}/initramfs" "${FINAL_DIR}/efi/INITRAMFS"
 fi
 
 if [ "${SKIP_BOOT_BUILD}" != "1" ]; then

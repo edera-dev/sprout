@@ -1,18 +1,21 @@
 version = 1
 
 [values]
-default-options = "console=hvc0"
+default-options = "initrd=\\initramfs init=/bin/sh console=hvc0"
 
 [actions.welcome]
 print.text = "Welcome to Sprout!"
 
 [actions.splash]
 splash.image = "edera-splash.png"
-splash.time = 5
+splash.time = 1
 
 [actions.chainload-kernel]
 chainload.path = "$path"
 chainload.options = ["$default-options"]
+
+[actions.chainload-shell]
+chainload.path = "\\EFI\\BOOT\\shell.efi"
 
 [generators.kernels.matrix]
 entry.title = "Boot Kernel $name"
@@ -21,4 +24,4 @@ entry.actions = ["chainload-kernel"]
 values.name = ["kernel.efi"]
 
 [[phases.startup]]
-actions = ["splash", "welcome"]
+actions = ["welcome", "splash"]
