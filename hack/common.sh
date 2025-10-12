@@ -6,8 +6,13 @@ DOCKER_PREFIX="ghcr.io/edera-dev/sprout"
 DEFAULT_RUST_PROFILE="release"
 DEFAULT_DOCKER_TAG="latest"
 
+HOST_ARCH="$(uname -m)"
+
+[ "${HOST_ARCH}" = "arm64" ] && HOST_ARCH="aarch64"
+[ "${HOST_ARCH}" = "amd64" ] && HOST_ARCH="x86_64"
+
 [ -z "${TARGET_ARCH}" ] && TARGET_ARCH="${1}"
-{ [ -z "${TARGET_ARCH}" ] || [ "${TARGET_ARCH}" = "native" ]; } && TARGET_ARCH="$(uname -m)"
+{ [ -z "${TARGET_ARCH}" ] || [ "${TARGET_ARCH}" = "native" ]; } && TARGET_ARCH="${HOST_ARCH}"
 [ -z "${RUST_PROFILE}" ] && RUST_PROFILE="${2}"
 [ -z "${RUST_PROFILE}" ] && RUST_PROFILE="${DEFAULT_RUST_PROFILE}"
 
@@ -29,3 +34,9 @@ RUST_TARGET="${TARGET_ARCH}-unknown-uefi"
 [ -z "${DOCKER_TAG}" ] && DOCKER_TAG="${DEFAULT_DOCKER_TAG}"
 DOCKER_TARGET="linux/${TARGET_ARCH}"
 FINAL_DIR="target/final/${TARGET_ARCH}"
+
+if [ -z "${QEMU_ACCEL}" ] && [ "${TARGET_ARCH}" = "${HOST_ARCH}" ] &&
+	[ -f "/proc/cpuinfo" ] &&
+	grep -E '^flags.*:.+ vmx .*' /proc/cpuinfo >/dev/null; then
+	QEMU_ACCEL="kvm"
+fi
