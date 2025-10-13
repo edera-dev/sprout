@@ -1,12 +1,12 @@
 #!/bin/sh
 set -e
 
-cd "$(dirname "${0}")/.." || exit 1
+cd "$(dirname "${0}")/../.." || exit 1
 
 . "hack/common.sh"
 
 if [ "${SKIP_BUILD}" != "1" ]; then
-	./hack/build.sh "${TARGET_ARCH}" "${RUST_PROFILE}"
+	./hack/dev/build.sh "${TARGET_ARCH}" "${RUST_PROFILE}"
 fi
 
 clear

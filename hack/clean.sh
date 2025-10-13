@@ -19,6 +19,8 @@ if command -v docker >/dev/null 2>&1; then
 	delete_image sprout-utils-copy-polyfill || true
 	delete_image sprout-ovmf-x86_64 || true
 	delete_image sprout-ovmf-aarch64 || true
+	delete_image sprout-initramfs-x86_64 || true
+	delete_image sprout-initramfs-aarch64 || true
 	delete_image sprout-kernel-x86_64 || true
 	delete_image sprout-kernel-aarch64 || true
 	delete_image sprout-kernel-build-x86_64 || true
