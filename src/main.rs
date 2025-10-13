@@ -61,6 +61,8 @@ fn main() -> Result<()> {
     context.insert(&config.values);
     let context = context.freeze();
 
+    phase(context.clone(), &config.phases.early).context("failed to execute early phase")?;
+
     drivers::load(context.clone(), &config.drivers).context("failed to load drivers")?;
 
     let mut extracted = BTreeMap::new();
@@ -74,7 +76,7 @@ fn main() -> Result<()> {
     context.insert(&extracted);
     let context = context.freeze();
 
-    phase(context.clone(), &config.phases.startup)?;
+    phase(context.clone(), &config.phases.startup).context("failed to execute startup phase")?;
 
     let mut all_entries = Vec::new();
 
@@ -104,6 +106,8 @@ fn main() -> Result<()> {
         let title = context.stamp(&entry.title);
         info!("  entry {}: {}", index + 1, title);
     }
+
+    phase(context.clone(), &config.phases.late).context("failed to execute late phase")?;
 
     let index = 1;
 

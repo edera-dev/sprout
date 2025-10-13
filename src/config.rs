@@ -42,7 +42,11 @@ pub struct EntryDeclaration {
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct PhasesConfiguration {
     #[serde(default)]
+    pub early: Vec<PhaseConfiguration>,
+    #[serde(default)]
     pub startup: Vec<PhaseConfiguration>,
+    #[serde(default)]
+    pub late: Vec<PhaseConfiguration>,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]

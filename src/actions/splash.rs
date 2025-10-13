@@ -20,7 +20,7 @@ pub struct SplashConfiguration {
 }
 
 pub fn default_splash_time() -> u32 {
-    5
+    0
 }
 
 fn setup_graphics() -> Result<ScopedProtocol<GraphicsOutput>> {
