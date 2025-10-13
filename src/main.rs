@@ -4,12 +4,17 @@ use crate::config::PhaseConfiguration;
 use crate::context::{RootContext, SproutContext};
 use anyhow::{Context, Result, bail};
 use log::info;
+use std::collections::BTreeMap;
+use std::ops::Deref;
 use std::rc::Rc;
+use uefi::proto::device_path::LoadedImageDevicePath;
+use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
 
 pub mod actions;
 pub mod config;
 pub mod context;
 pub mod drivers;
+pub mod extractors;
 pub mod generators;
 pub mod setup;
 pub mod utils;
@@ -37,7 +42,19 @@ fn main() -> Result<()> {
         bail!("unsupported configuration version: {}", config.version);
     }
 
-    let mut root = RootContext::new();
+    let mut root = {
+        let current_image_device_path_protocol = uefi::boot::open_protocol_exclusive::<
+            LoadedImageDevicePath,
+        >(uefi::boot::image_handle())
+        .context("failed to get loaded image device path")?;
+        let loaded_image_path = current_image_device_path_protocol.deref().to_boxed();
+        info!(
+            "loaded image path: {}",
+            loaded_image_path.to_string(DisplayOnly(false), AllowShortcuts(false))?
+        );
+        RootContext::new(loaded_image_path)
+    };
+
     root.actions_mut().extend(config.actions.clone());
 
     let mut context = SproutContext::new(root);
@@ -45,6 +62,17 @@ fn main() -> Result<()> {
     let context = context.freeze();
 
     drivers::load(context.clone(), &config.drivers).context("failed to load drivers")?;
+
+    let mut extracted = BTreeMap::new();
+    for (name, extractor) in &config.extractors {
+        let value = extractors::extract(context.clone(), extractor)
+            .context(format!("failed to extract value {}", name))?;
+        info!("extracted value {}: {}", name, value);
+        extracted.insert(name.clone(), value);
+    }
+    let mut context = context.fork();
+    context.insert(&extracted);
+    let context = context.freeze();
 
     phase(context.clone(), &config.phases.startup)?;
 

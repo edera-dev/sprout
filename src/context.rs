@@ -1,15 +1,22 @@
 use crate::actions::ActionDeclaration;
+use anyhow::Result;
+use anyhow::anyhow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
+use uefi::proto::device_path::DevicePath;
 
 #[derive(Default)]
 pub struct RootContext {
     actions: BTreeMap<String, ActionDeclaration>,
+    loaded_image_path: Option<Box<DevicePath>>,
 }
 
 impl RootContext {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(loaded_image_device_path: Box<DevicePath>) -> Self {
+        RootContext {
+            actions: BTreeMap::new(),
+            loaded_image_path: Some(loaded_image_device_path),
+        }
     }
 
     pub fn actions(&self) -> &BTreeMap<String, ActionDeclaration> {
@@ -18,6 +25,12 @@ impl RootContext {
 
     pub fn actions_mut(&mut self) -> &mut BTreeMap<String, ActionDeclaration> {
         &mut self.actions
+    }
+
+    pub fn loaded_image_path(&self) -> Result<&DevicePath> {
+        self.loaded_image_path
+            .as_deref()
+            .ok_or_else(|| anyhow!("no loaded image path"))
     }
 }
 

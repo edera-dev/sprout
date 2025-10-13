@@ -21,6 +21,6 @@ pub fn generate(
     if let Some(matrix) = &generator.matrix {
         matrix::generate(context, matrix)
     } else {
-        bail!("unknown action configuration");
+        bail!("unknown generator configuration");
     }
 }

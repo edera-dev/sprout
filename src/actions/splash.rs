@@ -96,7 +96,7 @@ fn draw(image: DynamicImage) -> Result<()> {
 
 pub fn splash(context: Rc<SproutContext>, configuration: &SplashConfiguration) -> Result<()> {
     let image = context.stamp(&configuration.image);
-    let image = read_file_contents(&image)?;
+    let image = read_file_contents(context.root().loaded_image_path()?, &image)?;
     let image = ImageReader::with_format(Cursor::new(image), ImageFormat::Png)
         .decode()
         .context("failed to decode splash image")?;

@@ -1,9 +1,12 @@
 version = 1
 
+[extractors.boot.filesystem]
+item = "\\EFI\\BOOT\\kernel.efi"
+
 [actions.chainload-kernel]
-chainload.path = "\\EFI\\BOOT\\kernel.efi"
+chainload.path = "$boot\\EFI\\BOOT\\kernel.efi"
 chainload.options = ["console=hvc0"]
-chainload.linux-initrd = "\\initramfs"
+chainload.linux-initrd = "$boot\\initramfs"
 
 [entries.kernel]
 title = "Boot Linux"

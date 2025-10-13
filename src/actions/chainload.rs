@@ -20,22 +20,20 @@ pub struct ChainloadConfiguration {
 
 pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfiguration) -> Result<()> {
     let sprout_image = uefi::boot::image_handle();
-    let image_device_path_protocol =
+    let _image_device_path_protocol =
         uefi::boot::open_protocol_exclusive::<LoadedImageDevicePath>(sprout_image)
             .context("unable to open loaded image device path protocol")?;
 
-    let mut full_path = utils::device_path_root(&image_device_path_protocol)?;
-
-    full_path.push_str(&context.stamp(&configuration.path));
-
-    info!("path: {}", full_path);
-
-    let device_path = utils::text_to_device_path(&full_path)?;
+    let resolved = utils::resolve_path(
+        context.root().loaded_image_path()?,
+        &context.stamp(&configuration.path),
+    )
+    .context("failed to resolve chainload path")?;
 
     let image = uefi::boot::load_image(
         sprout_image,
         uefi::boot::LoadImageSource::FromDevicePath {
-            device_path: &device_path,
+            device_path: &resolved.full_path,
             boot_policy: uefi::proto::BootPolicy::ExactMatch,
         },
     )
@@ -77,8 +75,8 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     let mut initrd_handle = None;
     if let Some(ref linux_initrd) = configuration.linux_initrd {
         let initrd_path = context.stamp(linux_initrd);
-        let content =
-            utils::read_file_contents(&initrd_path).context("failed to read linux initrd")?;
+        let content = utils::read_file_contents(context.root().loaded_image_path()?, &initrd_path)
+            .context("failed to read linux initrd")?;
         initrd_handle = Some(
             register_linux_initrd(content.into_boxed_slice())
                 .context("failed to register linux initrd")?,
