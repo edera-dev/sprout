@@ -11,14 +11,16 @@ use uefi::proto::media::file::{File, FileSystemVolumeLabel};
 use uefi::proto::media::fs::SimpleFileSystem;
 
 #[derive(Serialize, Deserialize, Default, Clone)]
-pub struct FileSystemExtractorConfiguration {
-    pub label: Option<String>,
-    pub item: Option<String>,
+pub struct FilesystemDeviceMatchExtractor {
+    #[serde(default, rename = "has-label")]
+    pub has_label: Option<String>,
+    #[serde(default, rename = "has-item")]
+    pub has_item: Option<String>,
 }
 
 pub fn extract(
     context: Rc<SproutContext>,
-    device: &FileSystemExtractorConfiguration,
+    extractor: &FilesystemDeviceMatchExtractor,
 ) -> Result<String> {
     let handles = uefi::boot::find_handles::<SimpleFileSystem>()
         .context("failed to find filesystem handles")?;
@@ -26,7 +28,7 @@ pub fn extract(
         let mut filesystem = uefi::boot::open_protocol_exclusive::<SimpleFileSystem>(handle)
             .context("failed to open filesystem protocol")?;
 
-        if let Some(ref label) = device.label {
+        if let Some(ref label) = extractor.has_label {
             let want_label = CString16::try_from(context.stamp(label).as_str())
                 .context("failed to convert label to CString16")?;
             let mut root = filesystem
@@ -41,7 +43,7 @@ pub fn extract(
             }
         }
 
-        if let Some(ref item) = device.item {
+        if let Some(ref item) = extractor.has_item {
             let want_item = CString16::try_from(context.stamp(item).as_str())
                 .context("failed to convert item to CString16")?;
             let mut filesystem = FileSystem::new(filesystem);

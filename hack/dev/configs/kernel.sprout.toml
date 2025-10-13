@@ -1,7 +1,7 @@
 version = 1
 
-[extractors.boot.filesystem]
-item = "\\EFI\\BOOT\\kernel.efi"
+[extractors.boot.filesystem-device-match]
+has-item = "\\EFI\\BOOT\\kernel.efi"
 
 [actions.chainload-kernel]
 chainload.path = "$boot\\EFI\\BOOT\\kernel.efi"
