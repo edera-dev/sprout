@@ -1,4 +1,5 @@
 use crate::actions::ActionDeclaration;
+use crate::drivers::DriverDeclaration;
 use crate::generators::GeneratorDeclaration;
 use crate::utils;
 use anyhow::Context;
@@ -12,6 +13,8 @@ pub struct RootConfiguration {
     pub version: u32,
     #[serde(default)]
     pub values: BTreeMap<String, String>,
+    #[serde(default)]
+    pub drivers: BTreeMap<String, DriverDeclaration>,
     #[serde(default)]
     pub actions: BTreeMap<String, ActionDeclaration>,
     #[serde(default)]

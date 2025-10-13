@@ -9,6 +9,7 @@ use std::rc::Rc;
 pub mod actions;
 pub mod config;
 pub mod context;
+pub mod drivers;
 pub mod generators;
 pub mod setup;
 pub mod utils;
@@ -42,6 +43,8 @@ fn main() -> Result<()> {
     let mut context = SproutContext::new(root);
     context.insert(&config.values);
     let context = context.freeze();
+
+    drivers::load(context.clone(), &config.drivers).context("failed to load drivers")?;
 
     phase(context.clone(), &config.phases.startup)?;
 
