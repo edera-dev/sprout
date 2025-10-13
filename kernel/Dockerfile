@@ -1,5 +1,5 @@
-ARG KERNEL_SOURCE_URL=https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.16.9.tar.xz
-ARG KERNEL_CHECKSUM=sha256:7ac8c8a3cf05476375deaaa85dfcee095a826ffe557b437f43774fc3b64ce58d
+ARG KERNEL_SOURCE_URL=https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.17.2.tar.xz
+ARG KERNEL_CHECKSUM=sha256:fdebcb065065f5c1b8dc68a6fb59cda50cdddbf9103d207c2196d55ea764f57f
 
 FROM --platform=$BUILDPLATFORM debian:trixie@sha256:fd8f5a1df07b5195613e4b9a0b6a947d3772a151b81975db27d47f093f60c6e6 AS buildenv
 RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y \

@@ -25,7 +25,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
 
     full_path.push_str(&context.stamp(&configuration.path));
 
-    info!("path={}", full_path);
+    info!("path: {}", full_path);
 
     let device_path = utils::text_to_device_path(&full_path)?;
 
@@ -52,7 +52,12 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
             CString16::try_from(&options[..])
                 .context("unable to convert chainloader options to CString16")?,
         );
-        info!("options={}", options);
+        info!("options: {}", options);
+
+        // TODO(azenla): Free this memory, if possible.
+        // The lifetime of the pointer needs ot outlive start_image.
+        // Maybe consider moving this up.
+        let options = Box::leak(options);
 
         if options.num_bytes() > u32::MAX as usize {
             bail!("chainloader options too large");
@@ -68,7 +73,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     }
 
     let (base, size) = loaded_image_protocol.info();
-    info!("loaded image base={:#x} size={:#x}", base.addr(), size);
+    info!("loaded image: base={:#x} size={:#x}", base.addr(), size);
     uefi::boot::start_image(image).context("failed to start image")?;
     Ok(())
 }
