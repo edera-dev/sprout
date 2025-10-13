@@ -259,6 +259,7 @@ dependencies = [
  "serde",
  "toml",
  "uefi",
+ "uefi-raw",
 ]
 
 [[package]]

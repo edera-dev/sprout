@@ -1,5 +1,6 @@
 use crate::context::SproutContext;
 use crate::utils;
+use crate::utils::linux_media_initrd::{register_linux_initrd, unregister_linux_initrd};
 use anyhow::{Context, Result, bail};
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -13,6 +14,8 @@ pub struct ChainloadConfiguration {
     pub path: String,
     #[serde(default)]
     pub options: Vec<String>,
+    #[serde(default, rename = "linux-initrd")]
+    pub linux_initrd: Option<String>,
 }
 
 pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfiguration) -> Result<()> {
@@ -71,9 +74,24 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
         options_holder = Some(options);
     }
 
+    let mut initrd_handle = None;
+    if let Some(ref linux_initrd) = configuration.linux_initrd {
+        let initrd_path = context.stamp(linux_initrd);
+        let content =
+            utils::read_file_contents(&initrd_path).context("failed to read linux initrd")?;
+        initrd_handle = Some(
+            register_linux_initrd(content.into_boxed_slice())
+                .context("failed to register linux initrd")?,
+        );
+    }
+
     let (base, size) = loaded_image_protocol.info();
     info!("loaded image: base={:#x} size={:#x}", base.addr(), size);
-    uefi::boot::start_image(image).context("failed to start image")?;
+    let result = uefi::boot::start_image(image).context("failed to start image");
+    if let Some(initrd_handle) = initrd_handle {
+        unregister_linux_initrd(initrd_handle).context("failed to unregister linux initrd")?;
+    }
+    result.context("failed to start image")?;
     drop(options_holder);
     Ok(())
 }

@@ -6,6 +6,7 @@ use uefi::proto::device_path::{DevicePath, PoolDevicePath};
 use uefi::proto::media::fs::SimpleFileSystem;
 
 pub mod framebuffer;
+pub mod linux_media_initrd;
 
 pub fn text_to_device_path(path: &str) -> Result<PoolDevicePath> {
     let path = CString16::try_from(path).context("unable to convert path to CString16")?;

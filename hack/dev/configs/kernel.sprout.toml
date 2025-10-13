@@ -1,7 +1,8 @@
 version = 1
 
 [values]
-default-options = "initrd=\\initramfs console=hvc0"
+default-options = "console=hvc0"
+initramfs = "\\initramfs"
 
 [actions.welcome]
 print.text = "Welcome to Sprout!"
@@ -13,22 +14,13 @@ splash.time = 1
 [actions.chainload-kernel]
 chainload.path = "$path"
 chainload.options = ["$default-options"]
-
-[actions.chainload-shell]
-chainload.path = "\\EFI\\BOOT\\shell.efi"
-
-[actions.chainload-xen]
-chainload.path = "\\EFI\\BOOT\\xen.efi"
+chainload.linux-initrd = "$initramfs"
 
 [generators.kernels.matrix]
 entry.title = "Boot Linux $name"
 entry.values.path = "\\EFI\\BOOT\\$name"
 entry.actions = ["chainload-kernel"]
 values.name = ["kernel.efi"]
-
-#[entries.xen]
-#title = "Boot Xen"
-#actions = ["chainload-xen"]
 
 [[phases.startup]]
 actions = ["welcome"]
