@@ -1,26 +1,10 @@
 version = 1
 
-[values]
-default-options = "console=hvc0"
-initramfs = "\\initramfs"
-
-[actions.welcome]
-print.text = "Welcome to Sprout!"
-
-[actions.splash]
-splash.image = "edera-splash.png"
-splash.time = 1
-
 [actions.chainload-kernel]
-chainload.path = "$path"
-chainload.options = ["$default-options"]
-chainload.linux-initrd = "$initramfs"
+chainload.path = "\\EFI\\BOOT\\kernel.efi"
+chainload.options = ["console=hvc0"]
+chainload.linux-initrd = "\\initramfs"
 
-[generators.kernels.matrix]
-entry.title = "Boot Linux $name"
-entry.values.path = "\\EFI\\BOOT\\$name"
-entry.actions = ["chainload-kernel"]
-values.name = ["kernel.efi"]
-
-[[phases.startup]]
-actions = ["welcome"]
+[entries.kernel]
+title = "Boot Linux"
+actions = ["chainload-kernel"]
