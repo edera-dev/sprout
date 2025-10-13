@@ -17,11 +17,18 @@ chainload.options = ["$default-options"]
 [actions.chainload-shell]
 chainload.path = "\\EFI\\BOOT\\shell.efi"
 
+[actions.chainload-xen]
+chainload.path = "\\EFI\\BOOT\\xen.efi"
+
 [generators.kernels.matrix]
-entry.title = "Boot Kernel $name"
+entry.title = "Boot Linux $name"
 entry.values.path = "\\EFI\\BOOT\\$name"
 entry.actions = ["chainload-kernel"]
 values.name = ["kernel.efi"]
 
+#[entries.xen]
+#title = "Boot Xen"
+#actions = ["chainload-xen"]
+
 [[phases.startup]]
-actions = ["welcome", "splash"]
+actions = ["welcome"]

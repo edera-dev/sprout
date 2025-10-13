@@ -68,8 +68,6 @@ if [ "${SKIP_KERNEL_BUILD}" != "1" ]; then
 	fi
 
 	copy_from_image "${DOCKER_PREFIX}/sprout-kernel-${TARGET_ARCH}" "kernel.efi" "${FINAL_DIR}/kernel.efi"
-	cp "hack/dev/configs/${SPROUT_CONFIG_NAME}.sprout.toml" "${FINAL_DIR}/sprout.toml"
-	cp "hack/dev/assets/edera-splash.png" "${FINAL_DIR}/edera-splash.png"
 fi
 
 if [ "${SKIP_VM_BUILD}" != "1" ]; then
@@ -79,6 +77,8 @@ if [ "${SKIP_VM_BUILD}" != "1" ]; then
 	copy_from_image "${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}" "shell.efi" "${FINAL_DIR}/shell.efi"
 	docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-initramfs-${TARGET_ARCH}:${DOCKER_TAG}" -f hack/dev/vm/Dockerfile.initramfs "${FINAL_DIR}"
 	copy_from_image "${DOCKER_PREFIX}/sprout-initramfs-${TARGET_ARCH}" "initramfs" "${FINAL_DIR}/initramfs"
+	docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-xen-${TARGET_ARCH}:${DOCKER_TAG}" -f hack/dev/vm/Dockerfile.xen "${FINAL_DIR}"
+	copy_from_image "${DOCKER_PREFIX}/sprout-xen-${TARGET_ARCH}" "xen.efi" "${FINAL_DIR}/xen.efi"
 fi
 
 if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
@@ -92,6 +92,10 @@ if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
 		copy_from_image "${DOCKER_PREFIX}/sprout-${TARGET_ARCH}" "sprout.efi" "${FINAL_DIR}/sprout.efi"
 	fi
 
+	cp "hack/dev/configs/${SPROUT_CONFIG_NAME}.sprout.toml" "${FINAL_DIR}/sprout.toml"
+  cp "hack/dev/configs/xen.cfg" "${FINAL_DIR}/xen.cfg"
+  cp "hack/dev/assets/edera-splash.png" "${FINAL_DIR}/edera-splash.png"
+
 	mkdir -p "${FINAL_DIR}/efi/EFI/BOOT"
 	cp "${FINAL_DIR}/sprout.efi" "${FINAL_DIR}/efi/EFI/BOOT/${EFI_NAME}.EFI"
 	if [ -f "${FINAL_DIR}/kernel.efi" ]; then
@@ -100,6 +104,12 @@ if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
 	if [ -f "${FINAL_DIR}/shell.efi" ]; then
 		cp "${FINAL_DIR}/shell.efi" "${FINAL_DIR}/efi/EFI/BOOT/SHELL.EFI"
 	fi
+	if [ -f "${FINAL_DIR}/xen.efi" ]; then
+  	cp "${FINAL_DIR}/xen.efi" "${FINAL_DIR}/efi/EFI/BOOT/XEN.EFI"
+  fi
+	if [ -f "${FINAL_DIR}/xen.cfg" ]; then
+  	cp "${FINAL_DIR}/xen.cfg" "${FINAL_DIR}/efi/EFI/BOOT/XEN.CFG"
+  fi
 	cp "${FINAL_DIR}/sprout.toml" "${FINAL_DIR}/efi/SPROUT.TOML"
 	cp "${FINAL_DIR}/edera-splash.png" "${FINAL_DIR}/efi/EDERA-SPLASH.PNG"
 	cp "${FINAL_DIR}/initramfs" "${FINAL_DIR}/efi/INITRAMFS"

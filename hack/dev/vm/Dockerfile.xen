@@ -1,0 +1,6 @@
+FROM alpine:3.22@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1 AS build
+ARG TARGETPLATFORM
+RUN apk add --no-cache xen-hypervisor && cp /usr/lib/efi/xen.efi /xen.efi
+
+FROM scratch AS final
+COPY --from=build /xen.efi /xen.efi
