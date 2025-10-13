@@ -47,33 +47,33 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
         .map(|item| context.stamp(item))
         .collect::<Vec<_>>()
         .join(" ");
+
+    let mut options_holder: Option<Box<CString16>> = None;
     if !options.is_empty() {
         let options = Box::new(
             CString16::try_from(&options[..])
                 .context("unable to convert chainloader options to CString16")?,
         );
-        info!("options: {}", options);
 
-        // TODO(azenla): Free this memory, if possible.
-        // The lifetime of the pointer needs ot outlive start_image.
-        // Maybe consider moving this up.
-        let options = Box::leak(options);
+        info!("options: {}", options);
 
         if options.num_bytes() > u32::MAX as usize {
             bail!("chainloader options too large");
         }
 
-        // SAFETY: options size is checked to validate it is safe to pass.
-        // Additionally, the pointer is allocated and retained on the heap which makes
-        // passing the options pointer safe to the next image.
+        // SAFETY: option size is checked to validate it is safe to pass.
+        // Additionally, the pointer is allocated and retained on heap, which makes
+        // passing the `options` pointer safe to the next image.
         unsafe {
             loaded_image_protocol
                 .set_load_options(options.as_ptr() as *const u8, options.num_bytes() as u32);
         }
+        options_holder = Some(options);
     }
 
     let (base, size) = loaded_image_protocol.info();
     info!("loaded image: base={:#x} size={:#x}", base.addr(), size);
     uefi::boot::start_image(image).context("failed to start image")?;
+    drop(options_holder);
     Ok(())
 }

@@ -1,7 +1,7 @@
 version = 1
 
 [values]
-default-options = "initrd=\\initramfs init=/bin/sh console=hvc0"
+default-options = "initrd=\\initramfs console=hvc0"
 
 [actions.welcome]
 print.text = "Welcome to Sprout!"
