@@ -21,6 +21,8 @@ pub struct FilesystemDeviceMatchExtractor {
     pub has_item: Option<String>,
     #[serde(default, rename = "has-partition-uuid")]
     pub has_partition_uuid: Option<String>,
+    #[serde(default, rename = "has-partition-type-uuid")]
+    pub has_partition_type_uuid: Option<String>,
     #[serde(default)]
     pub fallback: Option<String>,
 }
@@ -34,14 +36,15 @@ pub fn extract(
     for handle in handles {
         let mut has_match = false;
 
-        let partition_uuid = {
+        let partition_info = {
             let partition_info = uefi::boot::open_protocol_exclusive::<PartitionInfo>(handle);
 
             match partition_info {
                 Ok(partition_info) => {
                     if let Some(gpt) = partition_info.gpt_partition_entry() {
                         let uuid = gpt.unique_partition_guid;
-                        Some(uuid)
+                        let type_uuid = gpt.partition_type_guid;
+                        Some((uuid, type_uuid.0))
                     } else {
                         None
                     }
@@ -59,12 +62,23 @@ pub fn extract(
             }
         };
 
-        if let Some(partition_uuid) = partition_uuid
+        if let Some((partition_uuid, _partition_type_guid)) = partition_info
             && let Some(ref has_partition_uuid) = extractor.has_partition_uuid
         {
             let parsed_uuid = Guid::from_str(has_partition_uuid)
-                .map_err(|e| anyhow!("failed to parse has-uuid: {}", e))?;
+                .map_err(|e| anyhow!("failed to parse has-partition-uuid: {}", e))?;
             if partition_uuid != parsed_uuid {
+                continue;
+            }
+            has_match = true;
+        }
+
+        if let Some((_partition_uuid, partition_type_guid)) = partition_info
+            && let Some(ref has_partition_type_uuid) = extractor.has_partition_type_uuid
+        {
+            let parsed_uuid = Guid::from_str(has_partition_type_uuid)
+                .map_err(|e| anyhow!("failed to parse has-partition-type-uuid: {}", e))?;
+            if partition_type_guid != parsed_uuid {
                 continue;
             }
             has_match = true;
