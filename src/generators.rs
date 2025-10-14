@@ -1,5 +1,5 @@
-use crate::config::EntryDeclaration;
 use crate::context::SproutContext;
+use crate::entries::EntryDeclaration;
 use crate::generators::bls::BlsConfiguration;
 use crate::generators::matrix::MatrixConfiguration;
 use anyhow::Result;

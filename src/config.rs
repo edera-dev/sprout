@@ -1,7 +1,9 @@
 use crate::actions::ActionDeclaration;
 use crate::drivers::DriverDeclaration;
+use crate::entries::EntryDeclaration;
 use crate::extractors::ExtractorDeclaration;
 use crate::generators::GeneratorDeclaration;
+use crate::phases::PhasesConfiguration;
 use crate::utils;
 use anyhow::Context;
 use anyhow::Result;
@@ -30,37 +32,14 @@ pub struct RootConfiguration {
     pub phases: PhasesConfiguration,
 }
 
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct EntryDeclaration {
-    pub title: String,
-    #[serde(default)]
-    pub actions: Vec<String>,
-    #[serde(default)]
-    pub values: BTreeMap<String, String>,
-}
-
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct PhasesConfiguration {
-    #[serde(default)]
-    pub early: Vec<PhaseConfiguration>,
-    #[serde(default)]
-    pub startup: Vec<PhaseConfiguration>,
-    #[serde(default)]
-    pub late: Vec<PhaseConfiguration>,
-}
-
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct PhaseConfiguration {
-    #[serde(default)]
-    pub actions: Vec<String>,
-    #[serde(default)]
-    pub values: BTreeMap<String, String>,
+pub fn latest_version() -> u32 {
+    1
 }
 
 pub fn load() -> Result<RootConfiguration> {
     let current_image_device_path_protocol =
         uefi::boot::open_protocol_exclusive::<LoadedImageDevicePath>(uefi::boot::image_handle())
-            .context("failed to get loaded image device path")?;
+            .context("unable to get loaded image device path")?;
     let path = current_image_device_path_protocol.deref().to_boxed();
 
     let content = utils::read_file_contents(&path, "sprout.toml")
@@ -68,8 +47,4 @@ pub fn load() -> Result<RootConfiguration> {
     let config: RootConfiguration =
         toml::from_slice(&content).context("unable to parse sprout.toml file")?;
     Ok(config)
-}
-
-pub fn latest_version() -> u32 {
-    1
 }

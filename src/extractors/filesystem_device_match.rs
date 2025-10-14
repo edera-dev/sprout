@@ -32,7 +32,7 @@ pub fn extract(
     extractor: &FilesystemDeviceMatchExtractor,
 ) -> Result<String> {
     let handles = uefi::boot::find_handles::<SimpleFileSystem>()
-        .context("failed to find filesystem handles")?;
+        .context("unable to find filesystem handles")?;
     for handle in handles {
         let mut has_match = false;
 
@@ -55,7 +55,7 @@ pub fn extract(
                     {
                         None
                     } else {
-                        Err(error).context("failed to open filesystem partition info")?;
+                        Err(error).context("unable to open filesystem partition info")?;
                         None
                     }
                 }
@@ -66,7 +66,7 @@ pub fn extract(
             && let Some(ref has_partition_uuid) = extractor.has_partition_uuid
         {
             let parsed_uuid = Guid::from_str(has_partition_uuid)
-                .map_err(|e| anyhow!("failed to parse has-partition-uuid: {}", e))?;
+                .map_err(|e| anyhow!("unable to parse has-partition-uuid: {}", e))?;
             if partition_uuid != parsed_uuid {
                 continue;
             }
@@ -77,7 +77,7 @@ pub fn extract(
             && let Some(ref has_partition_type_uuid) = extractor.has_partition_type_uuid
         {
             let parsed_uuid = Guid::from_str(has_partition_type_uuid)
-                .map_err(|e| anyhow!("failed to parse has-partition-type-uuid: {}", e))?;
+                .map_err(|e| anyhow!("unable to parse has-partition-type-uuid: {}", e))?;
             if partition_type_guid != parsed_uuid {
                 continue;
             }
@@ -85,17 +85,17 @@ pub fn extract(
         }
 
         let mut filesystem = uefi::boot::open_protocol_exclusive::<SimpleFileSystem>(handle)
-            .context("failed to open filesystem protocol")?;
+            .context("unable to open filesystem protocol")?;
 
         if let Some(ref label) = extractor.has_label {
             let want_label = CString16::try_from(context.stamp(label).as_str())
-                .context("failed to convert label to CString16")?;
+                .context("unable to convert label to CString16")?;
             let mut root = filesystem
                 .open_volume()
-                .context("failed to open filesystem volume")?;
+                .context("unable to open filesystem volume")?;
             let label = root
                 .get_boxed_info::<FileSystemVolumeLabel>()
-                .context("failed to get filesystem volume label")?;
+                .context("unable to get filesystem volume label")?;
 
             if label.volume_label() != want_label {
                 continue;
@@ -105,7 +105,7 @@ pub fn extract(
 
         if let Some(ref item) = extractor.has_item {
             let want_item = CString16::try_from(context.stamp(item).as_str())
-                .context("failed to convert item to CString16")?;
+                .context("unable to convert item to CString16")?;
             let mut filesystem = FileSystem::new(filesystem);
             let metadata = filesystem.metadata(Path::new(&want_item));
 
@@ -125,9 +125,9 @@ pub fn extract(
         }
 
         let path = uefi::boot::open_protocol_exclusive::<DevicePath>(handle)
-            .context("failed to open filesystem device path")?;
+            .context("unable to open filesystem device path")?;
         let path = path.deref();
-        return utils::device_path_root(path).context("failed to get device path root");
+        return utils::device_path_root(path).context("unable to get device path root");
     }
 
     if let Some(fallback) = &extractor.fallback {

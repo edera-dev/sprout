@@ -100,6 +100,9 @@ fn already_registered() -> Result<bool> {
     Ok(false)
 }
 
+/// Registers the provided [data] with the UEFI stack as a Linux initrd.
+/// This uses a special device path that Linux EFI stub will look at
+/// to load the initrd from.
 pub fn register_linux_initrd(data: Box<[u8]>) -> Result<LinuxMediaInitrdHandle> {
     let path = LinuxMediaInitrdProtocol::device_path();
     let path = Box::leak(path);
@@ -149,6 +152,8 @@ pub fn register_linux_initrd(data: Box<[u8]>) -> Result<LinuxMediaInitrdHandle> 
     })
 }
 
+/// Unregisters a Linux initrd from the UEFI stack.
+/// This will free the memory allocated by the initrd.
 pub fn unregister_linux_initrd(handle: LinuxMediaInitrdHandle) -> Result<()> {
     if !already_registered()? {
         return Ok(());

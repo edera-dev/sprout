@@ -1,6 +1,10 @@
 use anyhow::{Context, Result};
 use std::os::uefi as uefi_std;
 
+/// Initializes the UEFI environment.
+///
+/// This fetches the system table and current image handle from uefi_std and injects
+/// them into the uefi crate.
 pub fn init() -> Result<()> {
     let system_table = uefi_std::env::system_table();
     let image_handle = uefi_std::env::image_handle();
@@ -15,6 +19,6 @@ pub fn init() -> Result<()> {
         uefi::boot::set_image_handle(handle);
     }
 
-    uefi::helpers::init().context("failed to initialize uefi")?;
+    uefi::helpers::init().context("unable to initialize uefi")?;
     Ok(())
 }

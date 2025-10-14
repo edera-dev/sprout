@@ -34,16 +34,16 @@ fn load_driver(context: Rc<SproutContext>, driver: &DriverDeclaration) -> Result
             boot_policy: uefi::proto::BootPolicy::ExactMatch,
         },
     )
-    .context("failed to load image")?;
+    .context("unable to load image")?;
 
-    uefi::boot::start_image(image).context("failed to start driver image")?;
+    uefi::boot::start_image(image).context("unable to start driver image")?;
 
     Ok(())
 }
 
 fn reconnect() -> Result<()> {
     let handles = uefi::boot::locate_handle_buffer(SearchType::AllHandles)
-        .context("failed to locate handles buffer")?;
+        .context("unable to locate handles buffer")?;
 
     for handle in handles.iter() {
         // ignore result as there is nothing we can do if it doesn't work.
@@ -63,10 +63,10 @@ pub fn load(
 
     info!("loading drivers");
     for (name, driver) in drivers {
-        load_driver(context.clone(), driver).context(format!("failed to load driver: {}", name))?;
+        load_driver(context.clone(), driver).context(format!("unable to load driver: {}", name))?;
     }
 
-    reconnect().context("failed to reconnect drivers")?;
+    reconnect().context("unable to reconnect drivers")?;
     info!("loaded drivers");
     Ok(())
 }

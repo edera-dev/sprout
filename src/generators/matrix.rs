@@ -1,5 +1,5 @@
-use crate::config::EntryDeclaration;
 use crate::context::SproutContext;
+use crate::entries::EntryDeclaration;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

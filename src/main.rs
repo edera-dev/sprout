@@ -1,12 +1,11 @@
 #![feature(uefi_std)]
 
-use crate::config::PhaseConfiguration;
 use crate::context::{RootContext, SproutContext};
+use crate::phases::phase;
 use anyhow::{Context, Result, bail};
 use log::info;
 use std::collections::BTreeMap;
 use std::ops::Deref;
-use std::rc::Rc;
 use uefi::proto::device_path::LoadedImageDevicePath;
 use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
 
@@ -14,24 +13,12 @@ pub mod actions;
 pub mod config;
 pub mod context;
 pub mod drivers;
+pub mod entries;
 pub mod extractors;
 pub mod generators;
+pub mod phases;
 pub mod setup;
 pub mod utils;
-
-fn phase(context: Rc<SproutContext>, phase: &[PhaseConfiguration]) -> Result<()> {
-    for item in phase {
-        let mut context = context.fork();
-        context.insert(&item.values);
-        let context = context.freeze();
-
-        for action in item.actions.iter() {
-            actions::execute(context.clone(), action)
-                .context(format!("failed to execute action '{}'", action))?;
-        }
-    }
-    Ok(())
-}
 
 fn main() -> Result<()> {
     setup::init()?;
@@ -46,7 +33,7 @@ fn main() -> Result<()> {
         let current_image_device_path_protocol = uefi::boot::open_protocol_exclusive::<
             LoadedImageDevicePath,
         >(uefi::boot::image_handle())
-        .context("failed to get loaded image device path")?;
+        .context("unable to get loaded image device path")?;
         let loaded_image_path = current_image_device_path_protocol.deref().to_boxed();
         info!(
             "loaded image path: {}",
@@ -61,14 +48,14 @@ fn main() -> Result<()> {
     context.insert(&config.values);
     let context = context.freeze();
 
-    phase(context.clone(), &config.phases.early).context("failed to execute early phase")?;
+    phase(context.clone(), &config.phases.early).context("unable to execute early phase")?;
 
-    drivers::load(context.clone(), &config.drivers).context("failed to load drivers")?;
+    drivers::load(context.clone(), &config.drivers).context("unable to load drivers")?;
 
     let mut extracted = BTreeMap::new();
     for (name, extractor) in &config.extractors {
         let value = extractors::extract(context.clone(), extractor)
-            .context(format!("failed to extract value {}", name))?;
+            .context(format!("unable to extract value {}", name))?;
         info!("extracted value {}: {}", name, value);
         extracted.insert(name.clone(), value);
     }
@@ -76,7 +63,7 @@ fn main() -> Result<()> {
     context.insert(&extracted);
     let context = context.freeze();
 
-    phase(context.clone(), &config.phases.startup).context("failed to execute startup phase")?;
+    phase(context.clone(), &config.phases.startup).context("unable to execute startup phase")?;
 
     let mut all_entries = Vec::new();
 
@@ -107,7 +94,7 @@ fn main() -> Result<()> {
         info!("  entry {}: {}", index + 1, title);
     }
 
-    phase(context.clone(), &config.phases.late).context("failed to execute late phase")?;
+    phase(context.clone(), &config.phases.late).context("unable to execute late phase")?;
 
     let index = 1;
 
@@ -116,7 +103,7 @@ fn main() -> Result<()> {
     for action in &entry.actions {
         let action = context.stamp(action);
         actions::execute(context.clone(), &action)
-            .context(format!("failed to execute action '{}'", action))?;
+            .context(format!("unable to execute action '{}'", action))?;
     }
     Ok(())
 }

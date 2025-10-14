@@ -25,9 +25,9 @@ pub fn default_splash_time() -> u32 {
 
 fn setup_graphics() -> Result<ScopedProtocol<GraphicsOutput>> {
     let gop_handle = uefi::boot::get_handle_for_protocol::<GraphicsOutput>()
-        .context("failed to get graphics output")?;
+        .context("unable to get graphics output")?;
     uefi::boot::open_protocol_exclusive::<GraphicsOutput>(gop_handle)
-        .context("failed to open graphics output")
+        .context("unable to open graphics output")
 }
 
 fn fit_to_frame(image: &DynamicImage, frame: Rect) -> Rect {
@@ -99,7 +99,7 @@ pub fn splash(context: Rc<SproutContext>, configuration: &SplashConfiguration) -
     let image = read_file_contents(context.root().loaded_image_path()?, &image)?;
     let image = ImageReader::with_format(Cursor::new(image), ImageFormat::Png)
         .decode()
-        .context("failed to decode splash image")?;
+        .context("unable to decode splash image")?;
     draw(image)?;
     std::thread::sleep(Duration::from_secs(configuration.time as u64));
     Ok(())

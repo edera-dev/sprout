@@ -28,7 +28,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
         context.root().loaded_image_path()?,
         &context.stamp(&configuration.path),
     )
-    .context("failed to resolve chainload path")?;
+    .context("unable to resolve chainload path")?;
 
     let image = uefi::boot::load_image(
         sprout_image,
@@ -37,7 +37,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
             boot_policy: uefi::proto::BootPolicy::ExactMatch,
         },
     )
-    .context("failed to load image")?;
+    .context("unable to load image")?;
 
     let mut loaded_image_protocol = uefi::boot::open_protocol_exclusive::<LoadedImage>(image)
         .context("unable to open loaded image protocol")?;
@@ -76,20 +76,20 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     if let Some(ref linux_initrd) = configuration.linux_initrd {
         let initrd_path = context.stamp(linux_initrd);
         let content = utils::read_file_contents(context.root().loaded_image_path()?, &initrd_path)
-            .context("failed to read linux initrd")?;
+            .context("unable to read linux initrd")?;
         initrd_handle = Some(
             register_linux_initrd(content.into_boxed_slice())
-                .context("failed to register linux initrd")?,
+                .context("unable to register linux initrd")?,
         );
     }
 
     let (base, size) = loaded_image_protocol.info();
     info!("loaded image: base={:#x} size={:#x}", base.addr(), size);
-    let result = uefi::boot::start_image(image).context("failed to start image");
+    let result = uefi::boot::start_image(image).context("unable to start image");
     if let Some(initrd_handle) = initrd_handle {
-        unregister_linux_initrd(initrd_handle).context("failed to unregister linux initrd")?;
+        unregister_linux_initrd(initrd_handle).context("unable to unregister linux initrd")?;
     }
-    result.context("failed to start image")?;
+    result.context("unable to start image")?;
     drop(options_holder);
     Ok(())
 }

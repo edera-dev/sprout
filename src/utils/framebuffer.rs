@@ -27,7 +27,7 @@ impl Framebuffer {
             dest: (0, 0),
             dims: (self.width, self.height),
         })
-        .context("failed to blit framebuffer")?;
+        .context("unable to blit framebuffer")?;
         Ok(())
     }
 }
