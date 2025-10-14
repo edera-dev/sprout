@@ -8,6 +8,7 @@ ARG RUST_PROFILE
 RUN adduser -S -s /bin/sh build
 COPY \
     --exclude=rust-toolchain.toml \
+    --exclude=hack \
     --chown=build:build \
     . /build
 WORKDIR /build

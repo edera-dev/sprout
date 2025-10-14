@@ -8,6 +8,13 @@ chainload.path = "$boot\\EFI\\BOOT\\kernel.efi"
 chainload.options = ["console=hvc0"]
 chainload.linux-initrd = "$boot\\initramfs"
 
+[actions.chainload-xen]
+chainload.path = "$boot\\EFI\\BOOT\\xen.efi"
+
+[entries.xen]
+title = "Boot Xen"
+actions = ["chainload-xen"]
+
 [entries.kernel]
 title = "Boot Linux"
 actions = ["chainload-kernel"]

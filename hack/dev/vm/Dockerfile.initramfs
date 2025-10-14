@@ -1,11 +1,27 @@
+FROM alpine:3.22@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1 AS rootfs
+RUN apk --no-cache add alpine-base tzdata
+RUN rc-update add devfs sysinit && \
+    rc-update add dmesg sysinit && \
+    rc-update add mdev sysinit && \
+    rc-update add cgroups sysinit && \
+    rc-update add sysctl boot && \
+    rc-update add hostname boot && \
+    rc-update add bootmisc boot && \
+    rc-update add syslog boot && \
+    rc-update add mount-ro shutdown && \
+    rc-update add killprocs shutdown && \
+    rc-update add savecache shutdown && \
+    ln -s /sbin/init /init && \
+    echo 'root:root' | chpasswd && \
+    echo 'sprout' > /etc/hostname && \
+    echo '' > /etc/motd && \
+    ln -s /usr/share/zoneinfo/UTC /etc/localtime && \
+    echo 'hvc0::respawn:/sbin/getty -L hvc0 115200 vt100' >> /etc/inittab
+
 FROM alpine:3.22@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1 AS build
-RUN apk --no-cache add busybox-static
-RUN mkdir -p /tmp/initramfs/bin && cp /bin/busybox.static /tmp/initramfs/bin/busybox && \
-  chroot /tmp/initramfs /bin/busybox --install -s /bin && \
-  chroot /tmp/initramfs ln -s /bin/init /init && \
-  cd /tmp/initramfs && \
-  find . | cpio -R 0:0 --ignore-devno --renumber-inodes -o -H newc --quiet > /initramfs && \
-  rm -rf /tmp/initramfs
+COPY --from=rootfs / /rootfs
+WORKDIR /rootfs
+RUN find . | cpio -R 0:0 --ignore-devno --renumber-inodes -o -H newc --quiet > /initramfs
 
 FROM scratch AS final
 COPY --from=build /initramfs /initramfs

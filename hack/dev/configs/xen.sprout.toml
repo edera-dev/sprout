@@ -1,0 +1,11 @@
+version = 1
+
+[extractors.boot.filesystem-device-match]
+has-item = "\\EFI\\BOOT\\xen.efi"
+
+[actions.chainload-xen]
+chainload.path = "$boot\\EFI\\BOOT\\xen.efi"
+
+[entries.xen]
+title = "Boot Xen"
+actions = ["chainload-xen"]

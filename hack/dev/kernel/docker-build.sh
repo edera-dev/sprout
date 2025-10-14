@@ -29,11 +29,18 @@ else
 fi
 
 make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" defconfig
+if [ "${TARGET_KARCH}" = "x86_64" ]
+then
+  make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" xen.config
+  ./scripts/config -e XEN_PV
+  ./scripts/config -e XEN_PV_DOM0
+fi
 make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" mod2yesconfig
 
 ./scripts/config -e DRM_VIRTIO_GPU
 ./scripts/config -e FRAMEBUFFER_CONSOLE
 ./scripts/config -e FRAMEBUFFER_CONSOLE_DETECT_PRIMARY
+./scripts/config -e XEN_DOM0
 
 make "-j$(nproc)" CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}"
 
