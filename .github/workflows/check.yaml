@@ -1,0 +1,97 @@
+name: check
+
+on:
+  pull_request:
+    branches:
+    - main
+  push:
+    branches:
+    - main
+
+permissions:
+  contents: read
+
+jobs:
+  rustfmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+    - name: harden runner
+      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      with:
+        egress-policy: audit
+
+    - name: checkout
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      with:
+        persist-credentials: false
+
+    - name: 'install nightly rust toolchain with rustfmt'
+      run: |
+        rustup update --no-self-update nightly
+        rustup default nightly
+        rustup component add rustfmt
+
+    - name: 'cargo fmt'
+      run: cargo fmt --all -- --check
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+        - x86_64
+        - aarch64
+    env:
+      TARGET_ARCH: "${{ matrix.arch }}"
+    name: 'build ${{ matrix.arch }}'
+    steps:
+    - name: harden runner
+      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      with:
+        egress-policy: audit
+
+    - name: checkout
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      with:
+        persist-credentials: false
+
+    - name: 'install nightly rust toolchain'
+      run: |
+        rustup update --no-self-update nightly
+        rustup default nightly
+
+    - name: cargo build
+      run: cargo build --target "${TARGET_ARCH}-unknown-uefi"
+  
+  clippy:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+        - x86_64
+        - aarch64
+    env:
+      TARGET_ARCH: "${{ matrix.arch }}"
+    name: 'clippy ${{ matrix.arch }}'
+    steps:
+    - name: harden runner
+      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      with:
+        egress-policy: audit
+
+    - name: checkout
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      with:
+        persist-credentials: false
+
+    - name: 'install nightly rust toolchain with clippy'
+      run: |
+        rustup update --no-self-update nightly
+        rustup default stable
+        rustup component add clippy
+
+    - name: cargo clippy
+      run: cargo clippy --target "${TARGET_ARCH}-unknown-uefi"
