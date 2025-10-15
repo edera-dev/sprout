@@ -1,6 +1,7 @@
 use crate::context::SproutContext;
 use crate::utils;
-use crate::utils::linux_media_initrd::{register_linux_initrd, unregister_linux_initrd};
+use crate::utils::media_loader::MediaLoaderHandle;
+use crate::utils::media_loader::constants::LINUX_EFI_INITRD_MEDIA_GUID;
 use anyhow::{Context, Result, bail};
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -78,7 +79,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
         let content = utils::read_file_contents(context.root().loaded_image_path()?, &initrd_path)
             .context("unable to read linux initrd")?;
         initrd_handle = Some(
-            register_linux_initrd(content.into_boxed_slice())
+            MediaLoaderHandle::register(LINUX_EFI_INITRD_MEDIA_GUID, content.into_boxed_slice())
                 .context("unable to register linux initrd")?,
         );
     }
@@ -87,7 +88,9 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     info!("loaded image: base={:#x} size={:#x}", base.addr(), size);
     let result = uefi::boot::start_image(image).context("unable to start image");
     if let Some(initrd_handle) = initrd_handle {
-        unregister_linux_initrd(initrd_handle).context("unable to unregister linux initrd")?;
+        initrd_handle
+            .unregister()
+            .context("unable to unregister linux initrd")?;
     }
     result.context("unable to start image")?;
     drop(options_holder);

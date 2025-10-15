@@ -7,7 +7,7 @@ use uefi::proto::media::fs::SimpleFileSystem;
 use uefi::{CString16, Handle};
 
 pub mod framebuffer;
-pub mod linux_media_initrd;
+pub mod media_loader;
 
 /// Parses the input [path] as a [DevicePath].
 /// Uses the [DevicePathFromText] protocol exclusively, and will fail if it cannot acquire the protocol.
