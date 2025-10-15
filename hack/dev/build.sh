@@ -83,8 +83,13 @@ if [ "${SKIP_VM_BUILD}" != "1" ]; then
 	docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-initramfs-${TARGET_ARCH}:${DOCKER_TAG}" \
 		-f hack/dev/vm/Dockerfile.initramfs "${FINAL_DIR}"
 	copy_from_image "${DOCKER_PREFIX}/sprout-initramfs-${TARGET_ARCH}" "initramfs" "${FINAL_DIR}/initramfs"
-	docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-xen-${TARGET_ARCH}:${DOCKER_TAG}" -f hack/dev/vm/Dockerfile.xen "${FINAL_DIR}"
-	copy_from_image "${DOCKER_PREFIX}/sprout-xen-${TARGET_ARCH}" "xen.efi" "${FINAL_DIR}/xen.efi"
+
+	if [ -n "${SPROUT_XEN_EFI_OVERRIDE}" ]; then
+		cp "${SPROUT_XEN_EFI_OVERRIDE}" "${FINAL_DIR}/xen.efi"
+	else
+		docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-xen-${TARGET_ARCH}:${DOCKER_TAG}" -f hack/dev/vm/Dockerfile.xen "${FINAL_DIR}"
+		copy_from_image "${DOCKER_PREFIX}/sprout-xen-${TARGET_ARCH}" "xen.efi" "${FINAL_DIR}/xen.efi"
+	fi
 fi
 
 if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then

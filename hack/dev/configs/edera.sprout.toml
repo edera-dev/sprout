@@ -1,0 +1,15 @@
+version = 1
+
+[extractors.boot.filesystem-device-match]
+has-item = "\\EFI\\BOOT\\xen.efi"
+
+[actions.boot-edera]
+edera.xen = "$boot\\EFI\\BOOT\\xen.efi"
+edera.xen-options = ["clocksource=tsc", "smp=on", "smt=on", "ioapic_ack=new", "dom0_vcpus_pin=on", "spec-ctrl=gds-mit=no", "noreboot", "console=com1"]
+edera.kernel = "$boot\\EFI\\BOOT\\kernel.efi"
+edera.kernel-options = ["console=hvc0", "edera-xen=yes"]
+edera.initrd = "$boot\\initramfs"
+
+[entries.edera]
+title = "Boot Edera"
+actions = ["boot-edera"]

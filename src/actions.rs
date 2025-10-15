@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 
 pub mod chainload;
+pub mod edera;
 pub mod print;
 
 #[cfg(feature = "splash")]
@@ -18,6 +19,8 @@ pub struct ActionDeclaration {
     #[serde(default)]
     #[cfg(feature = "splash")]
     pub splash: Option<splash::SplashConfiguration>,
+    #[serde(default, rename = "edera")]
+    pub edera: Option<edera::EderaConfiguration>,
 }
 
 pub fn execute(context: Rc<SproutContext>, name: impl AsRef<str>) -> Result<()> {
@@ -32,6 +35,8 @@ pub fn execute(context: Rc<SproutContext>, name: impl AsRef<str>) -> Result<()> 
     } else if let Some(print) = &action.print {
         print::print(context.clone(), print)?;
         return Ok(());
+    } else if let Some(edera) = &action.edera {
+        edera::edera(context.clone(), edera)?;
     }
 
     #[cfg(feature = "splash")]
