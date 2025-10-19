@@ -13,7 +13,7 @@ pub mod constants;
 
 #[derive(Debug)]
 #[repr(C)]
-pub struct MediaLoaderProtocol {
+struct MediaLoaderProtocol {
     pub load_file: unsafe extern "efiapi" fn(
         this: *mut MediaLoaderProtocol,
         file_path: *const DevicePathProtocol,
@@ -25,14 +25,24 @@ pub struct MediaLoaderProtocol {
     pub length: usize,
 }
 
+/// Represents a media loader which has been registered in the UEFI stack.
+/// You MUST call [MediaLoaderHandle::unregister] when ready to unregister.
+/// [Drop] is not implemented for this type.
 pub struct MediaLoaderHandle {
-    pub guid: Guid,
-    pub handle: Handle,
-    pub protocol: *mut MediaLoaderProtocol,
-    pub path: *mut DevicePath,
+    guid: Guid,
+    handle: Handle,
+    protocol: *mut MediaLoaderProtocol,
+    path: *mut DevicePath,
 }
 
 impl MediaLoaderHandle {
+    /// The behavior of this function is derived from how Linux calls it.
+    ///
+    /// Linux calls this function by first passing a NULL [buffer].
+    /// We must set the size of the buffer it should allocate in [buffer_size].
+    /// The next call will pass a buffer of the right size, and we should copy
+    /// data into that buffer, checking whether it is safe to copy based on
+    /// the buffer size.
     unsafe extern "efiapi" fn load_file(
         this: *mut MediaLoaderProtocol,
         file_path: *const DevicePathProtocol,
@@ -44,10 +54,14 @@ impl MediaLoaderHandle {
             return Status::INVALID_PARAMETER;
         }
 
+        // Boot policy must not be true, as that's special behavior that is irrelevant
+        // for the media loader concept.
         if boot_policy == Boolean::TRUE {
             return Status::UNSUPPORTED;
         }
 
+        // SAFETY: Validated as safe because this is checked to be non-null. It is the caller's
+        // responsibility to ensure that the right pointer is passed for [this].
         unsafe {
             if (*this).length == 0 || (*this).address.is_null() {
                 return Status::NOT_FOUND;
@@ -65,7 +79,7 @@ impl MediaLoaderHandle {
         Status::SUCCESS
     }
 
-    pub fn device_path(guid: Guid) -> Box<DevicePath> {
+    fn device_path(guid: Guid) -> Box<DevicePath> {
         let mut path = Vec::new();
         let path = DevicePathBuilder::with_vec(&mut path)
             .push(&Vendor {
@@ -167,8 +181,15 @@ impl MediaLoaderHandle {
             )
             .context("unable to uninstall media loader load file handle")?;
 
-            let _path = Box::from_raw(self.path);
-            let _protocol = Box::from_raw(self.protocol);
+            let path = Box::from_raw(self.path);
+            let protocol = Box::from_raw(self.protocol);
+            let slice =
+                std::ptr::slice_from_raw_parts_mut(protocol.address as *mut u8, protocol.length);
+            let data = Box::from_raw(slice);
+
+            drop(path);
+            drop(protocol);
+            drop(data);
         }
 
         Ok(())

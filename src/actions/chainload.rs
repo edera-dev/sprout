@@ -1,7 +1,7 @@
 use crate::context::SproutContext;
 use crate::utils;
 use crate::utils::media_loader::MediaLoaderHandle;
-use crate::utils::media_loader::constants::LINUX_EFI_INITRD_MEDIA_GUID;
+use crate::utils::media_loader::constants::linux::LINUX_EFI_INITRD_MEDIA_GUID;
 use anyhow::{Context, Result, bail};
 use log::{error, info};
 use serde::{Deserialize, Serialize};
@@ -74,10 +74,10 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
         let initrd_path = context.stamp(linux_initrd);
         let content = utils::read_file_contents(context.root().loaded_image_path()?, &initrd_path)
             .context("unable to read linux initrd")?;
-        initrd_handle = Some(
+        let handle =
             MediaLoaderHandle::register(LINUX_EFI_INITRD_MEDIA_GUID, content.into_boxed_slice())
-                .context("unable to register linux initrd")?,
-        );
+                .context("unable to register linux initrd")?;
+        initrd_handle = Some(handle);
     }
 
     let (base, size) = loaded_image_protocol.info();

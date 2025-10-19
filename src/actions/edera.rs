@@ -12,7 +12,7 @@ use crate::{
         self,
         media_loader::{
             MediaLoaderHandle,
-            constants::{
+            constants::xen::{
                 XEN_EFI_CONFIG_MEDIA_GUID, XEN_EFI_KERNEL_MEDIA_GUID, XEN_EFI_RAMDISK_MEDIA_GUID,
             },
         },
