@@ -3,8 +3,6 @@
 <img src="assets/logo.png" alt="sprout logo" width="258" height="200" />
 <h1 align="center">Sprout</h1>
 
----
-
 Sprout is an **EXPERIMENTAL** programmable UEFI bootloader written in Rust.
 
 Sprout is in use at Edera today in development environments and is intended to ship to production soon.
