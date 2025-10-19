@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use anyhow::{Context, Result};
+use log::error;
 use serde::{Deserialize, Serialize};
 use uefi::Guid;
 
@@ -63,19 +64,22 @@ fn register_media_loader_file(
 
 pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> Result<()> {
     let config = build_xen_config(configuration);
-    let config = register_media_loader_text(XEN_EFI_CONFIG_MEDIA_GUID, "config", config)?;
+    let config = register_media_loader_text(XEN_EFI_CONFIG_MEDIA_GUID, "config", config)
+        .context("unable to register config media loader")?;
     let kernel = register_media_loader_file(
         &context,
         XEN_EFI_KERNEL_MEDIA_GUID,
         "kernel",
         &configuration.kernel,
-    )?;
+    )
+    .context("unable to register kernel media loader")?;
 
     let mut media_loaders = vec![config, kernel];
 
     if let Some(ref initrd) = configuration.initrd {
         let initrd =
-            register_media_loader_file(&context, XEN_EFI_RAMDISK_MEDIA_GUID, "initrd", initrd)?;
+            register_media_loader_file(&context, XEN_EFI_RAMDISK_MEDIA_GUID, "initrd", initrd)
+                .context("unable to register initrd media loader")?;
         media_loaders.push(initrd);
     }
 
@@ -90,7 +94,9 @@ pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> 
     .context("unable to chainload to xen");
 
     for media_loader in media_loaders {
-        media_loader.unregister()?;
+        if let Err(error) = media_loader.unregister() {
+            error!("unable to unregister media loader: {}", error);
+        }
     }
 
     result

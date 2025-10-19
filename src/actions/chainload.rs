@@ -3,11 +3,10 @@ use crate::utils;
 use crate::utils::media_loader::MediaLoaderHandle;
 use crate::utils::media_loader::constants::LINUX_EFI_INITRD_MEDIA_GUID;
 use anyhow::{Context, Result, bail};
-use log::info;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use uefi::CString16;
-use uefi::proto::device_path::LoadedImageDevicePath;
 use uefi::proto::loaded_image::LoadedImage;
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -21,9 +20,6 @@ pub struct ChainloadConfiguration {
 
 pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfiguration) -> Result<()> {
     let sprout_image = uefi::boot::image_handle();
-    let _image_device_path_protocol =
-        uefi::boot::open_protocol_exclusive::<LoadedImageDevicePath>(sprout_image)
-            .context("unable to open loaded image device path protocol")?;
 
     let resolved = utils::resolve_path(
         context.root().loaded_image_path()?,
@@ -87,10 +83,10 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     let (base, size) = loaded_image_protocol.info();
     info!("loaded image: base={:#x} size={:#x}", base.addr(), size);
     let result = uefi::boot::start_image(image).context("unable to start image");
-    if let Some(initrd_handle) = initrd_handle {
-        initrd_handle
-            .unregister()
-            .context("unable to unregister linux initrd")?;
+    if let Some(initrd_handle) = initrd_handle
+        && let Err(error) = initrd_handle.unregister()
+    {
+        error!("unable to unregister linux initrd: {}", error);
     }
     result.context("unable to start image")?;
     drop(options_holder);
