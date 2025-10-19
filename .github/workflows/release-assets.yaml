@@ -6,14 +6,13 @@ on:
     - created
 
 permissions:
-  contents: read
+  contents: read # Needed to checkout the repository.
 
 jobs:
   assets:
     name: assets
     permissions:
-      # write is needed to upload release artifacts.
-      contents: write
+      contents: write # Needed to upload release assets.
     runs-on: ubuntu-latest
     steps:
     - name: harden runner

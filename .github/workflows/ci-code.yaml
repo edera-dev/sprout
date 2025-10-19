@@ -9,8 +9,7 @@ on:
     - main
 
 permissions:
-  # we only need to read the contents of the repository.
-  contents: read
+  contents: read # Needed to checkout the repository.
 
 jobs:
   rustfmt:

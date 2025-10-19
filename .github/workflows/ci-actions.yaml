@@ -7,19 +7,16 @@ on:
     branches: ["**"]
 
 permissions:
-  contents: read
+  contents: read # Needed to checkout the repository.
 
 jobs:
   zizmor:
     name: zizmor
     runs-on: ubuntu-latest
     permissions:
-      # write is needed to upload security events to GitHub code scanning.
-      security-events: write
-      # we only need to read the contents of the repository.
-      contents: read
-      # we only need to read the action metadata.
-      actions: read
+      security-events: write # Needed to upload code scanning results.
+      contents: read # Needed to checkout the repository.
+      actions: read # Needed to analyze action metadata.
     steps:
     - name: harden runner
       uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
