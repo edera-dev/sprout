@@ -26,5 +26,3 @@ updates:
     cargo-dev-updates:
       dependency-type: development
       applies-to: version-updates
-  exclude-paths:
-  - "deps/**"

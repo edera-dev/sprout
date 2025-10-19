@@ -18,4 +18,4 @@ fi
 
 cd target/assemble
 
-retry gh release upload "${TAG}" --clobber ./*
+retry gh release upload "${RELEASE_TAG}" --clobber ./*
