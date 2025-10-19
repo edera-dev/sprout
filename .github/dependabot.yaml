@@ -4,6 +4,8 @@ updates:
   directory: /
   schedule:
     interval: weekly
+  cooldown:
+    default-days: 7
   groups:
     actions-updates:
       dependency-type: production
@@ -15,6 +17,8 @@ updates:
   directory: /
   schedule:
     interval: weekly
+  cooldown:
+    default-days: 7
   groups:
     cargo-updates:
       dependency-type: production

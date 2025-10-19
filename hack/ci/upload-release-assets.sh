@@ -2,18 +2,19 @@
 set -e
 
 retry() {
-  for i in $(seq 1 10); do
-    if "${@}"; then
-      return 0
-    else
-      sleep "${i}"
-    fi
-  done
-  "${@}"
+	for i in $(seq 1 10); do
+		if "${@}"; then
+			return 0
+		else
+			sleep "${i}"
+		fi
+	done
+	"${@}"
 }
 
-TAG="${1}"
-shift
+if [ -z "${RELEASE_TAG}" ]; then
+	exit 1
+fi
 
 cd target/assemble
 

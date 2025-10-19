@@ -12,6 +12,7 @@ jobs:
   assets:
     name: assets
     permissions:
+      # write is needed to upload release artifacts.
       contents: write
     runs-on: ubuntu-latest
     steps:
@@ -34,7 +35,8 @@ jobs:
       run: ./hack/assemble.sh
 
     - name: 'upload release artifacts'
-      run: ./hack/ci/upload-release-assets.sh "${{ github.event.release.tag_name }}"
+      run: ./hack/ci/upload-release-assets.sh
       env:
         GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        RELEASE_TAG: "${{ github.event.release.tag_name }}"
       if: ${{ github.event_name == 'release' }}
