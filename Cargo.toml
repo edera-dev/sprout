@@ -44,7 +44,9 @@ strip = "debuginfo"
 debug = 0
 
 [patch.crates-io.simd-adler32]
-path = "deps/simd-adler32"
+git = "https://github.com/edera-dev/sprout-patched-deps.git"
+rev = "2c4fcc84b50d40c28f540d4271109ea0ca7e1268"
 
 [patch.crates-io.moxcms]
-path = "deps/moxcms"
+git = "https://github.com/edera-dev/sprout-patched-deps.git"
+rev = "2c4fcc84b50d40c28f540d4271109ea0ca7e1268"
