@@ -12,9 +12,7 @@ jobs:
   assets:
     name: assets
     permissions:
-      contents: read
-      id-token: write
-      packages: write
+      contents: write
     runs-on: ubuntu-latest
     steps:
     - name: harden runner
