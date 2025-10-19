@@ -20,7 +20,7 @@ HOST_ARCH="$(uname -m)"
 [ "${TARGET_ARCH}" = "amd64" ] && TARGET_ARCH="x86_64"
 
 if [ "${TARGET_ARCH}" != "x86_64" ] && [ "${TARGET_ARCH}" != "aarch64" ]; then
-	echo "Unsupported Architecture: ${TARGET_ARCH}" >/dev/stderr
+	echo "Unsupported architecture: ${TARGET_ARCH}" >/dev/stderr
 	exit 1
 fi
 
@@ -34,6 +34,7 @@ RUST_TARGET="${TARGET_ARCH}-unknown-uefi"
 [ -z "${DOCKER_TAG}" ] && DOCKER_TAG="${DEFAULT_DOCKER_TAG}"
 DOCKER_TARGET="linux/${TARGET_ARCH}"
 FINAL_DIR="target/final/${TARGET_ARCH}"
+ASSEMBLE_DIR="target/assemble"
 
 if [ -z "${QEMU_ACCEL}" ] && [ "${TARGET_ARCH}" = "${HOST_ARCH}" ] &&
 	[ -f "/proc/cpuinfo" ] &&

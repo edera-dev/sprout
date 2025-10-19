@@ -1,0 +1,42 @@
+name: release assets
+
+on:
+  release:
+    types:
+    - created
+
+permissions:
+  contents: read
+
+jobs:
+  assets:
+    name: assets
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+    - name: harden runner
+      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      with:
+        egress-policy: audit
+
+    - name: checkout
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      with:
+        persist-credentials: false
+
+    - name: 'install nightly rust toolchain'
+      run: |
+        rustup update --no-self-update nightly
+        rustup default nightly
+
+    - name: 'assemble release artifacts'
+      run: ./hack/assemble.sh
+
+    - name: 'upload release artifacts'
+      run: ./hack/ci/upload-release-assets.sh "${{ github.event.release.tag_name }}"
+      env:
+        GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      if: ${{ github.event_name == 'release' }}
