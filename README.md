@@ -18,7 +18,7 @@ Sprout is licensed under Apache 2.0 and is open to modifications and contributio
 ## Features
 
 NOTE: Currently, Sprout is experimental and is not intended for production use. For example, it doesn't currently
-have secure boot support. In fact, as of writing, it doesn't even have a boot menu. Instead, it boots the first entry it sees, or panics.
+have secure boot support. In fact, as of writing, it doesn't even have a boot menu. Instead, it boots the first entry it sees, or fails.
 
 ### Current
 

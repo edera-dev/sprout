@@ -96,9 +96,9 @@ fn main() -> Result<()> {
 
     phase(context.clone(), &config.phases.late).context("unable to execute late phase")?;
 
-    let index = 1;
-
-    let (context, entry) = &final_entries[index - 1];
+    let Some((context, entry)) = final_entries.first() else {
+        bail!("no entries found");
+    };
 
     for action in &entry.actions {
         let action = context.stamp(action);
