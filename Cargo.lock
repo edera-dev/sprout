@@ -253,7 +253,7 @@ source = "git+https://github.com/edera-dev/sprout-patched-deps.git?rev=2c4fcc84b
 
 [[package]]
 name = "sprout"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "image",
