@@ -12,8 +12,43 @@ Sprout is in use at Edera today in development environments and is intended to s
 The name "sprout" is derived from our company name "Edera" which means "ivy."
 Given that Sprout is the first thing intended to start on an Edera system, the name was apt.
 
-It supports x86_64 and ARM64 EFI-capable systems. It is designed to require UEFI and can be chainloaded from an
+It supports `x86_64` and `ARM64` EFI-capable systems. It is designed to require UEFI and can be chainloaded from an
 existing UEFI bootloader or booted by the hardware directly.
+
+Sprout is licensed under Apache 2.0 and is open to modifications and contributions.
+
+## Features
+
+NOTE: Currently, Sprout is experimental and is not intended for production use. For example, it doesn't currently
+have secure boot support. In fact, as of writing, it doesn't even have a boot menu. Instead, it boots the first entry it sees, or panics.
+
+### Current
+
+- [x] Loadable driver support
+- [x] [Bootloader specification (BLS)](https://uapi-group.org/specifications/specs/boot_loader_specification/) support
+- [x] Chainload support
+- [x] Linux boot support via EFI stub
+- [x] Load Linux initrd from disk
+- [x] Boot first configured entry
+
+### Roadmap
+
+- [ ] Boot menu
+- [ ] Secure Boot support: work in progress
+- [ ] UKI support: partial
+- [ ] Windows boot support (untested via chainload)
+- [ ] multiboot2 support
+- [ ] Linux boot protocol (boot without EFI stub)
+
+## Concepts
+
+- drivers: loadable EFI modules that can add functionality to the EFI system.
+- actions: executable code with a configuration that can be run by various other sprout concepts.
+- generators: code that can generate boot entries based on inputs or runtime code.
+- extractors: code that can extract values from the EFI environment.
+- values: key-value pairs that can be specified in the configuration or provided by extractors or generators.
+- entries: boot entries that will be displayed to the user.
+- phases: stages of the bootloader that can be hooked to run actions at specific points.
 
 ## Usage
 
