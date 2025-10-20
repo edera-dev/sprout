@@ -1,0 +1,74 @@
+name: publish
+
+on:
+  release:
+    types:
+    - created
+
+  push:
+    branches:
+    - main
+
+  pull_request:
+    branches:
+    - main
+    paths:
+    - bin/**
+    - src/**
+    - Cargo.*
+    - rust-toolchain.toml
+    - .github/workflows/publish.yaml
+
+permissions:
+  contents: read # Needed to checkout the repository.
+
+jobs:
+  assets:
+    name: assets
+    permissions:
+      contents: write # Needed to upload release assets and artifacts.
+    runs-on: ubuntu-latest
+    steps:
+    - name: harden runner
+      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      with:
+        egress-policy: audit
+
+    - name: checkout
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      with:
+        persist-credentials: false
+
+    - name: 'install nightly rust toolchain'
+      run: |
+        rustup update --no-self-update nightly
+        rustup default nightly
+
+    - name: 'assemble artifacts'
+      run: ./hack/assemble.sh
+
+    - name: 'upload sprout-x86_64.efi artifact'
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: sprout-x86_64.efi
+        path: target/assemble/sprout-x86_64.efi
+
+    - name: 'upload sprout-aarch64.efi artifact'
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: sprout-aarch64.efi
+        path: target/assemble/sprout-aarch64.efi
+
+    - name: 'generate cultivator token'
+      uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+      id: generate-token
+      with:
+        app-id: "${{ secrets.EDERA_CULTIVATION_APP_ID }}"
+        private-key: "${{ secrets.EDERA_CULTIVATION_APP_PRIVATE_KEY }}"
+
+    - name: 'upload release artifacts'
+      run: ./hack/ci/upload-release-assets.sh
+      env:
+        GITHUB_TOKEN: "${{ steps.generate-token.outputs.token }}"
+        RELEASE_TAG: "${{ github.event.release.tag_name }}"
+      if: ${{ github.event_name == 'release' }}
