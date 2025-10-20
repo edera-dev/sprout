@@ -6,6 +6,8 @@
 
 </div>
 
+Sprout is an **EXPERIMENTAL** programmable UEFI bootloader written in Rust.
+
 Sprout is in use at Edera today in development environments and is intended to ship to production soon.
 
 The name "sprout" is derived from our company name "Edera" which means "ivy."
