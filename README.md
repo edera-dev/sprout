@@ -22,6 +22,7 @@ Sprout is licensed under Apache 2.0 and is open to modifications and contributio
 
 - [Fedora Setup Guide]
 - [Generic Linux Setup Guide]
+- [Windows Setup Guide]
 - [Development Guide]
 - [Contributing Guide]
 - [Sprout License]
@@ -129,6 +130,7 @@ chainload.linux-initrd = "$boot\\$initrd"
 
 [Fedora Setup Guide]: ./docs/fedora-setup.md
 [Generic Linux Setup Guide]: ./docs/generic-linux-setup.md
+[Windows Setup Guide]: ./docs/windows-setup.md
 [Development Guide]: ./DEVELOPMENT.md
 [Contributing Guide]: ./CONTRIBUTING.md
 [Sprout License]: ./LICENSE
