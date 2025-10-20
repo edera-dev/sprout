@@ -5,28 +5,37 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use uefi::proto::device_path::DevicePath;
 
+/// Declares a root context for Sprout.
+/// This contains data that needs to be shared across Sprout.
 #[derive(Default)]
 pub struct RootContext {
+    /// The actions that are available in Sprout.
     actions: BTreeMap<String, ActionDeclaration>,
+    /// The device path of the loaded Sprout image.
     loaded_image_path: Option<Box<DevicePath>>,
 }
 
 impl RootContext {
+    /// Creates a new root context with the `loaded_image_device_path` which will be stored
+    /// in the context for easy access.
     pub fn new(loaded_image_device_path: Box<DevicePath>) -> Self {
-        RootContext {
+        Self {
             actions: BTreeMap::new(),
             loaded_image_path: Some(loaded_image_device_path),
         }
     }
 
+    /// Access the actions configured inside Sprout.
     pub fn actions(&self) -> &BTreeMap<String, ActionDeclaration> {
         &self.actions
     }
 
+    /// Access the actions configured inside Sprout mutably for modification.
     pub fn actions_mut(&mut self) -> &mut BTreeMap<String, ActionDeclaration> {
         &mut self.actions
     }
 
+    /// Access the device path of the loaded Sprout image.
     pub fn loaded_image_path(&self) -> Result<&DevicePath> {
         self.loaded_image_path
             .as_deref()
@@ -34,6 +43,12 @@ impl RootContext {
     }
 }
 
+/// A context of Sprout. This is passed around different parts of Sprout and represents
+/// a [RootContext] which is data that is shared globally, and [SproutContext] which works
+/// sort of like a tree of values. You can cheaply clone a [SproutContext] and modify it with
+/// new values, which override the values of contexts above it.
+///
+/// This is a core part of the value mechanism in Sprout which makes templating possible.
 pub struct SproutContext {
     root: Rc<RootContext>,
     parent: Option<Rc<SproutContext>>,
@@ -41,6 +56,7 @@ pub struct SproutContext {
 }
 
 impl SproutContext {
+    /// Create a new [SproutContext] using `root` as the root context.
     pub fn new(root: RootContext) -> Self {
         Self {
             root: Rc::new(root),
@@ -49,10 +65,13 @@ impl SproutContext {
         }
     }
 
+    /// Access the root context of this context.
     pub fn root(&self) -> &RootContext {
         self.root.as_ref()
     }
 
+    /// Retrieve the value specified by `key` from this context or its parents.
+    /// Returns `None` if the value is not found.
     pub fn get(&self, key: impl AsRef<str>) -> Option<&String> {
         self.values.get(key.as_ref()).or_else(|| {
             self.parent
@@ -61,6 +80,8 @@ impl SproutContext {
         })
     }
 
+    /// Collects all keys that are present in this context or its parents.
+    /// This is useful for iterating over all keys in a context.
     pub fn all_keys(&self) -> Vec<String> {
         let mut keys = BTreeSet::new();
 
@@ -74,6 +95,8 @@ impl SproutContext {
         keys.into_iter().collect()
     }
 
+    /// Collects all values that are present in this context or its parents.
+    /// This is useful for iterating over all values in a context.
     pub fn all_values(&self) -> BTreeMap<String, String> {
         let mut values = BTreeMap::new();
         for key in self.all_keys() {
@@ -82,17 +105,24 @@ impl SproutContext {
         values
     }
 
+    /// Sets the value `key` to the value specified by `value` in this context.
+    /// If the parent context has this key, this will override that key.
     pub fn set(&mut self, key: impl AsRef<str>, value: impl ToString) {
         self.values
             .insert(key.as_ref().to_string(), value.to_string());
     }
 
+    /// Inserts all the specified `values` into this context.
+    /// These values will take precedence over its parent context.
     pub fn insert(&mut self, values: &BTreeMap<String, String>) {
         for (key, value) in values {
             self.values.insert(key.clone(), value.clone());
         }
     }
 
+    /// Forks this context as an owned [SproutContext]. This makes it possible
+    /// to cheaply modify a context without cloning the parent context map.
+    /// The parent of the returned context is [self].
     pub fn fork(self: &Rc<SproutContext>) -> Self {
         Self {
             root: self.root.clone(),
@@ -101,11 +131,19 @@ impl SproutContext {
         }
     }
 
+    /// Freezes this context into a [Rc] which makes it possible to cheaply clone
+    /// and makes it less easy to modify a context. This can be used to pass the context
+    /// to various other parts of Sprout and ensure it won't be modified. Instead, once
+    /// a context is frozen, it should be [self.fork]'d to be modified.
     pub fn freeze(self) -> Rc<SproutContext> {
         Rc::new(self)
     }
 
+    /// Finalizes a context by producing a context with no parent that contains all the values
+    /// of all parent contexts merged. This makes it possible to ensure [SproutContext] has no
+    /// inheritance with other [SproutContext]s. It will still contain a [RootContext] however.
     pub fn finalize(&self) -> SproutContext {
+        // Collect all the values from the context and its parents.
         let mut current_values = self.all_values();
 
         loop {
@@ -114,16 +152,21 @@ impl SproutContext {
             for (key, value) in &current_values {
                 let (changed, result) = Self::stamp_values(&current_values, value);
                 if changed {
+                    // If the value changed, we need to re-stamp it.
                     did_change = true;
                 }
+                // Insert the new value into the value map.
                 values.insert(key.clone(), result);
             }
             current_values = values;
 
+            // If the values did not change, we can stop.
             if !did_change {
                 break;
             }
         }
+
+        // Produce the final context.
         Self {
             root: self.root.clone(),
             parent: None,
@@ -131,6 +174,8 @@ impl SproutContext {
         }
     }
 
+    /// Stamps the `text` value with the specified `values` map. The returned value indicates
+    /// whether the `text` has been changed and the value that was stamped and changed.
     fn stamp_values(values: &BTreeMap<String, String>, text: impl AsRef<str>) -> (bool, String) {
         let mut result = text.as_ref().to_string();
         let mut did_change = false;
@@ -144,6 +189,9 @@ impl SproutContext {
         (did_change, result)
     }
 
+    /// Stamps the input `text` with all the values in this [SproutContext] and it's parents.
+    /// For example, if this context contains {"a":"b"}, and the text "hello\\$a", it will produce
+    /// "hello\\b" as an output string.
     pub fn stamp(&self, text: impl AsRef<str>) -> String {
         Self::stamp_values(&self.all_values(), text.as_ref()).1
     }

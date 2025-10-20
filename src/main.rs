@@ -10,15 +10,34 @@ use std::ops::Deref;
 use uefi::proto::device_path::LoadedImageDevicePath;
 use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
 
+/// actions: Code that can be configured and executed by Sprout.
 pub mod actions;
+
+/// config: Sprout configuration mechanism.
 pub mod config;
+
+/// context: Stored values that can be cheaply forked and cloned.
 pub mod context;
+
+/// drivers: EFI drivers to load and provide extra functionality.
 pub mod drivers;
+
+/// entries: Boot menu entries that have a title and can execute actions.
 pub mod entries;
+
+/// extractors: Runtime code that can extract values into the Sprout context.
 pub mod extractors;
+
+/// generators: Runtime code that can generate entries with specific values.
 pub mod generators;
+
+/// phases: Hooks into specific parts of the boot process.
 pub mod phases;
+
+/// setup: Code that initializes the UEFI environment for Sprout.
 pub mod setup;
+
+/// utils: Utility functions that are used by other parts of Sprout.
 pub mod utils;
 
 /// The main entrypoint of sprout.
