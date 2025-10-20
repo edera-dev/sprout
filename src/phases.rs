@@ -20,6 +20,9 @@ pub struct PhasesConfiguration {
     pub late: Vec<PhaseConfiguration>,
 }
 
+/// Configures a single phase of the boot process.
+/// There can be multiple phase configurations that are
+/// executed sequentially.
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct PhaseConfiguration {
     /// The actions to run when the phase is executed.

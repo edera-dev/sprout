@@ -6,7 +6,10 @@ use uefi::proto::device_path::{DevicePath, PoolDevicePath};
 use uefi::proto::media::fs::SimpleFileSystem;
 use uefi::{CString16, Handle};
 
+/// Support code for the EFI framebuffer.
 pub mod framebuffer;
+
+/// Support code for the media loader protocol.
 pub mod media_loader;
 
 /// Parses the input [path] as a [DevicePath].
