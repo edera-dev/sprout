@@ -23,8 +23,8 @@ permissions:
   contents: read # Needed to checkout the repository.
 
 jobs:
-  assets:
-    name: assets
+  artifacts:
+    name: artifacts
     permissions:
       contents: write # Needed to upload release assets and artifacts.
     runs-on: ubuntu-latest
