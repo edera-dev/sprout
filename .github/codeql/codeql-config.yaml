@@ -1,0 +1,5 @@
+name: "codeql-config"
+
+extractor-options:
+  rust:
+    cargo_target: x86_64-unknown-uefi

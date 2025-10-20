@@ -45,6 +45,7 @@ jobs:
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
+        config-file: ./.github/codeql/codeql-config.yaml
 
     - name: perform codeql analysis
       uses: github/codeql-action/analyze@16140ae1a102900babc80a33c44059580f687047 #v4
