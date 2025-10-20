@@ -8,7 +8,7 @@
 
 ## Step 1: Base Installation
 
-Download the latest sprout.efi release from the [GitHub releases page](https://github.com/sprout-dev/sprout/releases).
+Download the latest sprout.efi release from the [GitHub releases page](https://github.com/edera-dev/sprout/releases).
 For x86_64 systems, download the `sprout-x86_64.efi` file, and for ARM systems, download the `sprout-aarch64.efi` file.
 Copy the downloaded `sprout.efi` file to `/boot/efi/EFI/BOOT/sprout.efi` on your EFI System Partition.
 
