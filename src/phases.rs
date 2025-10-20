@@ -37,9 +37,11 @@ pub struct PhaseConfiguration {
 pub fn phase(context: Rc<SproutContext>, phase: &[PhaseConfiguration]) -> Result<()> {
     for item in phase {
         let mut context = context.fork();
+        // Insert the values into the context.
         context.insert(&item.values);
         let context = context.freeze();
 
+        // Execute all the actions in this phase configuration.
         for action in item.actions.iter() {
             actions::execute(context.clone(), action)
                 .context(format!("unable to execute action '{}'", action))?;

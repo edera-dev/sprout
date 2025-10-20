@@ -35,12 +35,26 @@ pub struct RootConfiguration {
     /// inside the sprout context.
     #[serde(default)]
     pub extractors: BTreeMap<String, ExtractorDeclaration>,
+    /// Declares the actions that can execute operations for sprout.
+    /// Actions are executable modules in sprout that take in specific structured values.
+    /// Actions are responsible for ensuring that passed strings are stamped to replace values
+    /// at runtime.
+    /// Each action has a name that can be referenced by other base concepts like entries.
     #[serde(default)]
     pub actions: BTreeMap<String, ActionDeclaration>,
+    /// Declares the entries that are displayed on the boot menu. These entries are static
+    /// but can still use values from the sprout context.
     #[serde(default)]
     pub entries: BTreeMap<String, EntryDeclaration>,
+    /// Declares the generators that are used to generate entries at runtime.
+    /// Each generator has its own logic for generating entries, but generally they intake
+    /// a template entry and stamp that template entry over some values determined at runtime.
+    /// Each generator has an associated name used to differentiate it across sprout.
     #[serde(default)]
     pub generators: BTreeMap<String, GeneratorDeclaration>,
+    /// Configures the various phases of sprout. This allows you to hook into specific parts
+    /// of the boot process to execute actions, for example, you can show a boot splash during
+    /// the early phase.
     #[serde(default)]
     pub phases: PhasesConfiguration,
 }
