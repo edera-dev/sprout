@@ -18,6 +18,15 @@ existing UEFI bootloader or booted by the hardware directly.
 
 Sprout is licensed under Apache 2.0 and is open to modifications and contributions.
 
+## Documentation
+
+- [Fedora Setup Guide]
+- [Development Guide]
+- [Contributing Guide]
+- [Sprout License]
+- [Code of Conduct]
+- [Security Policy]
+
 ## Features
 
 NOTE: Currently, Sprout is experimental and is not intended for production use. For example, it doesn't currently
@@ -116,3 +125,10 @@ chainload.path = "$boot\\$chainload"
 chainload.options = ["$options"]
 chainload.linux-initrd = "$boot\\$initrd"
 ```
+
+[Fedora Setup Guide]: ./docs/fedora-setup.md
+[Development Guide]: ./DEVELOPMENT.md
+[Contributing Guide]: ./CONTRIBUTING.md
+[Sprout License]: ./LICENSE
+[Code of Conduct]: ./CODE_OF_CONDUCT.md
+[Security Policy]: ./SECURITY.md
