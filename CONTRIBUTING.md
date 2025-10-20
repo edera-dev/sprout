@@ -11,7 +11,7 @@ Welcome! We're happy you're reading this; Edera is excited for all kinds of cont
 
 ## Contributing Code
 
-To get started with technical contributions, please read out [Development Guide]. If you're looking for something easy to tackle, [look for issues labeled `good first issue`][good-first-issues].
+To get started with technical contributions, please read our [Development Guide]. If you're looking for something easy to tackle, [look for issues labeled `good first issue`][good-first-issues].
 
 ## Reporting bugs and other issues
 
