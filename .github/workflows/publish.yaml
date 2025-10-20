@@ -73,12 +73,12 @@ jobs:
       run: ./hack/ci/upload-release-assets.sh
       env:
         GITHUB_TOKEN: "${{ steps.generate-token.outputs.token }}"
-        RELEASE_TAG: "${{ github.event.release.tag_name }}"
+        RELEASE_TAG: "${{ github.event.inputs.release-tag }}"
       if: ${{ github.event.inputs.release-tag != '' }}
 
     - name: 'mark release as published'
       run: gh release edit "${RELEASE_TAG}" --draft=false --verify-tag
       env:
         GITHUB_TOKEN: "${{ steps.generate-token.outputs.token }}"
-        RELEASE_TAG: "${{ github.event.release.tag_name }}"
+        RELEASE_TAG: "${{ github.event.inputs.release-tag }}"
       if: ${{ github.event.inputs.release-tag != '' }}
