@@ -4,23 +4,35 @@ use crate::entries::EntryDeclaration;
 use crate::extractors::ExtractorDeclaration;
 use crate::generators::GeneratorDeclaration;
 use crate::phases::PhasesConfiguration;
-use crate::utils;
-use anyhow::Result;
-use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::ops::Deref;
-use toml::Value;
-use uefi::proto::device_path::LoadedImageDevicePath;
 
+/// The configuration loader mechanisms.
+pub mod loader;
+
+/// This is the latest version of the sprout configuration format.
+/// This must be incremented when the configuration breaks compatibility.
+pub const LATEST_VERSION: u32 = 1;
+
+/// The Sprout configuration format.
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct RootConfiguration {
+    /// The version of the configuration. This should always be declared
+    /// and be the latest version that is supported. If not specified, it is assumed
+    /// the configuration is the latest version.
     #[serde(default = "latest_version")]
     pub version: u32,
+    /// Values to be inserted into the root sprout context.
     #[serde(default)]
     pub values: BTreeMap<String, String>,
+    /// Drivers to load.
+    /// These drivers provide extra functionality like filesystem support to Sprout.
+    /// Each driver has a name which uniquely identifies it inside Sprout.
     #[serde(default)]
     pub drivers: BTreeMap<String, DriverDeclaration>,
+    /// Declares the extractors that add values to the sprout context that are calculated
+    /// at runtime. Each extractor has a name which corresponds to the value it will set
+    /// inside the sprout context.
     #[serde(default)]
     pub extractors: BTreeMap<String, ExtractorDeclaration>,
     #[serde(default)]
@@ -33,40 +45,6 @@ pub struct RootConfiguration {
     pub phases: PhasesConfiguration,
 }
 
-pub fn latest_version() -> u32 {
-    1
-}
-
-fn load_raw_config() -> Result<Vec<u8>> {
-    let current_image_device_path_protocol =
-        uefi::boot::open_protocol_exclusive::<LoadedImageDevicePath>(uefi::boot::image_handle())
-            .context("unable to get loaded image device path")?;
-    let path = current_image_device_path_protocol.deref().to_boxed();
-
-    let content = utils::read_file_contents(&path, "sprout.toml")
-        .context("unable to read sprout.toml file")?;
-    Ok(content)
-}
-
-pub fn load() -> Result<RootConfiguration> {
-    let content = load_raw_config()?;
-    let value: Value = toml::from_slice(&content).context("unable to parse sprout.toml file")?;
-
-    let version = value
-        .get("version")
-        .cloned()
-        .unwrap_or_else(|| Value::Integer(latest_version() as i64));
-
-    let version: u32 = version
-        .try_into()
-        .context("unable to get configuration version")?;
-
-    if version != latest_version() {
-        bail!("unsupported configuration version: {}", version);
-    }
-
-    let config: RootConfiguration = value
-        .try_into()
-        .context("unable to parse sprout.toml file")?;
-    Ok(config)
+fn latest_version() -> u32 {
+    LATEST_VERSION
 }
