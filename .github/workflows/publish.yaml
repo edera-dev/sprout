@@ -39,10 +39,9 @@ jobs:
       with:
         persist-credentials: false
 
-    - name: 'install nightly rust toolchain'
+    - name: 'install rust toolchain'
       run: |
-        rustup update --no-self-update nightly
-        rustup default nightly
+        cargo version
 
     - name: 'assemble artifacts'
       run: ./hack/assemble.sh
