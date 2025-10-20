@@ -1,0 +1,49 @@
+name: codeql
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+  - cron: '33 16 * * 0'
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: 'ubuntu-latest'
+    permissions:
+      security-events: write # Needed to upload results.
+      packages: read # Needed to fetch internal or private CodeQL packs.
+      actions: read # Needed to read workflows.
+      contents: read # Needed to read code.
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - language: actions
+          build-mode: none
+        - language: rust
+          build-mode: none
+    steps:
+    - name: harden runner
+      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      with:
+        egress-policy: audit
+
+    - name: checkout
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      with:
+        persist-credentials: false
+
+    - name: initialize codeql
+      uses: github/codeql-action/init@16140ae1a102900babc80a33c44059580f687047 #v4
+      with:
+        languages: ${{ matrix.language }}
+        build-mode: ${{ matrix.build-mode }}
+
+    - name: perform codeql analysis
+      uses: github/codeql-action/analyze@16140ae1a102900babc80a33c44059580f687047 #v4
+      with:
+        category: "/language:${{matrix.language}}"
