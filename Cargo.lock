@@ -60,6 +60,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "edera-sprout"
+version = "0.0.2"
+dependencies = [
+ "anyhow",
+ "image",
+ "log",
+ "serde",
+ "toml",
+ "uefi",
+ "uefi-raw",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -250,19 +263,6 @@ dependencies = [
 name = "simd-adler32"
 version = "0.3.7"
 source = "git+https://github.com/edera-dev/sprout-patched-deps.git?rev=2c4fcc84b50d40c28f540d4271109ea0ca7e1268#2c4fcc84b50d40c28f540d4271109ea0ca7e1268"
-
-[[package]]
-name = "sprout"
-version = "0.0.2"
-dependencies = [
- "anyhow",
- "image",
- "log",
- "serde",
- "toml",
- "uefi",
- "uefi-raw",
-]
 
 [[package]]
 name = "syn"

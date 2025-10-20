@@ -1,9 +1,9 @@
+use crate::config::{RootConfiguration, latest_version};
+use crate::utils;
+use anyhow::{Context, Result, bail};
 use std::ops::Deref;
-use anyhow::{bail, Context, Result};
 use toml::Value;
 use uefi::proto::device_path::LoadedImageDevicePath;
-use crate::config::{latest_version, RootConfiguration};
-use crate::utils;
 
 fn load_raw_config() -> Result<Vec<u8>> {
     let current_image_device_path_protocol =

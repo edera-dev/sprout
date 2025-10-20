@@ -1,8 +1,7 @@
 [package]
-name = "sprout"
+name = "edera-sprout"
 version = "0.0.2"
 edition = "2024"
-publish = false
 
 [dependencies]
 anyhow = "1.0.100"
@@ -26,13 +25,13 @@ features = ["alloc", "logger"]
 [dependencies.uefi-raw]
 version =  "0.11.0"
 
-[profile.release]
-lto = "thin"
-strip = "symbols"
-
 [features]
 default = ["splash"]
 splash = ["dep:image"]
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
 
 [profile.release-debuginfo]
 inherits = "release"
@@ -51,3 +50,7 @@ rev = "2c4fcc84b50d40c28f540d4271109ea0ca7e1268"
 [patch.crates-io.moxcms]
 git = "https://github.com/edera-dev/sprout-patched-deps.git"
 rev = "2c4fcc84b50d40c28f540d4271109ea0ca7e1268"
+
+[[bin]]
+name = "sprout"
+path = "src/main.rs"
