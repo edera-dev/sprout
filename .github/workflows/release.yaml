@@ -1,0 +1,91 @@
+name: release
+
+on:
+  # This workflow runs on every push to main to either open a PR or publish the release.
+  push:
+    branches:
+    - main
+
+permissions:
+  contents: read # Default token to read
+
+jobs:
+  release-plz-release:
+    if: ${{ github.repository_owner == 'edera-dev' }}
+    name: release-plz release
+    runs-on: ubuntu-latest
+    environment: release  # Environment for trusted publishing
+    permissions:
+      contents: write # Needed to write release artifacts
+      id-token: write # Needed for trusted publishing
+    steps:
+    - name: harden runner
+      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      with:
+        egress-policy: audit
+
+    - name: checkout
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      with:
+        persist-credentials: false
+
+    - name: 'install nightly rust toolchain'
+      run: |
+        rustup update --no-self-update nightly
+        rustup default nightly
+
+    - name: 'generate cultivator token'
+      uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+      id: generate-token
+      with:
+        app-id: "${{ secrets.EDERA_CULTIVATION_APP_ID }}"
+        private-key: "${{ secrets.EDERA_CULTIVATION_APP_PRIVATE_KEY }}"
+
+    - name: 'release-plz'
+      uses: release-plz/action@d529f731ae3e89610ada96eda34e5c6ba3b12214 # v0.5
+      with:
+        command: release
+      env:
+        GITHUB_TOKEN: "${{ steps.generate-token.outputs.token }}"
+
+  release-plz-pr:
+    if: ${{ github.repository_owner == 'edera-dev' }}
+    name: release-plz pr
+    runs-on: ubuntu-latest
+    environment: release # Environment for trusted publishing
+    permissions:
+      contents: write # Needed to write release artifacts
+      id-token: write # Needed for trusted publishing
+      pull-requests: write # Needed to create pull requests
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+    - name: harden runner
+      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      with:
+        egress-policy: audit
+
+    - name: checkout
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      with:
+        persist-credentials: false
+
+    - name: 'install nightly rust toolchain'
+      run: |
+        rustup update --no-self-update nightly
+        rustup default nightly
+
+    - name: 'generate cultivator token'
+      uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+      id: generate-token
+      with:
+        app-id: "${{ secrets.EDERA_CULTIVATION_APP_ID }}"
+        private-key: "${{ secrets.EDERA_CULTIVATION_APP_PRIVATE_KEY }}"
+
+    - name: 'release-plz'
+      uses: release-plz/action@d529f731ae3e89610ada96eda34e5c6ba3b12214 # v0.5
+      with:
+        command: release-pr
+      env:
+        GITHUB_TOKEN: "${{ steps.generate-token.outputs.token }}"

@@ -1,0 +1,14 @@
+[workspace]
+pr_branch_prefix = "release/"
+pr_labels = ["release"]
+release_always = true
+git_release_enable = false
+git_tag_enable = false
+changelog_update = false
+
+[[package]]
+name = "sprout"
+git_release_name = "v{{ version }}"
+git_tag_name = "v{{ version }}"
+git_tag_enable = true
+git_release_enable = true
