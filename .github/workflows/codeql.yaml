@@ -40,10 +40,6 @@ jobs:
       with:
         persist-credentials: false
 
-    - name: use rust extractor config
-      run: |
-        echo "CODEQL_EXTRACTOR_RUST_CONFIG=.github/codeql/rust-extractor.yaml" >> $GITHUB_ENV
-
     - name: initialize codeql
       uses: github/codeql-action/init@16140ae1a102900babc80a33c44059580f687047 #v4
       with:
