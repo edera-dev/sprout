@@ -1,4 +1,4 @@
-# Sprout on Fedora
+# Setup Sprout on Fedora
 
 ## Prerequisites
 
