@@ -66,6 +66,26 @@ chainload.linux-initrd = "$boot\\$initrd"
 
 You can configure GRUB to add a boot entry for Sprout, so you can continue to use GRUB without interruption.
 
+GRUB needs to be configured with the chainloader module to load Sprout.
+
+### x86_64
+
+```bash
+# Install x86_64 GRUB modules.
+$ sudo dnf install grub2-efi-x64-modules
+# Copy x86_64 GRUB modules to /boot/grub2 for use by GRUB if it isn't installed already.
+$ [ ! -d /boot/grub2/x86_64-efi ] && sudo cp -r /usr/lib/grub/x86_64-efi /boot/grub2/x86_64-efi
+```
+
+### ARM64
+
+```bash
+# Install ARM64 GRUB modules.
+$ sudo dnf install grub2-efi-aa64-modules
+# Copy ARM64 GRUB modules to /boot/grub2 for use by GRUB if it isn't installed already.
+$ [ ! -d /boot/grub2/arm64-efi ] && sudo cp -r /usr/lib/grub/arm64-efi /boot/grub2/x86_64-efi
+```
+
 You will need to find the UUID of your EFI System Partition. You can do this by running the following command:
 ```bash
 $ grep "/boot/efi" /etc/fstab | awk '{print $1}' | awk -F '=' '{print $2}'
@@ -78,6 +98,7 @@ The GRUB configuration for Sprout is as follows, replace `SAMPLE-VALUE` with the
 menuentry 'Sprout' $menuentry_id_option 'sprout' {
         insmod part_gpt
         insmod fat
+        insmod chain
         search --no-floppy --fs-uuid --set=root SAMPLE-VALUE
         chainloader /EFI/BOOT/sprout.efi
 }
