@@ -26,3 +26,16 @@ updates:
     cargo-dev-updates:
       dependency-type: development
       applies-to: version-updates
+- package-ecosystem: docker
+  directory: /
+  schedule:
+    interval: weekly
+  cooldown:
+    default-days: 7
+  groups:
+    docker-updates:
+      dependency-type: production
+      applies-to: version-updates
+    docker-dev-updates:
+      dependency-type: development
+      applies-to: version-updates
