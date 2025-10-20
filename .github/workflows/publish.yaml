@@ -65,6 +65,7 @@ jobs:
       with:
         app-id: "${{ secrets.EDERA_CULTIVATION_APP_ID }}"
         private-key: "${{ secrets.EDERA_CULTIVATION_APP_PRIVATE_KEY }}"
+      if: ${{ github.event_name == 'release' }}
 
     - name: 'upload release artifacts'
       run: ./hack/ci/upload-release-assets.sh
