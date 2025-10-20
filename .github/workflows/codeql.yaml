@@ -8,6 +8,9 @@ on:
   schedule:
   - cron: '33 16 * * 0'
 
+permissions:
+  contents: read # Needed to checkout the repository.
+
 jobs:
   analyze:
     name: analyze (${{ matrix.language }})
@@ -16,7 +19,7 @@ jobs:
       security-events: write # Needed to upload results.
       packages: read # Needed to fetch internal or private CodeQL packs.
       actions: read # Needed to read workflows.
-      contents: read # Needed to read code.
+      contents: read # Needed to checkout the repository.
 
     strategy:
       fail-fast: false
@@ -36,6 +39,10 @@ jobs:
       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
       with:
         persist-credentials: false
+
+    - name: use rust extractor config
+      run: |
+        echo "CODEQL_EXTRACTOR_RUST_CONFIG=.github/codeql/rust-extractor.yaml" >> $GITHUB_ENV
 
     - name: initialize codeql
       uses: github/codeql-action/init@16140ae1a102900babc80a33c44059580f687047 #v4
