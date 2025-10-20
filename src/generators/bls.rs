@@ -33,6 +33,13 @@ fn default_bls_path() -> String {
     BLS_TEMPLATE_PATH.to_string()
 }
 
+// TODO(azenla): remove this once variable substitution is implemented.
+/// This function is used to remove the `tuned_initrd` variable from entry values.
+/// Fedora uses tuned which adds an initrd that shouldn't be used.
+fn quirk_initrd_remove_tuned(input: String) -> String {
+    input.replace("$tuned_initrd", "").trim().to_string()
+}
+
 /// Generates entries from the BLS entries directory using the specified `bls` configuration and
 /// `context`. The BLS conversion is best-effort and will ignore any unsupported entries.
 pub fn generate(
@@ -108,10 +115,18 @@ pub fn generate(
 
         // Produce a new sprout context for the entry with the extracted values.
         let mut context = context.fork();
-        context.set("title", entry.title().unwrap_or(name));
-        context.set("chainload", entry.chainload_path().unwrap_or_default());
-        context.set("options", entry.options().unwrap_or_default());
-        context.set("initrd", entry.initrd_path().unwrap_or_default());
+
+        let title = entry.title().unwrap_or(name);
+        let chainload = entry.chainload_path().unwrap_or_default();
+        let options = entry.options().unwrap_or_default();
+
+        // Put the initrd through a quirk modifier to support Fedora.
+        let initrd = quirk_initrd_remove_tuned(entry.initrd_path().unwrap_or_default());
+
+        context.set("title", title);
+        context.set("chainload", chainload);
+        context.set("options", options);
+        context.set("initrd", initrd);
 
         // Add the entry to the list with a frozen context.
         entries.push((context.freeze(), bls.entry.clone()));
