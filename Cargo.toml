@@ -2,7 +2,7 @@
 name = "edera-sprout"
 description = "Modern UEFI bootloader"
 license = "Apache-2.0"
-version = "0.0.3"
+version = "0.0.4"
 homepage = "https://sprout.edera.dev"
 repository = "https://github.com/edera-dev/sprout"
 edition = "2024"
