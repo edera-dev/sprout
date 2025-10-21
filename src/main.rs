@@ -51,7 +51,7 @@ fn main() -> Result<()> {
     setup::init()?;
 
     // Parse the options to the sprout executable.
-    let options = options::parse().context("unable to parse options")?;
+    let options = options::parser::parse().context("unable to parse options")?;
 
     // Load the configuration of sprout.
     // At this point, the configuration has been validated and the specified
