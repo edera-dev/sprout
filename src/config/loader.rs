@@ -1,31 +1,36 @@
 use crate::config::{RootConfiguration, latest_version};
+use crate::options::SproutOptions;
 use crate::utils;
 use anyhow::{Context, Result, bail};
+use log::info;
 use std::ops::Deref;
 use toml::Value;
 use uefi::proto::device_path::LoadedImageDevicePath;
 
-/// Loads the raw configuration from the sprout.toml file as data.
-fn load_raw_config() -> Result<Vec<u8>> {
+/// Loads the raw configuration from the sprout config file as data.
+fn load_raw_config(options: &SproutOptions) -> Result<Vec<u8>> {
     // Open the LoadedImageDevicePath protocol to get the path to the current image.
     let current_image_device_path_protocol =
         uefi::boot::open_protocol_exclusive::<LoadedImageDevicePath>(uefi::boot::image_handle())
             .context("unable to get loaded image device path")?;
     // Acquire the device path as a boxed device path.
     let path = current_image_device_path_protocol.deref().to_boxed();
-    // Read the contents of the sprout.toml file.
-    let content = utils::read_file_contents(&path, "sprout.toml")
-        .context("unable to read sprout.toml file")?;
-    // Return the contents of the sprout.toml file.
+
+    info!("configuration file: {}", options.config);
+
+    // Read the contents of the sprout config file.
+    let content = utils::read_file_contents(&path, &options.config)
+        .context("unable to read sprout config file")?;
+    // Return the contents of the sprout config file.
     Ok(content)
 }
 
 /// Loads the [RootConfiguration] for Sprout.
-pub fn load() -> Result<RootConfiguration> {
-    // Load the raw configuration from the sprout.toml file.
-    let content = load_raw_config()?;
+pub fn load(options: &SproutOptions) -> Result<RootConfiguration> {
+    // Load the raw configuration from the sprout config file.
+    let content = load_raw_config(options)?;
     // Parse the raw configuration into a toml::Value which can represent any TOML file.
-    let value: Value = toml::from_slice(&content).context("unable to parse sprout.toml file")?;
+    let value: Value = toml::from_slice(&content).context("unable to parse sprout config file")?;
 
     // Check the version of the configuration without parsing the full configuration.
     let version = value

@@ -1,4 +1,5 @@
 use crate::actions::ActionDeclaration;
+use crate::options::SproutOptions;
 use anyhow::Result;
 use anyhow::anyhow;
 use std::collections::{BTreeMap, BTreeSet};
@@ -13,15 +14,18 @@ pub struct RootContext {
     actions: BTreeMap<String, ActionDeclaration>,
     /// The device path of the loaded Sprout image.
     loaded_image_path: Option<Box<DevicePath>>,
+    /// The global options of Sprout.
+    options: SproutOptions,
 }
 
 impl RootContext {
     /// Creates a new root context with the `loaded_image_device_path` which will be stored
     /// in the context for easy access.
-    pub fn new(loaded_image_device_path: Box<DevicePath>) -> Self {
+    pub fn new(loaded_image_device_path: Box<DevicePath>, options: SproutOptions) -> Self {
         Self {
             actions: BTreeMap::new(),
             loaded_image_path: Some(loaded_image_device_path),
+            options,
         }
     }
 
@@ -40,6 +44,11 @@ impl RootContext {
         self.loaded_image_path
             .as_deref()
             .ok_or_else(|| anyhow!("no loaded image path"))
+    }
+
+    /// Access the global Sprout options.
+    pub fn options(&self) -> &SproutOptions {
+        &self.options
     }
 }
 

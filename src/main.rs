@@ -3,7 +3,7 @@
 
 use crate::context::{RootContext, SproutContext};
 use crate::phases::phase;
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use log::info;
 use std::collections::BTreeMap;
 use std::ops::Deref;
@@ -37,6 +37,9 @@ pub mod phases;
 /// setup: Code that initializes the UEFI environment for Sprout.
 pub mod setup;
 
+/// options: Parse the options of the Sprout executable.
+pub mod options;
+
 /// utils: Utility functions that are used by other parts of Sprout.
 pub mod utils;
 
@@ -47,10 +50,13 @@ fn main() -> Result<()> {
     // Initialize the basic UEFI environment.
     setup::init()?;
 
+    // Parse the options to the sprout executable.
+    let options = options::parse().context("unable to parse options")?;
+
     // Load the configuration of sprout.
     // At this point, the configuration has been validated and the specified
     // version is checked to ensure compatibility.
-    let config = config::loader::load()?;
+    let config = config::loader::load(&options)?;
 
     // Load the root context.
     // This is done in a block to ensure the release of the LoadedImageDevicePath protocol.
@@ -64,7 +70,7 @@ fn main() -> Result<()> {
             "loaded image path: {}",
             loaded_image_path.to_string(DisplayOnly(false), AllowShortcuts(false))?
         );
-        RootContext::new(loaded_image_path)
+        RootContext::new(loaded_image_path, options)
     };
 
     // Insert the configuration actions into the root context.
@@ -144,9 +150,14 @@ fn main() -> Result<()> {
     // Execute the late phase.
     phase(context.clone(), &config.phases.late).context("unable to execute late phase")?;
 
-    // Pick the first entry from the list of final entries until a boot menu is implemented.
-    let Some((context, entry)) = final_entries.first() else {
-        bail!("no entries found");
+    // Use the boot option if possible, otherwise pick the first entry.
+    let (context, entry) = if let Some(ref boot) = context.root().options().boot {
+        final_entries
+            .iter()
+            .find(|(_context, entry)| &entry.title == boot)
+            .context(format!("unable to find entry: {boot}"))?
+    } else {
+        final_entries.first().context("no entries found")?
     };
 
     // Execute all the actions for the selected entry.
