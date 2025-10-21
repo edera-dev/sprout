@@ -61,7 +61,7 @@ dependencies = [
 
 [[package]]
 name = "edera-sprout"
-version = "0.0.4"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "image",
