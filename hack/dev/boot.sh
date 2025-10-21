@@ -19,7 +19,7 @@ elif [ "${TARGET_ARCH}" = "aarch64" ]; then
 fi
 
 if [ -n "${QEMU_ACCEL}" ]; then
-	set -- "${@}" "-accel" "kvm"
+	set -- "${@}" "-accel" "${QEMU_ACCEL}"
 fi
 
 if [ "${QEMU_GDB}" = "1" ]; then

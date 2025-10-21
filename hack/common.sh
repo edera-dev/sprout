@@ -41,3 +41,8 @@ if [ -z "${QEMU_ACCEL}" ] && [ "${TARGET_ARCH}" = "${HOST_ARCH}" ] &&
 	grep -E '^flags.*:.+ vmx .*' /proc/cpuinfo >/dev/null; then
 	QEMU_ACCEL="kvm"
 fi
+
+if [ "$(uname)" = "Darwin" ] && [ "${TARGET_ARCH}" = "${HOST_ARCH}" ] &&
+	[ "$(sysctl -n kern.hv_support 2>&1 || true)" = "1" ]; then
+	QEMU_ACCEL="hvf"
+fi
