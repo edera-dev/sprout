@@ -73,6 +73,17 @@ See [Configuration](#configuration) for how to configure sprout.
 
 Sprout is configured using a TOML file at `\sprout.toml` on the root of the EFI partition sprout was booted from.
 
+### Command Line Options
+
+Sprout supports some command line options that can be combined to modify behavior without the configuration file.
+
+```bash
+# Boot Sprout with a specific configuration file.
+$ sprout.efi --config=\path\to\config.toml
+# Boot a specific entry, bypassing the menu.
+$ sprout.efi --boot="Boot Xen"
+```
+
 ### Boot Linux from ESP
 
 ```toml
