@@ -40,6 +40,7 @@ have secure boot support. In fact, as of writing, it doesn't even have a boot me
 - [x] [Bootloader specification (BLS)](https://uapi-group.org/specifications/specs/boot_loader_specification/) support
 - [x] Chainload support
 - [x] Linux boot support via EFI stub
+- [x] Windows boot support via chainload
 - [x] Load Linux initrd from disk
 - [x] Boot first configured entry
 
@@ -48,7 +49,6 @@ have secure boot support. In fact, as of writing, it doesn't even have a boot me
 - [ ] Boot menu
 - [ ] Secure Boot support: work in progress
 - [ ] UKI support: partial
-- [ ] Windows boot support (untested via chainload)
 - [ ] multiboot2 support
 - [ ] Linux boot protocol (boot without EFI stub)
 
