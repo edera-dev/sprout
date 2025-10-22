@@ -2,6 +2,8 @@
 #![feature(uefi_std)]
 
 use crate::context::{RootContext, SproutContext};
+use crate::options::SproutOptions;
+use crate::options::parser::OptionsRepresentable;
 use crate::phases::phase;
 use anyhow::{Context, Result};
 use log::info;
@@ -51,7 +53,7 @@ fn main() -> Result<()> {
     setup::init()?;
 
     // Parse the options to the sprout executable.
-    let options = options::parser::parse().context("unable to parse options")?;
+    let options = SproutOptions::parse().context("unable to parse options")?;
 
     // Load the configuration of sprout.
     // At this point, the configuration has been validated and the specified
