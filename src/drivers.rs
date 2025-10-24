@@ -19,7 +19,7 @@ pub struct DriverDeclaration {
     pub path: String,
 }
 
-/// Loads the driver specified by the [driver] declaration.
+/// Loads the driver specified by the `driver` declaration.
 fn load_driver(context: Rc<SproutContext>, driver: &DriverDeclaration) -> Result<()> {
     // Acquire the handle and device path of the loaded image.
     let sprout_image = uefi::boot::image_handle();

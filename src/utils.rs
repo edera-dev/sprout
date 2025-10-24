@@ -12,7 +12,7 @@ pub mod framebuffer;
 /// Support code for the media loader protocol.
 pub mod media_loader;
 
-/// Parses the input [path] as a [DevicePath].
+/// Parses the input `path` as a [DevicePath].
 /// Uses the [DevicePathFromText] protocol exclusively, and will fail if it cannot acquire the protocol.
 pub fn text_to_device_path(path: &str) -> Result<PoolDevicePath> {
     let path = CString16::try_from(path).context("unable to convert path to CString16")?;
@@ -27,7 +27,7 @@ pub fn text_to_device_path(path: &str) -> Result<PoolDevicePath> {
         .context("unable to convert text to device path")
 }
 
-/// Grabs the root part of the [path].
+/// Grabs the root part of the `path`.
 /// For example, given "PciRoot(0x0)/Pci(0x4,0x0)/NVMe(0x1,00-00-00-00-00-00-00-00)/HD(1,MBR,0xBE1AFDFA,0x3F,0xFBFC1)/\EFI\BOOT\BOOTX64.efi"
 /// it will give "PciRoot(0x0)/Pci(0x4,0x0)/NVMe(0x1,00-00-00-00-00-00-00-00)/HD(1,MBR,0xBE1AFDFA,0x3F,0xFBFC1)"
 pub fn device_path_root(path: &DevicePath) -> Result<String> {
@@ -52,7 +52,7 @@ pub fn device_path_root(path: &DevicePath) -> Result<String> {
     Ok(path)
 }
 
-/// Grabs the part of the [path] after the root.
+/// Grabs the part of the `path` after the root.
 /// For example, given "PciRoot(0x0)/Pci(0x4,0x0)/NVMe(0x1,00-00-00-00-00-00-00-00)/HD(1,MBR,0xBE1AFDFA,0x3F,0xFBFC1)/\EFI\BOOT\BOOTX64.efi"
 /// it will give "\EFI\BOOT\BOOTX64.efi"
 pub fn device_path_subpath(path: &DevicePath) -> Result<String> {
@@ -92,8 +92,8 @@ pub struct ResolvedPath {
     pub filesystem_handle: Handle,
 }
 
-/// Resolve a path specified by [input] to its various components.
-/// Uses [default_root_path] as the base root if one is not specified in the path.
+/// Resolve a path specified by `input` to its various components.
+/// Uses `default_root_path` as the base root if one is not specified in the path.
 /// Returns [ResolvedPath] which contains the resolved components.
 pub fn resolve_path(default_root_path: &DevicePath, input: &str) -> Result<ResolvedPath> {
     let mut path = text_to_device_path(input).context("unable to convert text to path")?;
@@ -137,9 +137,9 @@ pub fn resolve_path(default_root_path: &DevicePath, input: &str) -> Result<Resol
     })
 }
 
-/// Read the contents of a file at the location specified with the [input] path.
+/// Read the contents of a file at the location specified with the `input` path.
 /// Internally, this uses [resolve_path] to resolve the path to its various components.
-/// [resolve_path] is passed the [default_root_path] which should specify a base root.
+/// [resolve_path] is passed the `default_root_path` which should specify a base root.
 ///
 /// This acquires exclusive protocol access to the [SimpleFileSystem] protocol of the resolved
 /// filesystem handle, so care must be taken to call this function outside a scope with

@@ -46,8 +46,8 @@ pub struct MediaLoaderHandle {
 impl MediaLoaderHandle {
     /// The behavior of this function is derived from how Linux calls it.
     ///
-    /// Linux calls this function by first passing a NULL [buffer].
-    /// We must set the size of the buffer it should allocate in [buffer_size].
+    /// Linux calls this function by first passing a NULL `buffer`.
+    /// We must set the size of the buffer it should allocate in `buffer_size`.
     /// The next call will pass a buffer of the right size, and we should copy
     /// data into that buffer, checking whether it is safe to copy based on
     /// the buffer size.
@@ -137,7 +137,7 @@ impl MediaLoaderHandle {
         Ok(false)
     }
 
-    /// Registers the provided [data] with the UEFI stack as media loader.
+    /// Registers the provided `data` with the UEFI stack as media loader.
     /// This uses a special device path that other EFI programs will look at
     /// to load the data from.
     pub fn register(guid: Guid, data: Box<[u8]>) -> Result<MediaLoaderHandle> {
