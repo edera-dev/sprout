@@ -18,6 +18,23 @@ existing UEFI bootloader or booted by the hardware directly.
 
 Sprout is licensed under Apache 2.0 and is open to modifications and contributions.
 
+## Background
+
+At [Edera] we make compute isolation technology for a wide variety of environments, often ones we do not fully control.
+Our technology utilizes a hypervisor to boot the host system to provide a new isolation mechanism that works
+with or without hardware virtualization support. To do this we need to inject our hypervisor at boot time.
+
+Unfortunately, GRUB, the most common bootloader on Linux systems today, utilizes a shell-script like
+configuration system. Both the code that runs to generate a GRUB config and the GRUB config
+itself is fully turing complete. This makes modifying boot configuration difficult and error-prone.
+
+Sprout was designed to take in a machine-readable, writable, and modifiable configuration that treats boot information
+like data plus configuration, and can be chained from both UEFI firmware and GRUB alike.
+
+Sprout aims to be flexible, secure, and modern. Written in Rust, it handles data safely and uses unsafe code as little
+as possible. It also critically must be easy to install into all common distributions, relying on simple principles to
+simplify installation and usage.
+
 ## Documentation
 
 - [Fedora Setup Guide]
@@ -139,6 +156,7 @@ chainload.options = ["$options"]
 chainload.linux-initrd = "$boot\\$initrd"
 ```
 
+[Edera]: https://edera.dev
 [Fedora Setup Guide]: ./docs/fedora-setup.md
 [Generic Linux Setup Guide]: ./docs/generic-linux-setup.md
 [Windows Setup Guide]: ./docs/windows-setup.md
