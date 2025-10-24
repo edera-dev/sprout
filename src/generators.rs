@@ -1,5 +1,5 @@
 use crate::context::SproutContext;
-use crate::entries::EntryDeclaration;
+use crate::entries::BootableEntry;
 use crate::generators::bls::BlsConfiguration;
 use crate::generators::matrix::MatrixConfiguration;
 use anyhow::Result;
@@ -40,7 +40,7 @@ pub struct GeneratorDeclaration {
 pub fn generate(
     context: Rc<SproutContext>,
     generator: &GeneratorDeclaration,
-) -> Result<Vec<(Rc<SproutContext>, EntryDeclaration)>> {
+) -> Result<Vec<BootableEntry>> {
     if let Some(matrix) = &generator.matrix {
         matrix::generate(context, matrix)
     } else if let Some(bls) = &generator.bls {

@@ -1,5 +1,5 @@
 use crate::context::SproutContext;
-use crate::entries::EntryDeclaration;
+use crate::entries::{BootableEntry, EntryDeclaration};
 use crate::generators::bls::entry::BlsEntry;
 use crate::utils;
 use anyhow::{Context, Result};
@@ -42,10 +42,7 @@ fn quirk_initrd_remove_tuned(input: String) -> String {
 
 /// Generates entries from the BLS entries directory using the specified `bls` configuration and
 /// `context`. The BLS conversion is best-effort and will ignore any unsupported entries.
-pub fn generate(
-    context: Rc<SproutContext>,
-    bls: &BlsConfiguration,
-) -> Result<Vec<(Rc<SproutContext>, EntryDeclaration)>> {
+pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Vec<BootableEntry>> {
     let mut entries = Vec::new();
 
     // Stamp the path to the BLS entries directory.
@@ -116,7 +113,7 @@ pub fn generate(
         // Produce a new sprout context for the entry with the extracted values.
         let mut context = context.fork();
 
-        let title = entry.title().unwrap_or(name);
+        let title = entry.title().unwrap_or_else(|| name.clone());
         let chainload = entry.chainload_path().unwrap_or_default();
         let options = entry.options().unwrap_or_default();
 
@@ -129,7 +126,12 @@ pub fn generate(
         context.set("initrd", initrd);
 
         // Add the entry to the list with a frozen context.
-        entries.push((context.freeze(), bls.entry.clone()));
+        entries.push(BootableEntry::new(
+            name,
+            bls.entry.title.clone(),
+            context.freeze(),
+            bls.entry.clone(),
+        ));
     }
 
     Ok(entries)
