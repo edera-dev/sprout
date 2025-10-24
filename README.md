@@ -1,6 +1,6 @@
 <div align="center">
 
-![Sprout Logo](assets/logo.png)
+![Sprout Logo](assets/logo-small.png)
 
 # Sprout
 
