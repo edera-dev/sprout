@@ -2,6 +2,7 @@ use crate::actions::ActionDeclaration;
 use crate::options::SproutOptions;
 use anyhow::anyhow;
 use anyhow::{Result, bail};
+use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use uefi::proto::device_path::DevicePath;
@@ -204,7 +205,9 @@ impl SproutContext {
         // Sort the keys by length. This is to ensure that we stamp the longest keys first.
         // If we did not do this, "$abc" could be stamped by "$a" into an invalid result.
         let mut keys = values.keys().collect::<Vec<_>>();
-        keys.sort_by_key(|key| key.len());
+
+        // Sort by key length, reversed. This results in the longest keys appearing first.
+        keys.sort_by_key(|key| Reverse(key.len()));
 
         for key in keys {
             // Empty keys are not supported.
