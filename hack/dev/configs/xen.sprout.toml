@@ -1,5 +1,8 @@
 version = 1
 
+[defaults]
+entry = "xen"
+
 [extractors.boot.filesystem-device-match]
 has-item = "\\EFI\\BOOT\\xen.efi"
 

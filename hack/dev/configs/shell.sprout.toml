@@ -1,11 +1,14 @@
 version = 1
 
+[defaults]
+entry = "shell"
+
 [extractors.boot.filesystem-device-match]
 has-item = "\\EFI\\BOOT\\shell.efi"
 
 [actions.chainload-shell]
 chainload.path = "$boot\\EFI\\BOOT\\shell.efi"
 
-[entries.xen]
+[entries.shell]
 title = "Boot Shell"
 actions = ["chainload-shell"]

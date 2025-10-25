@@ -22,6 +22,9 @@ pub struct RootConfiguration {
     /// the configuration is the latest version.
     #[serde(default = "latest_version")]
     pub version: u32,
+    /// Default options for Sprout.
+    #[serde(default)]
+    pub defaults: DefaultsConfiguration,
     /// Values to be inserted into the root sprout context.
     #[serde(default)]
     pub values: BTreeMap<String, String>,
@@ -57,6 +60,14 @@ pub struct RootConfiguration {
     /// the early phase.
     #[serde(default)]
     pub phases: PhasesConfiguration,
+}
+
+/// Default configuration for Sprout, used when the corresponding options are not specified.
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct DefaultsConfiguration {
+    /// The entry to boot without showing the boot menu.
+    /// If not specified, a boot menu is shown.
+    pub entry: Option<String>,
 }
 
 fn latest_version() -> u32 {
