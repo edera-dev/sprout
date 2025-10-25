@@ -117,7 +117,7 @@ fn main() -> Result<()> {
         // Associate the main context with the static entry.
         entries.push(BootableEntry::new(
             name,
-            context.stamp(&entry.title),
+            entry.title.clone(),
             context.clone(),
             entry,
         ));
@@ -139,7 +139,7 @@ fn main() -> Result<()> {
     }
 
     for entry in &mut entries {
-        let mut context = context.fork();
+        let mut context = entry.context().fork();
         // Insert the values from the entry configuration into the
         // sprout context to use with the entry itself.
         context.insert(&entry.declaration().values);
@@ -154,7 +154,7 @@ fn main() -> Result<()> {
     // For now, we just print all of the entries.
     info!("entries:");
     for (index, entry) in entries.iter().enumerate() {
-        let title = context.stamp(&entry.declaration().title);
+        let title = entry.context().stamp(&entry.declaration().title);
         info!("  entry {} [{}]: {}", index, entry.name(), title);
     }
 
@@ -177,8 +177,8 @@ fn main() -> Result<()> {
 
     // Execute all the actions for the selected entry.
     for action in &entry.declaration().actions {
-        let action = context.stamp(action);
-        actions::execute(context.clone(), &action)
+        let action = entry.context().stamp(action);
+        actions::execute(entry.context().clone(), &action)
             .context(format!("unable to execute action '{}'", action))?;
     }
 
