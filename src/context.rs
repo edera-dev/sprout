@@ -201,6 +201,10 @@ impl SproutContext {
         let mut result = text.as_ref().to_string();
         let mut did_change = false;
         for (key, value) in values {
+            // Empty keys are not supported.
+            if key.is_empty() {
+                continue;
+            }
             let next_result = result.replace(&format!("${key}"), value);
             if result != next_result {
                 did_change = true;
