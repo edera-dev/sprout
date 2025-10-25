@@ -31,6 +31,11 @@ impl Framebuffer {
 
     /// Mutably acquires a pixel of the framebuffer at the specified `x` and `y` coordinate.
     pub fn pixel(&mut self, x: usize, y: usize) -> Option<&mut BltPixel> {
+        // Verify that the coordinates are within the bounds of the framebuffer.
+        if x >= self.width || y >= self.height {
+            return None;
+        }
+
         // Calculate the index of the pixel safely, returning None if it overflows.
         let index = y.checked_mul(self.width)?.checked_add(x)?;
         // Return the pixel at the index. If the index is out of bounds, this will return None.
