@@ -120,7 +120,8 @@ fn draw(image: DynamicImage) -> Result<()> {
     let image = resize_to_fit(&image, fit);
 
     // Create a framebuffer to draw the image on.
-    let mut framebuffer = Framebuffer::new(width, height);
+    let mut framebuffer =
+        Framebuffer::new(width, height).context("unable to create framebuffer")?;
 
     // Iterate over the pixels in the image and put them on the framebuffer.
     for (x, y, pixel) in image.enumerate_pixels() {

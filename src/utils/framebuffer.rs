@@ -13,17 +13,28 @@ pub struct Framebuffer {
 
 impl Framebuffer {
     /// Creates a new framebuffer of the specified `width` and `height`.
-    pub fn new(width: usize, height: usize) -> Self {
-        Framebuffer {
+    pub fn new(width: usize, height: usize) -> Result<Self> {
+        // Verify that the size is valid during multiplication.
+        let size = width
+            .checked_mul(height)
+            .context("framebuffer size overflow")?;
+
+        // Initialize the pixel buffer with black pixels, with the verified size.
+        let pixels = vec![BltPixel::new(0, 0, 0); size];
+
+        Ok(Framebuffer {
             width,
             height,
-            pixels: vec![BltPixel::new(0, 0, 0); width * height],
-        }
+            pixels,
+        })
     }
 
     /// Mutably acquires a pixel of the framebuffer at the specified `x` and `y` coordinate.
     pub fn pixel(&mut self, x: usize, y: usize) -> Option<&mut BltPixel> {
-        self.pixels.get_mut(y * self.width + x)
+        // Calculate the index of the pixel safely, returning None if it overflows.
+        let index = y.checked_mul(self.width)?.checked_add(x)?;
+        // Return the pixel at the index. If the index is out of bounds, this will return None.
+        self.pixels.get_mut(index)
     }
 
     /// Blit the framebuffer to the specified `gop` [GraphicsOutput].
