@@ -37,7 +37,7 @@ pub fn device_path_root(path: &DevicePath) -> Result<String> {
             let item = item.to_string(DisplayOnly(false), AllowShortcuts(false));
             if item
                 .as_ref()
-                .map(|item| item.to_string().contains("("))
+                .map(|item| item.to_string().contains('('))
                 .unwrap_or(false)
             {
                 Some(item.unwrap_or_default())
@@ -62,7 +62,7 @@ pub fn device_path_subpath(path: &DevicePath) -> Result<String> {
             let item = item.to_string(DisplayOnly(false), AllowShortcuts(false));
             if item
                 .as_ref()
-                .map(|item| item.to_string().contains("("))
+                .map(|item| item.to_string().contains('('))
                 .unwrap_or(false)
             {
                 None
@@ -104,11 +104,11 @@ pub fn resolve_path(default_root_path: &DevicePath, input: &str) -> Result<Resol
             it.to_string(DisplayOnly(false), AllowShortcuts(false))
                 .unwrap_or_default()
         })
-        .map(|it| it.to_string().contains("("))
+        .map(|it| it.to_string().contains('('))
         .unwrap_or(false);
     if !path_has_device {
         let mut input = input.to_string();
-        if !input.starts_with("\\") {
+        if !input.starts_with('\\') {
             input.insert(0, '\\');
         }
         input.insert_str(

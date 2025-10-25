@@ -99,7 +99,7 @@ impl BlsEntry {
         self.linux
             .clone()
             .or(self.efi.clone())
-            .map(|path| path.replace("/", "\\").trim_start_matches("\\").to_string())
+            .map(|path| path.replace('/', "\\").trim_start_matches('\\').to_string())
     }
 
     /// Fetches the path to an initrd to pass to the kernel, if any.
@@ -107,7 +107,7 @@ impl BlsEntry {
     pub fn initrd_path(&self) -> Option<String> {
         self.initrd
             .clone()
-            .map(|path| path.replace("/", "\\").trim_start_matches("\\").to_string())
+            .map(|path| path.replace('/', "\\").trim_start_matches('\\').to_string())
     }
 
     /// Fetches the options to pass to the kernel, if any.
