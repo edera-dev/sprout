@@ -164,13 +164,23 @@ fn main() -> Result<()> {
     // Execute the late phase.
     phase(context.clone(), &config.phases.late).context("unable to execute late phase")?;
 
+    // If --boot is specified, or defaults.entry is specified, use that to find the entry to boot.
+    let boot = context
+        .root()
+        .options()
+        .boot
+        .as_ref()
+        .or(config.defaults.entry.as_ref());
+
     // Use the boot option if possible, otherwise pick the first entry.
-    let entry = if let Some(ref boot) = context.root().options().boot {
+    let entry = if let Some(ref boot) = boot {
         entries
             .iter()
             .enumerate()
             .find(|(index, entry)| {
-                entry.name() == boot || entry.title() == boot || &index.to_string() == boot
+                entry.name() == boot.as_str()
+                    || entry.title() == boot.as_str()
+                    || index.to_string() == boot.as_str()
             })
             .context(format!("unable to find entry: {boot}"))?
             .1 // select the bootable entry.
