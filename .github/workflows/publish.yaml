@@ -35,7 +35,7 @@ jobs:
         egress-policy: audit
 
     - name: checkout
-      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       with:
         persist-credentials: false
 
@@ -47,13 +47,13 @@ jobs:
       run: ./hack/assemble.sh
 
     - name: 'upload sprout-x86_64.efi artifact'
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
         name: sprout-x86_64.efi
         path: target/assemble/sprout-x86_64.efi
 
     - name: 'upload sprout-aarch64.efi artifact'
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
         name: sprout-aarch64.efi
         path: target/assemble/sprout-aarch64.efi
