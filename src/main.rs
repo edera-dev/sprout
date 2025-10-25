@@ -107,7 +107,7 @@ fn main() -> Result<()> {
     context.insert(&extracted);
     let context = context.freeze();
 
-    // Execute the late phase.
+    // Execute the startup phase.
     phase(context.clone(), &config.phases.startup).context("unable to execute startup phase")?;
 
     let mut entries = Vec::new();
