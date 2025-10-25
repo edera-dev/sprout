@@ -29,11 +29,10 @@ else
 fi
 
 make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" defconfig
-if [ "${TARGET_KARCH}" = "x86_64" ]
-then
-  make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" xen.config
-  ./scripts/config -e XEN_PV
-  ./scripts/config -e XEN_PV_DOM0
+if [ "${TARGET_KARCH}" = "x86_64" ]; then
+	make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" xen.config
+	./scripts/config -e XEN_PV
+	./scripts/config -e XEN_PV_DOM0
 fi
 make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" mod2yesconfig
 
@@ -45,5 +44,5 @@ make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" mod2yesconfig
 make "-j$(nproc)" CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}"
 
 [ -f "arch/x86/boot/bzImage" ] && cp "arch/x86/boot/bzImage" kernel.image
-[ -f "arch/arm64/boot/Image.gz" ] && gzip -d < "arch/arm64/boot/Image.gz" > kernel.image
+[ -f "arch/arm64/boot/Image.gz" ] && gzip -d <"arch/arm64/boot/Image.gz" >kernel.image
 exit 0

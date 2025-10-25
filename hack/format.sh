@@ -3,5 +3,5 @@ set -e
 
 cd "$(dirname "${0}")/.." || exit 1
 
-cargo fmt --all
-shfmt -w hack/**/*.sh
+cargo fmt --all || true
+shfmt -w hack/**/*.sh || true
