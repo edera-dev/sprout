@@ -36,9 +36,7 @@ DOCKER_TARGET="linux/${TARGET_ARCH}"
 FINAL_DIR="target/final/${TARGET_ARCH}"
 ASSEMBLE_DIR="target/assemble"
 
-if [ -z "${QEMU_ACCEL}" ] && [ "${TARGET_ARCH}" = "${HOST_ARCH}" ] &&
-	[ -f "/proc/cpuinfo" ] &&
-	grep -E '^flags.*:.+ vmx .*' /proc/cpuinfo >/dev/null; then
+if [ -z "${QEMU_ACCEL}" ] && [ "${TARGET_ARCH}" = "${HOST_ARCH}" ] && [ -e "/dev/kvm" ]; then
 	QEMU_ACCEL="kvm"
 fi
 
