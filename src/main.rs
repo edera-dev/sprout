@@ -143,7 +143,10 @@ fn main() -> Result<()> {
         // Insert the values from the entry configuration into the
         // sprout context to use with the entry itself.
         context.insert(&entry.declaration().values);
-        let context = context.finalize().freeze();
+        let context = context
+            .finalize()
+            .context("unable to finalize context")?
+            .freeze();
         // Provide the new context to the bootable entry.
         entry.swap_context(context);
         // Restamp the title with any values.
