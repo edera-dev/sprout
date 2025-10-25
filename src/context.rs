@@ -200,11 +200,23 @@ impl SproutContext {
     fn stamp_values(values: &BTreeMap<String, String>, text: impl AsRef<str>) -> (bool, String) {
         let mut result = text.as_ref().to_string();
         let mut did_change = false;
-        for (key, value) in values {
+
+        // Sort the keys by length. This is to ensure that we stamp the longest keys first.
+        // If we did not do this, "$abc" could be stamped by "$a" into an invalid result.
+        let mut keys = values.keys().collect::<Vec<_>>();
+        keys.sort_by_key(|key| key.len());
+
+        for key in keys {
             // Empty keys are not supported.
             if key.is_empty() {
                 continue;
             }
+
+            // We can fetch the value from the map. It is verifiable that the key exists.
+            let Some(value) = values.get(key) else {
+                unreachable!("keys iterated over is collected on a map that cannot be modified");
+            };
+
             let next_result = result.replace(&format!("${key}"), value);
             if result != next_result {
                 did_change = true;
