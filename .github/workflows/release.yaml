@@ -1,0 +1,62 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: 'Release Tag'
+        required: true
+        type: string
+
+permissions:
+  contents: read # Needed to checkout the repository.
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.event.inputs.release-tag }}"
+  cancel-in-progress: true
+
+jobs:
+  release:
+    name: release
+    permissions:
+      contents: write # Needed to upload release assets.
+    runs-on: ubuntu-latest
+    steps:
+    - name: harden runner
+      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      with:
+        egress-policy: audit
+
+    - name: checkout
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      with:
+        persist-credentials: false
+
+    - name: 'install rust toolchain'
+      run: |
+        cargo version
+
+    - name: 'assemble artifacts'
+      run: ./hack/assemble.sh
+
+    - name: 'generate cultivator token'
+      uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+      id: generate-token
+      with:
+        app-id: "${{ secrets.EDERA_CULTIVATION_APP_ID }}"
+        private-key: "${{ secrets.EDERA_CULTIVATION_APP_PRIVATE_KEY }}"
+      if: ${{ github.event.inputs.release-tag != '' }}
+
+    - name: 'upload release artifacts'
+      run: ./hack/ci/upload-release-assets.sh
+      env:
+        GITHUB_TOKEN: "${{ steps.generate-token.outputs.token }}"
+        RELEASE_TAG: "${{ github.event.inputs.release-tag }}"
+      if: ${{ github.event.inputs.release-tag != '' }}
+
+    - name: 'mark release as published'
+      run: gh release edit "${RELEASE_TAG}" --draft=false --verify-tag
+      env:
+        GITHUB_TOKEN: "${{ steps.generate-token.outputs.token }}"
+        RELEASE_TAG: "${{ github.event.inputs.release-tag }}"
+      if: ${{ github.event.inputs.release-tag != '' }}

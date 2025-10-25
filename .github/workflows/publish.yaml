@@ -1,13 +1,6 @@
 name: publish
 
 on:
-  workflow_dispatch:
-    inputs:
-      release-tag:
-        description: 'Release Tag'
-        required: true
-        type: string
-
   push:
     branches:
     - main
@@ -33,7 +26,7 @@ jobs:
   artifacts:
     name: artifacts
     permissions:
-      contents: write # Needed to upload release assets and artifacts.
+      contents: write # Needed to upload artifacts.
     runs-on: ubuntu-latest
     steps:
     - name: harden runner
@@ -64,25 +57,3 @@ jobs:
       with:
         name: sprout-aarch64.efi
         path: target/assemble/sprout-aarch64.efi
-
-    - name: 'generate cultivator token'
-      uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
-      id: generate-token
-      with:
-        app-id: "${{ secrets.EDERA_CULTIVATION_APP_ID }}"
-        private-key: "${{ secrets.EDERA_CULTIVATION_APP_PRIVATE_KEY }}"
-      if: ${{ github.event.inputs.release-tag != '' }}
-
-    - name: 'upload release artifacts'
-      run: ./hack/ci/upload-release-assets.sh
-      env:
-        GITHUB_TOKEN: "${{ steps.generate-token.outputs.token }}"
-        RELEASE_TAG: "${{ github.event.inputs.release-tag }}"
-      if: ${{ github.event.inputs.release-tag != '' }}
-
-    - name: 'mark release as published'
-      run: gh release edit "${RELEASE_TAG}" --draft=false --verify-tag
-      env:
-        GITHUB_TOKEN: "${{ steps.generate-token.outputs.token }}"
-        RELEASE_TAG: "${{ github.event.inputs.release-tag }}"
-      if: ${{ github.event.inputs.release-tag != '' }}
