@@ -36,6 +36,11 @@ impl FromStr for BlsEntry {
             // Trim the line.
             let line = line.trim();
 
+            // Skip over empty lines and comments.
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+
             // Split the line once by whitespace.
             let Some((key, value)) = line.split_once(char::is_whitespace) else {
                 continue;
