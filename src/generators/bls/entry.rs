@@ -36,8 +36,13 @@ impl FromStr for BlsEntry {
             // Trim the line.
             let line = line.trim();
 
-            // Split the line once by a space.
-            let Some((key, value)) = line.split_once(" ") else {
+            // Skip over empty lines and comments.
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+
+            // Split the line once by whitespace.
+            let Some((key, value)) = line.split_once(char::is_whitespace) else {
                 continue;
             };
 
@@ -99,7 +104,7 @@ impl BlsEntry {
         self.linux
             .clone()
             .or(self.efi.clone())
-            .map(|path| path.replace("/", "\\").trim_start_matches("\\").to_string())
+            .map(|path| path.replace('/', "\\").trim_start_matches('\\').to_string())
     }
 
     /// Fetches the path to an initrd to pass to the kernel, if any.
@@ -107,7 +112,7 @@ impl BlsEntry {
     pub fn initrd_path(&self) -> Option<String> {
         self.initrd
             .clone()
-            .map(|path| path.replace("/", "\\").trim_start_matches("\\").to_string())
+            .map(|path| path.replace('/', "\\").trim_start_matches('\\').to_string())
     }
 
     /// Fetches the options to pass to the kernel, if any.

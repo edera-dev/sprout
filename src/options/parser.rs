@@ -72,11 +72,7 @@ pub trait OptionsRepresentable {
             let mut value = None;
 
             // Check if the option is of the form --abc=123
-            if option.contains("=") {
-                let Some((part_key, part_value)) = option.split_once("=") else {
-                    bail!("invalid option: {option}");
-                };
-
+            if let Some((part_key, part_value)) = option.split_once('=') {
                 let part_key = part_key.to_string();
                 let part_value = part_value.to_string();
                 option = part_key;
@@ -131,7 +127,7 @@ pub trait OptionsRepresentable {
                     );
                 }
                 // Exit because the help has been displayed.
-                std::process::exit(1);
+                std::process::exit(0);
             }
 
             // Insert the option and the value into the map.

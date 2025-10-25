@@ -52,6 +52,11 @@ fn fit_to_frame(image: &DynamicImage, frame: Rect) -> Rect {
         height: image.height(),
     };
 
+    // Handle the case where the image is zero-sized.
+    if input.height == 0 || input.width == 0 {
+        return input;
+    }
+
     // Calculate the ratio of the image dimensions.
     let input_ratio = input.width as f32 / input.height as f32;
 
@@ -65,6 +70,11 @@ fn fit_to_frame(image: &DynamicImage, frame: Rect) -> Rect {
         width: frame.width,
         height: frame.height,
     };
+
+    // Handle the case where the output is zero-sized.
+    if output.height == 0 || output.width == 0 {
+        return output;
+    }
 
     if input_ratio < frame_ratio {
         output.width = (frame.height as f32 * input_ratio).floor() as u32;
@@ -110,7 +120,8 @@ fn draw(image: DynamicImage) -> Result<()> {
     let image = resize_to_fit(&image, fit);
 
     // Create a framebuffer to draw the image on.
-    let mut framebuffer = Framebuffer::new(width, height);
+    let mut framebuffer =
+        Framebuffer::new(width, height).context("unable to create framebuffer")?;
 
     // Iterate over the pixels in the image and put them on the framebuffer.
     for (x, y, pixel) in image.enumerate_pixels() {

@@ -1,5 +1,5 @@
 use crate::context::SproutContext;
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 
@@ -50,7 +50,10 @@ pub fn execute(context: Rc<SproutContext>, name: impl AsRef<str>) -> Result<()> 
         bail!("unknown action '{}'", name.as_ref());
     };
     // Finalize the context and freeze it.
-    let context = context.finalize().freeze();
+    let context = context
+        .finalize()
+        .context("unable to finalize context")?
+        .freeze();
 
     // Execute the action.
     if let Some(chainload) = &action.chainload {
@@ -61,6 +64,7 @@ pub fn execute(context: Rc<SproutContext>, name: impl AsRef<str>) -> Result<()> 
         return Ok(());
     } else if let Some(edera) = &action.edera {
         edera::edera(context.clone(), edera)?;
+        return Ok(());
     }
 
     #[cfg(feature = "splash")]

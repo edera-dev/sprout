@@ -6,7 +6,6 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use std::str::FromStr;
-use uefi::CString16;
 use uefi::fs::{FileSystem, Path};
 use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
 use uefi::proto::media::fs::SimpleFileSystem;
@@ -89,10 +88,9 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
             continue;
         }
 
-        // Produce the full path to the entry file.
-        let full_entry_path = CString16::try_from(format!("{}\\{}", sub_text_path, name).as_str())
-            .context("unable to construct full entry path")?;
-        let full_entry_path = Path::new(&full_entry_path);
+        // Create a mutable path so we can append the file name to produce the full path.
+        let mut full_entry_path = entries_path.to_path_buf();
+        full_entry_path.push(entry.file_name());
 
         // Read the entry file.
         let content = fs

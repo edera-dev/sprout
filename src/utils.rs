@@ -27,6 +27,12 @@ pub fn text_to_device_path(path: &str) -> Result<PoolDevicePath> {
         .context("unable to convert text to device path")
 }
 
+/// Checks if a [CString16] contains a char `c`.
+/// We need to call to_string() because CString16 doesn't support `contains` with a char.
+fn cstring16_contains_char(string: &CString16, c: char) -> bool {
+    string.to_string().contains(c)
+}
+
 /// Grabs the root part of the `path`.
 /// For example, given "PciRoot(0x0)/Pci(0x4,0x0)/NVMe(0x1,00-00-00-00-00-00-00-00)/HD(1,MBR,0xBE1AFDFA,0x3F,0xFBFC1)/\EFI\BOOT\BOOTX64.efi"
 /// it will give "PciRoot(0x0)/Pci(0x4,0x0)/NVMe(0x1,00-00-00-00-00-00-00-00)/HD(1,MBR,0xBE1AFDFA,0x3F,0xFBFC1)"
@@ -37,7 +43,7 @@ pub fn device_path_root(path: &DevicePath) -> Result<String> {
             let item = item.to_string(DisplayOnly(false), AllowShortcuts(false));
             if item
                 .as_ref()
-                .map(|item| item.to_string().contains("("))
+                .map(|item| cstring16_contains_char(item, '('))
                 .unwrap_or(false)
             {
                 Some(item.unwrap_or_default())
@@ -62,7 +68,7 @@ pub fn device_path_subpath(path: &DevicePath) -> Result<String> {
             let item = item.to_string(DisplayOnly(false), AllowShortcuts(false));
             if item
                 .as_ref()
-                .map(|item| item.to_string().contains("("))
+                .map(|item| cstring16_contains_char(item, '('))
                 .unwrap_or(false)
             {
                 None
@@ -104,11 +110,11 @@ pub fn resolve_path(default_root_path: &DevicePath, input: &str) -> Result<Resol
             it.to_string(DisplayOnly(false), AllowShortcuts(false))
                 .unwrap_or_default()
         })
-        .map(|it| it.to_string().contains("("))
+        .map(|it| it.to_string().contains('('))
         .unwrap_or(false);
     if !path_has_device {
         let mut input = input.to_string();
-        if !input.starts_with("\\") {
+        if !input.starts_with('\\') {
             input.insert(0, '\\');
         }
         input.insert_str(

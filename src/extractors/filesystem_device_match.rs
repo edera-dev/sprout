@@ -81,7 +81,7 @@ pub fn extract(
                     } else {
                         // We should still handle other errors gracefully.
                         Err(error).context("unable to open filesystem partition info")?;
-                        None
+                        unreachable!()
                     }
                 }
             }

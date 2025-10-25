@@ -107,7 +107,7 @@ fn main() -> Result<()> {
     context.insert(&extracted);
     let context = context.freeze();
 
-    // Execute the late phase.
+    // Execute the startup phase.
     phase(context.clone(), &config.phases.startup).context("unable to execute startup phase")?;
 
     let mut entries = Vec::new();
@@ -143,7 +143,10 @@ fn main() -> Result<()> {
         // Insert the values from the entry configuration into the
         // sprout context to use with the entry itself.
         context.insert(&entry.declaration().values);
-        let context = context.finalize().freeze();
+        let context = context
+            .finalize()
+            .context("unable to finalize context")?
+            .freeze();
         // Provide the new context to the bootable entry.
         entry.swap_context(context);
         // Restamp the title with any values.

@@ -1,10 +1,14 @@
 use crate::actions::ActionDeclaration;
 use crate::options::SproutOptions;
-use anyhow::Result;
 use anyhow::anyhow;
+use anyhow::{Result, bail};
+use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use uefi::proto::device_path::DevicePath;
+
+/// The maximum number of iterations that can be performed in [SproutContext::finalize].
+const CONTEXT_FINALIZE_ITERATION_LIMIT: usize = 100;
 
 /// Declares a root context for Sprout.
 /// This contains data that needs to be shared across Sprout.
@@ -151,11 +155,20 @@ impl SproutContext {
     /// Finalizes a context by producing a context with no parent that contains all the values
     /// of all parent contexts merged. This makes it possible to ensure [SproutContext] has no
     /// inheritance with other [SproutContext]s. It will still contain a [RootContext] however.
-    pub fn finalize(&self) -> SproutContext {
+    pub fn finalize(&self) -> Result<SproutContext> {
         // Collect all the values from the context and its parents.
         let mut current_values = self.all_values();
 
+        // To ensure that there is no possible infinite loop, we need to check
+        // the number of iterations. If it exceeds 100, we bail.
+        let mut iterations: usize = 0;
         loop {
+            iterations += 1;
+
+            if iterations > CONTEXT_FINALIZE_ITERATION_LIMIT {
+                bail!("infinite loop detected in context finalization");
+            }
+
             let mut did_change = false;
             let mut values = BTreeMap::new();
             for (key, value) in &current_values {
@@ -176,11 +189,11 @@ impl SproutContext {
         }
 
         // Produce the final context.
-        Self {
+        Ok(Self {
             root: self.root.clone(),
             parent: None,
             values: current_values,
-        }
+        })
     }
 
     /// Stamps the `text` value with the specified `values` map. The returned value indicates
@@ -188,7 +201,25 @@ impl SproutContext {
     fn stamp_values(values: &BTreeMap<String, String>, text: impl AsRef<str>) -> (bool, String) {
         let mut result = text.as_ref().to_string();
         let mut did_change = false;
-        for (key, value) in values {
+
+        // Sort the keys by length. This is to ensure that we stamp the longest keys first.
+        // If we did not do this, "$abc" could be stamped by "$a" into an invalid result.
+        let mut keys = values.keys().collect::<Vec<_>>();
+
+        // Sort by key length, reversed. This results in the longest keys appearing first.
+        keys.sort_by_key(|key| Reverse(key.len()));
+
+        for key in keys {
+            // Empty keys are not supported.
+            if key.is_empty() {
+                continue;
+            }
+
+            // We can fetch the value from the map. It is verifiable that the key exists.
+            let Some(value) = values.get(key) else {
+                unreachable!("keys iterated over is collected on a map that cannot be modified");
+            };
+
             let next_result = result.replace(&format!("${key}"), value);
             if result != next_result {
                 did_change = true;

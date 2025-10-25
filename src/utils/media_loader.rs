@@ -97,7 +97,7 @@ impl MediaLoaderHandle {
     }
 
     /// Creates a new device path for the media loader based on a vendor `guid`.
-    fn device_path(guid: Guid) -> Box<DevicePath> {
+    fn device_path(guid: Guid) -> Result<Box<DevicePath>> {
         // The buffer for the device path.
         let mut path = Vec::new();
         // Build a device path for the media loader with a vendor-specific guid.
@@ -106,18 +106,18 @@ impl MediaLoaderHandle {
                 vendor_guid: guid,
                 vendor_defined_data: &[],
             })
-            .unwrap() // We know that the device path is valid, so we can unwrap.
+            .context("unable to produce device path")?
             .finalize()
-            .unwrap(); // We know that the device path is valid, so we can unwrap.
+            .context("unable to produce device path")?;
         // Convert the device path to a boxed device path.
         // This is safer than dealing with a pooled device path.
-        path.to_boxed()
+        Ok(path.to_boxed())
     }
 
     /// Checks if the media loader is already registered with the UEFI stack.
     fn already_registered(guid: Guid) -> Result<bool> {
         // Acquire the device path for the media loader.
-        let path = Self::device_path(guid);
+        let path = Self::device_path(guid)?;
 
         let mut existing_path = path.as_ref();
 
@@ -142,7 +142,7 @@ impl MediaLoaderHandle {
     /// to load the data from.
     pub fn register(guid: Guid, data: Box<[u8]>) -> Result<MediaLoaderHandle> {
         // Acquire the vendor device path for the media loader.
-        let path = Self::device_path(guid);
+        let path = Self::device_path(guid)?;
 
         // Check if the media loader is already registered.
         // If it is, we can't register it again safely.
