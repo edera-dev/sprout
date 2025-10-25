@@ -36,8 +36,8 @@ impl FromStr for BlsEntry {
             // Trim the line.
             let line = line.trim();
 
-            // Split the line once by a space.
-            let Some((key, value)) = line.split_once(" ") else {
+            // Split the line once by whitespace.
+            let Some((key, value)) = line.split_once(char::is_whitespace) else {
                 continue;
             };
 
