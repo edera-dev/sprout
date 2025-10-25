@@ -131,7 +131,7 @@ pub trait OptionsRepresentable {
                     );
                 }
                 // Exit because the help has been displayed.
-                std::process::exit(1);
+                std::process::exit(0);
             }
 
             // Insert the option and the value into the map.
