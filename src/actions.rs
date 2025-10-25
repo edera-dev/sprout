@@ -64,6 +64,7 @@ pub fn execute(context: Rc<SproutContext>, name: impl AsRef<str>) -> Result<()> 
         return Ok(());
     } else if let Some(edera) = &action.edera {
         edera::edera(context.clone(), edera)?;
+        return Ok(());
     }
 
     #[cfg(feature = "splash")]
