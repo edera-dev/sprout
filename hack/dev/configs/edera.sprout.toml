@@ -1,7 +1,7 @@
 version = 1
 
-[defaults]
-entry = "edera"
+[options]
+default-entry = "edera"
 menu-timeout = 0
 
 [extractors.boot.filesystem-device-match]

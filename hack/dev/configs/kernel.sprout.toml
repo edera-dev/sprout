@@ -1,7 +1,7 @@
 version = 1
 
-[defaults]
-entry = "kernel"
+[options]
+default-entry = "kernel"
 menu-timeout = 0
 
 [extractors.boot.filesystem-device-match]

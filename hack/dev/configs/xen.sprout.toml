@@ -1,7 +1,7 @@
 version = 1
 
-[defaults]
-entry = "xen"
+[options]
+default-entry = "xen"
 menu-timeout = 0
 
 [extractors.boot.filesystem-device-match]

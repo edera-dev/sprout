@@ -1,7 +1,7 @@
 version = 1
 
-[defaults]
-entry = "kernel"
+[options]
+default-entry = "kernel"
 
 [extractors.boot.filesystem-device-match]
 has-item = "\\EFI\\BOOT\\kernel.efi"

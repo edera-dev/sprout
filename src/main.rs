@@ -100,7 +100,7 @@ fn run() -> Result<()> {
 
     // If --autoconfigure is specified or the loaded configuration has autoconfigure enabled,
     // trigger the autoconfiguration mechanism.
-    if context.root().options().autoconfigure || config.defaults.autoconfigure {
+    if context.root().options().autoconfigure || config.options.autoconfigure {
         autoconfigure::autoconfigure(&mut config).context("unable to autoconfigure")?;
     }
 
@@ -182,7 +182,7 @@ fn run() -> Result<()> {
         entry.restamp_title();
 
         // Mark this entry as the default entry if it is declared as such.
-        if let Some(ref default_entry) = config.defaults.entry {
+        if let Some(ref default_entry) = config.options.default_entry {
             // If the entry matches the default entry, mark it as the default entry.
             if entry.is_match(default_entry) {
                 entry.mark_default();
@@ -211,7 +211,7 @@ fn run() -> Result<()> {
         .root()
         .options()
         .menu_timeout
-        .unwrap_or(config.defaults.menu_timeout);
+        .unwrap_or(config.options.menu_timeout);
     let menu_timeout = Duration::from_secs(menu_timeout);
 
     // Use the forced boot entry if possible, otherwise pick the first entry using a boot menu.

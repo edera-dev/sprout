@@ -1,7 +1,7 @@
 version = 1
 
-[defaults]
-entry = "shell"
+[options]
+default-entry = "shell"
 menu-timeout = 0
 
 [extractors.boot.filesystem-device-match]

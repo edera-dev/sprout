@@ -27,7 +27,7 @@ pub struct RootConfiguration {
     pub version: u32,
     /// Default options for Sprout.
     #[serde(default)]
-    pub defaults: DefaultsConfiguration,
+    pub options: OptionsConfiguration,
     /// Values to be inserted into the root sprout context.
     #[serde(default)]
     pub values: BTreeMap<String, String>,
@@ -65,16 +65,18 @@ pub struct RootConfiguration {
     pub phases: PhasesConfiguration,
 }
 
-/// Default configuration for Sprout, used when the corresponding options are not specified.
+/// Options configuration for Sprout, used when the corresponding options are not specified.
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct DefaultsConfiguration {
+pub struct OptionsConfiguration {
     /// The entry to boot without showing the boot menu.
     /// If not specified, a boot menu is shown.
-    pub entry: Option<String>,
+    #[serde(rename = "default-entry", default)]
+    pub default_entry: Option<String>,
     /// The timeout of the boot menu.
     #[serde(rename = "menu-timeout", default = "default_menu_timeout")]
     pub menu_timeout: u64,
     /// Enables autoconfiguration of Sprout based on the environment.
+    #[serde(default)]
     pub autoconfigure: bool,
 }
 
