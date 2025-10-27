@@ -4,7 +4,7 @@ use crate::config::RootConfiguration;
 use crate::entries::EntryDeclaration;
 use crate::generators::GeneratorDeclaration;
 use crate::generators::bls::BlsConfiguration;
-use anyhow::Context;
+use anyhow::{Context, Result};
 use uefi::cstr16;
 use uefi::fs::{FileSystem, Path};
 use uefi::proto::device_path::DevicePath;
@@ -19,7 +19,7 @@ pub fn scan(
     filesystem: &mut FileSystem,
     root: &DevicePath,
     config: &mut RootConfiguration,
-) -> anyhow::Result<bool> {
+) -> Result<bool> {
     // BLS has a loader.conf file that can specify its own auto-entries mechanism.
     let bls_loader_conf_path = Path::new(cstr16!("\\loader\\loader.conf"));
     // BLS also has an entries directory that can specify explicit entries.
