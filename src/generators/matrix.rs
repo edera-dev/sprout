@@ -1,5 +1,6 @@
 use crate::context::SproutContext;
 use crate::entries::{BootableEntry, EntryDeclaration};
+use crate::generators::list;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -57,30 +58,12 @@ pub fn generate(
 ) -> Result<Vec<BootableEntry>> {
     // Produce all the combinations of the input values.
     let combinations = build_matrix(&matrix.values);
-    let mut entries = Vec::new();
-
-    // For each combination, create a new context and entry.
-    for (index, combination) in combinations.into_iter().enumerate() {
-        let mut context = context.fork();
-        // Insert the combination into the context.
-        context.insert(&combination);
-        let context = context.freeze();
-
-        // Stamp the entry title and actions from the template.
-        let mut entry = matrix.entry.clone();
-        entry.actions = entry
-            .actions
-            .into_iter()
-            .map(|action| context.stamp(action))
-            .collect();
-        // Push the entry into the list with the new context.
-        entries.push(BootableEntry::new(
-            index.to_string(),
-            entry.title.clone(),
-            context,
-            entry,
-        ));
-    }
-
-    Ok(entries)
+    // Use the list generator to generate entries for each combination.
+    list::generate(
+        context,
+        &list::ListConfiguration {
+            entry: matrix.entry.clone(),
+            values: combinations,
+        },
+    )
 }

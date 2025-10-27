@@ -1,6 +1,7 @@
 use crate::context::SproutContext;
 use crate::entries::BootableEntry;
 use crate::generators::bls::BlsConfiguration;
+use crate::generators::list::ListConfiguration;
 use crate::generators::matrix::MatrixConfiguration;
 use anyhow::Result;
 use anyhow::bail;
@@ -8,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 
 pub mod bls;
+pub mod list;
 pub mod matrix;
 
 /// Declares a generator configuration.
@@ -32,6 +34,9 @@ pub struct GeneratorDeclaration {
     /// It will generate a sprout entry for every supported BLS entry.
     #[serde(default)]
     pub bls: Option<BlsConfiguration>,
+    /// List generator configuration.
+    /// Allows you to specify a list of values to generate an entry from.
+    pub list: Option<ListConfiguration>,
 }
 
 /// Runs the generator specified by the `generator` option.
@@ -45,6 +50,8 @@ pub fn generate(
         matrix::generate(context, matrix)
     } else if let Some(bls) = &generator.bls {
         bls::generate(context, bls)
+    } else if let Some(list) = &generator.list {
+        list::generate(context, list)
     } else {
         bail!("unknown generator configuration");
     }

@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, bail};
+use log::info;
 use std::collections::BTreeMap;
 
 /// The type of option. This disambiguates different behavior
@@ -113,9 +114,9 @@ pub trait OptionsRepresentable {
             // Handle the --help flag case.
             if description.form == OptionForm::Help {
                 // Generic configured options output.
-                println!("Configured Options:");
+                info!("Configured Options:");
                 for (name, description) in &configured {
-                    println!(
+                    info!(
                         "  --{}{}: {}",
                         name,
                         if description.form == OptionForm::Value {

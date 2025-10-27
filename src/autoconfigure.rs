@@ -4,8 +4,13 @@ use uefi::fs::FileSystem;
 use uefi::proto::device_path::DevicePath;
 use uefi::proto::media::fs::SimpleFileSystem;
 
-/// bls: autodetect and configure BLS-enabled systems.
+/// bls: autodetect and configure BLS-enabled filesystems.
 pub mod bls;
+
+/// linux: autodetect and configure Linux kernels.
+/// This autoconfiguration module should not be activated
+/// on BLS-enabled filesystems as it may make duplicate entries.
+pub mod linux;
 
 /// Generate a [RootConfiguration] based on the environment.
 /// Intakes a `config` to use as the basis of the autoconfiguration.
@@ -31,8 +36,14 @@ pub fn autoconfigure(config: &mut RootConfiguration) -> Result<()> {
         let mut filesystem = FileSystem::new(filesystem);
 
         // Scan the filesystem for BLS supported configurations.
-        bls::scan(&mut filesystem, &root, config)
+        let bls_found = bls::scan(&mut filesystem, &root, config)
             .context("unable to scan for bls configurations")?;
+
+        // If BLS was not found, scan for Linux configurations.
+        if !bls_found {
+            linux::scan(&mut filesystem, &root, config)
+                .context("unable to scan for linux configurations")?;
+        }
     }
 
     Ok(())

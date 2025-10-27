@@ -121,7 +121,7 @@ fn select_with_input<'a>(
             // Entry was selected by number. If the number is invalid, we continue.
             MenuOperation::Number(index) => {
                 let Some(entry) = entries.get(index) else {
-                    println!("invalid entry number");
+                    info!("invalid entry number");
                     continue;
                 };
                 return Ok(entry);

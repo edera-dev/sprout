@@ -8,7 +8,7 @@ use crate::options::SproutOptions;
 use crate::options::parser::OptionsRepresentable;
 use crate::phases::phase;
 use anyhow::{Context, Result, bail};
-use log::info;
+use log::{error, info};
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::time::Duration;
@@ -54,13 +54,8 @@ pub mod options;
 /// utils: Utility functions that are used by other parts of Sprout.
 pub mod utils;
 
-/// The main entrypoint of sprout.
-/// It is possible this function will not return if actions that are executed
-/// exit boot services or do not return control to sprout.
-fn main() -> Result<()> {
-    // Initialize the basic UEFI environment.
-    setup::init()?;
-
+/// Run Sprout, returning an error if one occurs.
+fn run() -> Result<()> {
     // Parse the options to the sprout executable.
     let options = SproutOptions::parse().context("unable to parse options")?;
 
@@ -238,6 +233,26 @@ fn main() -> Result<()> {
         let action = entry.context().stamp(action);
         actions::execute(entry.context().clone(), &action)
             .context(format!("unable to execute action '{}'", action))?;
+    }
+
+    Ok(())
+}
+
+/// The main entrypoint of sprout.
+/// It is possible this function will not return if actions that are executed
+/// exit boot services or do not return control to sprout.
+fn main() -> Result<()> {
+    // Initialize the basic UEFI environment.
+    setup::init()?;
+
+    // Run Sprout, then handle the error.
+    let result = run();
+    if let Err(ref error) = result {
+        // Print an error trace.
+        error!("sprout encountered an error");
+        for (index, stack) in error.chain().enumerate() {
+            error!("[{}]: {}", index, stack);
+        }
     }
 
     // Sprout doesn't necessarily guarantee anything was booted.
