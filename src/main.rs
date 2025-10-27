@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![feature(uefi_std)]
 
+use crate::config::RootConfiguration;
 use crate::context::{RootContext, SproutContext};
 use crate::entries::BootableEntry;
 use crate::options::SproutOptions;
@@ -16,6 +17,9 @@ use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
 
 /// actions: Code that can be configured and executed by Sprout.
 pub mod actions;
+
+/// autoconfigure: Autoconfigure Sprout based on the detected environment.
+pub mod autoconfigure;
 
 /// config: Sprout configuration mechanism.
 pub mod config;
@@ -60,10 +64,16 @@ fn main() -> Result<()> {
     // Parse the options to the sprout executable.
     let options = SproutOptions::parse().context("unable to parse options")?;
 
-    // Load the configuration of sprout.
-    // At this point, the configuration has been validated and the specified
-    // version is checked to ensure compatibility.
-    let config = config::loader::load(&options)?;
+    // If --autoconfigure is specified, we use a stub configuration.
+    let mut config = if options.autoconfigure {
+        info!("autoconfiguration enabled, configuration file will be ignored");
+        RootConfiguration::default()
+    } else {
+        // Load the configuration of sprout.
+        // At this point, the configuration has been validated and the specified
+        // version is checked to ensure compatibility.
+        config::loader::load(&options)?
+    };
 
     // Load the root context.
     // This is done in a block to ensure the release of the LoadedImageDevicePath protocol.
@@ -97,6 +107,12 @@ fn main() -> Result<()> {
 
     // Load all configured drivers.
     drivers::load(context.clone(), &config.drivers).context("unable to load drivers")?;
+
+    // If --autoconfigure is specified or the loaded configuration has autoconfigure enabled,
+    // trigger the autoconfiguration mechanism.
+    if context.root().options().autoconfigure || config.defaults.autoconfigure {
+        autoconfigure::autoconfigure(&mut config).context("unable to autoconfigure")?;
+    }
 
     // Run all the extractors declared in the configuration.
     let mut extracted = BTreeMap::new();

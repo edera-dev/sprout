@@ -11,6 +11,8 @@ const DEFAULT_CONFIG_PATH: &str = "\\sprout.toml";
 /// The parsed options of sprout.
 #[derive(Debug)]
 pub struct SproutOptions {
+    /// Configures Sprout automatically based on the environment.
+    pub autoconfigure: bool,
     /// Path to a configuration file to load.
     pub config: String,
     /// Entry to boot without showing the boot menu.
@@ -25,6 +27,7 @@ pub struct SproutOptions {
 impl Default for SproutOptions {
     fn default() -> Self {
         Self {
+            autoconfigure: false,
             config: DEFAULT_CONFIG_PATH.to_string(),
             boot: None,
             force_menu: false,
@@ -86,6 +89,11 @@ impl OptionsRepresentable for SproutOptions {
 
         for (key, value) in options {
             match key.as_str() {
+                "autoconfigure" => {
+                    // Enable autoconfiguration.
+                    result.autoconfigure = true;
+                }
+
                 "config" => {
                     // The configuration file to load.
                     result.config = value.context("--config option requires a value")?;

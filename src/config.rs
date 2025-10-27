@@ -74,6 +74,8 @@ pub struct DefaultsConfiguration {
     /// The timeout of the boot menu.
     #[serde(rename = "menu-timeout", default = "default_menu_timeout")]
     pub menu_timeout: u64,
+    /// Enables autoconfiguration of Sprout based on the environment.
+    pub autoconfigure: bool,
 }
 
 fn latest_version() -> u32 {
