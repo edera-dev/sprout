@@ -35,13 +35,15 @@ set -- "${@}" -smp 2 -m 4096
 if [ "${NO_GRAPHICAL_BOOT}" = "1" ]; then
 	set -- "${@}" -nographic
 else
-	if [ "${QEMU_LEGACY_SERIAL}" = "1" ]; then
-		set -- "${@}" -serial stdio
-	else
-		set -- "${@}" \
-			-device virtio-serial-pci,id=vs0 \
-			-chardev stdio,id=stdio0 \
-			-device virtconsole,chardev=stdio0,id=console0
+	if [ "${GRAPHICAL_ONLY}" != "1" ]; then
+		if [ "${QEMU_LEGACY_SERIAL}" = "1" ]; then
+			set -- "${@}" -serial stdio
+		else
+			set -- "${@}" \
+				-device virtio-serial-pci,id=vs0 \
+				-chardev stdio,id=stdio0 \
+				-device virtconsole,chardev=stdio0,id=console0
+		fi
 	fi
 
 	if [ "${QEMU_LEGACY_VGA}" = "1" ]; then

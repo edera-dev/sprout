@@ -2,6 +2,7 @@ version = 1
 
 [defaults]
 entry = "edera"
+menu-timeout = 0
 
 [extractors.boot.filesystem-device-match]
 has-item = "\\EFI\\BOOT\\xen.efi"
