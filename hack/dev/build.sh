@@ -11,7 +11,7 @@ if [ "${TARGET_ARCH}" = "aarch64" ]; then
 fi
 
 if [ -z "${SPROUT_CONFIG_NAME}" ]; then
-	SPROUT_CONFIG_NAME="kernel"
+	SPROUT_CONFIG_NAME="all"
 fi
 
 echo "[build] ${TARGET_ARCH} ${RUST_PROFILE}"

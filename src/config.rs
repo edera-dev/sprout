@@ -14,6 +14,9 @@ pub mod loader;
 /// This must be incremented when the configuration breaks compatibility.
 pub const LATEST_VERSION: u32 = 1;
 
+/// The default timeout for the boot menu in seconds.
+pub const DEFAULT_MENU_TIMEOUT_SECONDS: u64 = 10;
+
 /// The Sprout configuration format.
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct RootConfiguration {
@@ -68,8 +71,15 @@ pub struct DefaultsConfiguration {
     /// The entry to boot without showing the boot menu.
     /// If not specified, a boot menu is shown.
     pub entry: Option<String>,
+    /// The timeout of the boot menu.
+    #[serde(rename = "menu-timeout", default = "default_menu_timeout")]
+    pub menu_timeout: u64,
 }
 
 fn latest_version() -> u32 {
     LATEST_VERSION
+}
+
+fn default_menu_timeout() -> u64 {
+    DEFAULT_MENU_TIMEOUT_SECONDS
 }

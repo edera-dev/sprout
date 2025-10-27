@@ -10,6 +10,7 @@ use anyhow::{Context, Result};
 use log::info;
 use std::collections::BTreeMap;
 use std::ops::Deref;
+use std::time::Duration;
 use uefi::proto::device_path::LoadedImageDevicePath;
 use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
 
@@ -33,6 +34,9 @@ pub mod extractors;
 
 /// generators: Runtime code that can generate entries with specific values.
 pub mod generators;
+
+/// menu: Display a boot menu to select an entry to boot.
+pub mod menu;
 
 /// phases: Hooks into specific parts of the boot process.
 pub mod phases;
@@ -151,41 +155,47 @@ fn main() -> Result<()> {
         entry.swap_context(context);
         // Restamp the title with any values.
         entry.restamp_title();
+
+        // Mark this entry as the default entry if it is declared as such.
+        if let Some(ref default_entry) = config.defaults.entry {
+            // If the entry matches the default entry, mark it as the default entry.
+            if entry.is_match(default_entry) {
+                entry.mark_default();
+            }
+        }
     }
 
-    // TODO(azenla): Implement boot menu here.
-    // For now, we just print all of the entries.
-    info!("entries:");
-    for (index, entry) in entries.iter().enumerate() {
-        let title = entry.context().stamp(&entry.declaration().title);
-        info!("  entry {} [{}]: {}", index, entry.name(), title);
+    // If no entries were the default, pick the first entry as the default entry.
+    if entries.iter().all(|entry| !entry.is_default())
+        && let Some(entry) = entries.first_mut()
+    {
+        entry.mark_default();
     }
 
     // Execute the late phase.
     phase(context.clone(), &config.phases.late).context("unable to execute late phase")?;
 
-    // If --boot is specified, or defaults.entry is specified, use that to find the entry to boot.
-    let boot = context
+    // If --boot is specified, boot that entry immediately.
+    let force_boot_entry = context.root().options().boot.as_ref();
+    // If --force-menu is specified, show the boot menu regardless of the value of --boot.
+    let force_boot_menu = context.root().options().force_menu;
+
+    // Determine the menu timeout in seconds based on the options or configuration.
+    // We prefer the options over the configuration to allow for overriding.
+    let menu_timeout = context
         .root()
         .options()
-        .boot
-        .as_ref()
-        .or(config.defaults.entry.as_ref());
+        .menu_timeout
+        .unwrap_or(config.defaults.menu_timeout);
+    let menu_timeout = Duration::from_secs(menu_timeout);
 
-    // Use the boot option if possible, otherwise pick the first entry.
-    let entry = if let Some(ref boot) = boot {
-        entries
-            .iter()
-            .enumerate()
-            .find(|(index, entry)| {
-                entry.name() == boot.as_str()
-                    || entry.title() == boot.as_str()
-                    || index.to_string() == boot.as_str()
-            })
-            .context(format!("unable to find entry: {boot}"))?
-            .1 // select the bootable entry.
+    // Use the forced boot entry if possible, otherwise pick the first entry using a boot menu.
+    let entry = if !force_boot_menu && let Some(ref force_boot_entry) = force_boot_entry {
+        BootableEntry::find(force_boot_entry, entries.iter())
+            .context(format!("unable to find entry: {force_boot_entry}"))?
     } else {
-        entries.first().context("no entries found")?
+        // Delegate to the menu to select an entry to boot.
+        menu::select(menu_timeout, &entries).context("unable to select entry via boot menu")?
     };
 
     // Execute all the actions for the selected entry.

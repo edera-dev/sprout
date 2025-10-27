@@ -27,6 +27,7 @@ pub struct BootableEntry {
     title: String,
     context: Rc<SproutContext>,
     declaration: EntryDeclaration,
+    default: bool,
 }
 
 impl BootableEntry {
@@ -42,6 +43,7 @@ impl BootableEntry {
             title,
             context,
             declaration,
+            default: false,
         }
     }
 
@@ -65,6 +67,11 @@ impl BootableEntry {
         &self.declaration
     }
 
+    /// Fetch whether the entry is the default entry.
+    pub fn is_default(&self) -> bool {
+        self.default
+    }
+
     /// Swap out the context of the entry.
     pub fn swap_context(&mut self, context: Rc<SproutContext>) {
         self.context = context;
@@ -75,8 +82,30 @@ impl BootableEntry {
         self.title = self.context.stamp(&self.title);
     }
 
+    /// Mark this entry as the default entry.
+    pub fn mark_default(&mut self) {
+        self.default = true;
+    }
+
     /// Prepend the name of the entry with `prefix`.
     pub fn prepend_name_prefix(&mut self, prefix: &str) {
         self.name.insert_str(0, prefix);
+    }
+
+    /// Determine if this entry matches `needle` by comparing to the name or title of the entry.
+    pub fn is_match(&self, needle: &str) -> bool {
+        self.name == needle || self.title == needle
+    }
+
+    /// Find an entry by `needle` inside the entry iterator `haystack`.
+    /// This will search for an entry by name, title, or index.
+    pub fn find<'a>(
+        needle: &str,
+        haystack: impl Iterator<Item = &'a BootableEntry>,
+    ) -> Option<&'a BootableEntry> {
+        haystack
+            .enumerate()
+            .find(|(index, entry)| entry.is_match(needle) || index.to_string() == needle)
+            .map(|(_index, entry)| entry)
     }
 }

@@ -2,7 +2,6 @@ version = 1
 
 [defaults]
 entry = "kernel"
-menu-timeout = 0
 
 [extractors.boot.filesystem-device-match]
 has-item = "\\EFI\\BOOT\\kernel.efi"
@@ -15,3 +14,17 @@ chainload.linux-initrd = "$boot\\initramfs"
 [entries.kernel]
 title = "Boot Linux"
 actions = ["chainload-kernel"]
+
+[actions.chainload-shell]
+chainload.path = "$boot\\EFI\\BOOT\\shell.efi"
+
+[entries.shell]
+title = "Boot Shell"
+actions = ["chainload-shell"]
+
+[actions.chainload-xen]
+chainload.path = "$boot\\EFI\\BOOT\\xen.efi"
+
+[entries.xen]
+title = "Boot Xen"
+actions = ["chainload-xen"]

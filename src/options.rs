@@ -15,6 +15,10 @@ pub struct SproutOptions {
     pub config: String,
     /// Entry to boot without showing the boot menu.
     pub boot: Option<String>,
+    /// Force display of the boot menu.
+    pub force_menu: bool,
+    /// The timeout for the boot menu in seconds.
+    pub menu_timeout: Option<u64>,
 }
 
 /// The default Sprout options.
@@ -23,6 +27,8 @@ impl Default for SproutOptions {
         Self {
             config: DEFAULT_CONFIG_PATH.to_string(),
             boot: None,
+            force_menu: false,
+            menu_timeout: None,
         }
     }
 }
@@ -46,6 +52,20 @@ impl OptionsRepresentable for SproutOptions {
                 "boot",
                 OptionDescription {
                     description: "Entry to boot, bypassing the menu",
+                    form: OptionForm::Value,
+                },
+            ),
+            (
+                "force-menu",
+                OptionDescription {
+                    description: "Force showing of the boot menu",
+                    form: OptionForm::Flag,
+                },
+            ),
+            (
+                "menu-timeout",
+                OptionDescription {
+                    description: "Boot menu timeout, in seconds",
                     form: OptionForm::Value,
                 },
             ),
@@ -74,6 +94,20 @@ impl OptionsRepresentable for SproutOptions {
                 "boot" => {
                     // The entry to boot.
                     result.boot = Some(value.context("--boot option requires a value")?);
+                }
+
+                "force-menu" => {
+                    // Force showing of the boot menu.
+                    result.force_menu = true;
+                }
+
+                "menu-timeout" => {
+                    // The timeout for the boot menu in seconds.
+                    let value = value.context("--menu-timeout option requires a value")?;
+                    let value = value
+                        .parse::<u64>()
+                        .context("menu-timeout must be a number")?;
+                    result.menu_timeout = Some(value);
                 }
 
                 _ => bail!("unknown option: --{key}"),
