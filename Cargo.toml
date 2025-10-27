@@ -37,6 +37,11 @@ version = "0.12.0"
 default = ["splash"]
 splash = ["dep:image"]
 
+[profile.dev]
+# We have to compile for opt-level = 2 due to optimization passes
+# which don't handle the UEFI target properly.
+opt-level = 2
+
 [profile.release]
 lto = "thin"
 strip = "symbols"
@@ -50,6 +55,7 @@ debug = 1
 inherits = "dev"
 strip = "debuginfo"
 debug = 0
+opt-level = 2
 
 [patch.crates-io.simd-adler32]
 git = "https://github.com/edera-dev/sprout-patched-deps.git"
