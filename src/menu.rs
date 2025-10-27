@@ -44,10 +44,15 @@ fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
     let trigger = TimerTrigger::Relative(timeout.as_nanos() as u64 / 100);
     uefi::boot::set_timer(&timer_event, trigger).context("unable to set timeout timer")?;
 
-    let mut events = [timer_event, key_event];
+    let mut events = vec![timer_event, key_event];
     let event = uefi::boot::wait_for_event(&mut events)
         .discard_errdata()
         .context("unable to wait for event")?;
+
+    // Close the timer event that we acquired.
+    if let Some(timer_event) = events.into_iter().next() {
+        uefi::boot::close_event(timer_event).context("unable to close timer event")?;
+    }
 
     // The first event is the timer event.
     // If it has triggered, the user did not select a numbered entry.
