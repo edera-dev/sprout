@@ -20,7 +20,7 @@ use uefi_raw::Status;
 ///
 /// This function only requires one of the criteria to match.
 /// The fallback value can be used to provide a value if none is found.
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct FilesystemDeviceMatchExtractor {
     /// Matches a filesystem that has the specified label.
     #[serde(default, rename = "has-label")]

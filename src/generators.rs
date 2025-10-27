@@ -12,7 +12,7 @@ pub mod matrix;
 
 /// Declares a generator configuration.
 /// Generators allow generating entries at runtime based on a set of data.
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct GeneratorDeclaration {
     /// Matrix generator configuration.
     /// Matrix allows you to specify multiple value-key values as arrays.

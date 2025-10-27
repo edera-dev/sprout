@@ -10,7 +10,7 @@ use uefi::CString16;
 use uefi::proto::loaded_image::LoadedImage;
 
 /// The configuration of the chainload action.
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ChainloadConfiguration {
     /// The path to the image to chainload.
     /// This can be a Linux EFI stub (vmlinuz usually) or a standard EFI executable.
@@ -98,10 +98,6 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
                 .context("unable to register linux initrd")?;
         initrd_handle = Some(handle);
     }
-
-    // Retrieve the base and size of the loaded image to display.
-    let (base, size) = loaded_image_protocol.info();
-    info!("loaded image: base={:#x} size={:#x}", base.addr(), size);
 
     // Start the loaded image.
     // This call might return, or it may pass full control to another image that will never return.

@@ -83,6 +83,11 @@ impl SproutContext {
         self.root.as_ref()
     }
 
+    /// Access the root context to modify it, if possible.
+    pub fn root_mut(&mut self) -> Option<&mut RootContext> {
+        Rc::get_mut(&mut self.root)
+    }
+
     /// Retrieve the value specified by `key` from this context or its parents.
     /// Returns `None` if the value is not found.
     pub fn get(&self, key: impl AsRef<str>) -> Option<&String> {
@@ -234,5 +239,11 @@ impl SproutContext {
     /// "hello\\b" as an output string.
     pub fn stamp(&self, text: impl AsRef<str>) -> String {
         Self::stamp_values(&self.all_values(), text.as_ref()).1
+    }
+
+    /// Unloads a [SproutContext] back into an owned context. This
+    /// may not succeed if something else is holding onto the value.
+    pub fn unload(self: Rc<SproutContext>) -> Option<SproutContext> {
+        Rc::into_inner(self)
     }
 }

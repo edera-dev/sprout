@@ -65,13 +65,8 @@ set -- "${@}" \
 	-drive "if=pflash,file=${FINAL_DIR}/ovmf-boot.fd,format=raw,readonly=on" \
 	-device nvme,drive=disk1,serial=cafebabe
 
-if [ "${DISK_BOOT}" = "1" ]; then
-	set -- "${@}" \
-		-drive "if=none,file=${FINAL_DIR}/sprout.img,format=raw,id=disk1,readonly=on"
-else
-	set -- "${@}" \
-		-drive "if=none,file=fat:rw:${FINAL_DIR}/efi,format=raw,id=disk1"
-fi
+set -- "${@}" \
+	-drive "if=none,file=${FINAL_DIR}/sprout.img,format=raw,id=disk1,readonly=on"
 
 set -- "${@}" -name "sprout ${TARGET_ARCH}"
 

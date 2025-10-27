@@ -10,7 +10,7 @@ pub mod filesystem_device_match;
 /// Declares an extractor configuration.
 /// Extractors allow calculating values at runtime
 /// using built-in sprout modules.
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ExtractorDeclaration {
     /// The filesystem device match extractor.
     /// This extractor finds a filesystem using some search criteria and returns
