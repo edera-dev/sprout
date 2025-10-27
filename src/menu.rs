@@ -1,5 +1,6 @@
 use crate::entries::BootableEntry;
 use anyhow::{Context, Result, bail};
+use log::info;
 use std::time::Duration;
 use uefi::ResultExt;
 use uefi::boot::TimerTrigger;
@@ -93,10 +94,10 @@ fn select_with_input<'a>(
         // If the timeout is not zero, let's display the boot menu.
         if !timeout.is_zero() {
             // Until a pretty menu is available, we just print all the entries.
-            println!("Boot Menu:");
+            info!("Boot Menu:");
             for (index, entry) in entries.iter().enumerate() {
                 let title = entry.context().stamp(&entry.declaration().title);
-                println!("  [{}] {} ({})", index, title, entry.name());
+                info!("  [{}] {} ({})", index, title, entry.name());
             }
         }
 
@@ -107,9 +108,8 @@ fn select_with_input<'a>(
                 break MenuOperation::Exit;
             }
 
-            println!();
-            println!("Select a boot entry using the number keys.");
-            println!("Press Escape to exit and enter to display the entries again.");
+            info!("Select a boot entry using the number keys.");
+            info!("Press Escape to exit and enter to display the entries again.");
 
             let operation = read(input, &timeout)?;
             if operation != MenuOperation::Nop {

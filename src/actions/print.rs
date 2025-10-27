@@ -1,5 +1,6 @@
 use crate::context::SproutContext;
 use anyhow::Result;
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 
@@ -13,6 +14,6 @@ pub struct PrintConfiguration {
 
 /// Executes the print action with the specified `configuration` inside the provided `context`.
 pub fn print(context: Rc<SproutContext>, configuration: &PrintConfiguration) -> Result<()> {
-    println!("{}", context.stamp(&configuration.text));
+    info!("{}", context.stamp(&configuration.text));
     Ok(())
 }
