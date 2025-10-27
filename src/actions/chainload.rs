@@ -64,7 +64,8 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     // Pass the options to the image, if any are provided.
     // The holder must drop at the end of this function to ensure the options are not leaked,
     // and the holder here ensures it outlives the if block here, as a pointer has to be
-    // passed to the image. This has been hand-validated to be safe.
+    // passed to the image.
+    // SAFETY: The options outlive the usage of the image, and the image is not used after this.
     let mut options_holder: Option<Box<CString16>> = None;
     if !options.is_empty() {
         let options = Box::new(
@@ -103,7 +104,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     // This call might return, or it may pass full control to another image that will never return.
     // Capture the result to ensure we can return an error if the image fails to start, but only
     // after the optional initrd has been unregistered.
-    let result = uefi::boot::start_image(image).context("unable to start image");
+    let result = uefi::boot::start_image(image);
 
     // Unregister the initrd if it was registered.
     if let Some(initrd_handle) = initrd_handle

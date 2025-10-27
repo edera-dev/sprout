@@ -118,7 +118,10 @@ impl SproutContext {
     pub fn all_values(&self) -> BTreeMap<String, String> {
         let mut values = BTreeMap::new();
         for key in self.all_keys() {
-            values.insert(key.clone(), self.get(key).cloned().unwrap_or_default());
+            // Acquire the value from the context. Since retrieving all the keys will give us
+            // a full view of the context, we can be sure that the key exists.
+            let value = self.get(&key).cloned().unwrap_or_default();
+            values.insert(key.clone(), value);
         }
         values
     }

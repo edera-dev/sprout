@@ -18,7 +18,7 @@ use uefi_raw::Status;
 /// the device root path that can concatenated with subpaths to access files
 /// on a particular filesystem.
 ///
-/// This function only requires one of the criteria to match.
+/// This function only requires all the criteria to match.
 /// The fallback value can be used to provide a value if none is found.
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct FilesystemDeviceMatchExtractor {
