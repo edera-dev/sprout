@@ -4,6 +4,7 @@ use crate::config::RootConfiguration;
 use crate::entries::EntryDeclaration;
 use crate::generators::GeneratorDeclaration;
 use crate::generators::bls::BlsConfiguration;
+use crate::utils;
 use anyhow::{Context, Result};
 use uefi::cstr16;
 use uefi::fs::{FileSystem, Path};
@@ -33,6 +34,9 @@ pub fn scan(
     // Add a trailing slash to the root to ensure the path is valid.
     root.push('/');
 
+    // Generate a unique hash of the root path.
+    let root_unique_hash = utils::unique_hash(&root);
+
     // Whether we have a loader.conf file.
     let has_loader_conf = filesystem
         .try_exists(bls_loader_conf_path)
@@ -54,7 +58,7 @@ pub fn scan(
     }
 
     // Generate a unique name for the BLS chainload action.
-    let chainload_action_name = format!("{}{}", BLS_CHAINLOAD_ACTION_PREFIX, root);
+    let chainload_action_name = format!("{}{}", BLS_CHAINLOAD_ACTION_PREFIX, root_unique_hash,);
 
     // BLS is now detected, generate a configuration for it.
     let generator = BlsConfiguration {
@@ -68,7 +72,7 @@ pub fn scan(
 
     // Generate a unique name for the BLS generator and insert the generator into the configuration.
     config.generators.insert(
-        format!("autoconfigure-bls-{}", root),
+        format!("autoconfigure-bls-{}", root_unique_hash),
         GeneratorDeclaration {
             bls: Some(generator),
             ..Default::default()

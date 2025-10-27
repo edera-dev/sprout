@@ -175,3 +175,9 @@ pub fn combine_options<T: AsRef<str>>(options: impl Iterator<Item = T>) -> Strin
         .collect::<Vec<_>>()
         .join(" ")
 }
+
+/// Produce a unique hash for the input.
+/// This uses SHA-256, which is unique enough but relatively short.
+pub fn unique_hash(input: &str) -> String {
+    sha256::digest(input.as_bytes())
+}

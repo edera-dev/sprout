@@ -4,6 +4,7 @@ use crate::config::RootConfiguration;
 use crate::entries::EntryDeclaration;
 use crate::generators::GeneratorDeclaration;
 use crate::generators::list::ListConfiguration;
+use crate::utils;
 use anyhow::{Context, Result};
 use std::collections::BTreeMap;
 use uefi::CString16;
@@ -136,6 +137,9 @@ pub fn scan(
     // Add a trailing slash to the root to ensure the path is valid.
     root.push('/');
 
+    // Generate a unique hash of the root path.
+    let root_unique_hash = utils::unique_hash(&root);
+
     // Scan all locations for kernel pairs, adding them to the list.
     for location in SCAN_LOCATIONS {
         let scanned = scan_directory(filesystem, location)
@@ -149,7 +153,7 @@ pub fn scan(
     }
 
     // Generate a unique name for the linux chainload action.
-    let chainload_action_name = format!("{}{}", LINUX_CHAINLOAD_ACTION_PREFIX, root);
+    let chainload_action_name = format!("{}{}", LINUX_CHAINLOAD_ACTION_PREFIX, root_unique_hash,);
 
     // Kernel pairs are detected, generate a list configuration for it.
     let generator = ListConfiguration {
@@ -171,7 +175,7 @@ pub fn scan(
 
     // Generate a unique name for the Linux generator and insert the generator into the configuration.
     config.generators.insert(
-        format!("autoconfigure-linux-{}", root),
+        format!("autoconfigure-linux-{}", root_unique_hash),
         GeneratorDeclaration {
             list: Some(generator),
             ..Default::default()
