@@ -6,15 +6,16 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use std::str::FromStr;
-use uefi::fs::{FileSystem, Path};
+use uefi::fs::{FileSystem, Path, PathBuf};
 use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
 use uefi::proto::media::fs::SimpleFileSystem;
+use uefi::{CString16, cstr16};
 
 /// BLS entry parser.
 mod entry;
 
-/// The default path to the BLS entries directory.
-const BLS_TEMPLATE_PATH: &str = "\\loader\\entries";
+/// The default path to the BLS directory.
+const BLS_TEMPLATE_PATH: &str = "\\loader";
 
 /// The configuration of the BLS generator.
 /// The BLS uses the Bootloader Specification to produce
@@ -23,7 +24,7 @@ const BLS_TEMPLATE_PATH: &str = "\\loader\\entries";
 pub struct BlsConfiguration {
     /// The entry to use for as a template.
     pub entry: EntryDeclaration,
-    /// The path to the BLS entries directory.
+    /// The path to the BLS directory.
     #[serde(default = "default_bls_path")]
     pub path: String,
 }
@@ -44,20 +45,33 @@ fn quirk_initrd_remove_tuned(input: String) -> String {
 pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Vec<BootableEntry>> {
     let mut entries = Vec::new();
 
-    // Stamp the path to the BLS entries directory.
+    // Stamp the path to the BLS directory.
     let path = context.stamp(&bls.path);
 
+    // Convert the path to a UEFI PathBuf.
+    let path = PathBuf::from(
+        CString16::try_from(path.as_str()).context("unable to convert bls path to CString16")?,
+    );
+
+    // Construct the path to the BLS entries directory.
+    let mut entries_path = path.clone();
+    entries_path.push(cstr16!("entries"));
+
     // Resolve the path to the BLS entries directory.
-    let resolved = utils::resolve_path(context.root().loaded_image_path()?, &path)
-        .context("unable to resolve bls path")?;
+    let entries_resolved = utils::resolve_path(
+        context.root().loaded_image_path()?,
+        &path.to_cstr16().to_string(),
+    )
+    .context("unable to resolve bls path")?;
 
     // Open exclusive access to the BLS filesystem.
-    let fs = uefi::boot::open_protocol_exclusive::<SimpleFileSystem>(resolved.filesystem_handle)
-        .context("unable to open bls filesystem")?;
+    let fs =
+        uefi::boot::open_protocol_exclusive::<SimpleFileSystem>(entries_resolved.filesystem_handle)
+            .context("unable to open bls filesystem")?;
     let mut fs = FileSystem::new(fs);
 
     // Convert the subpath to the BLS entries directory to a string.
-    let sub_text_path = resolved
+    let sub_text_path = entries_resolved
         .sub_path
         .to_string(DisplayOnly(false), AllowShortcuts(false))
         .context("unable to convert subpath to string")?;

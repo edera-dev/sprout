@@ -135,10 +135,10 @@ version = 1
 path = "\\sprout\\drivers\\ext4.efi"
 
 # extract the full path of the first filesystem
-# that contains \loader\entries as a directory
+# that contains \loader as a directory
 # into the value called "boot"
 [extractors.boot.filesystem-device-match]
-has-item = "\\loader\\entries"
+has-item = "\\loader"
 
 # use the sprout bls module to scan a bls
 # directory for entries and load them as boot
@@ -146,7 +146,7 @@ has-item = "\\loader\\entries"
 # as specified here. the bls action below will
 # be passed the extracted values from bls.
 [generators.boot.bls]
-path = "$boot\\loader\\entries"
+path = "$boot\\loader"
 entry.title = "$title"
 entry.actions = ["bls"]
 
