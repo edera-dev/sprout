@@ -11,9 +11,9 @@ use uefi::proto::device_path::DevicePath;
 use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
 use uefi::proto::media::fs::SimpleFileSystem;
 
-/// The name of the BLS chainload action that will be used
+/// The name prefix of the BLS chainload action that will be used
 /// by the BLS generator to chainload entries.
-const BLS_CHAINLOAD_ACTION: &str = "bls-chainload";
+const BLS_CHAINLOAD_ACTION_PREFIX: &str = "bls-chainload-";
 
 /// Scan the specified `filesystem` for BLS configurations.
 fn scan_for_bls(
@@ -54,11 +54,14 @@ fn scan_for_bls(
         return Ok(false);
     }
 
+    // Generate a unique name for the BLS chainload action.
+    let chainload_action_name = format!("{}{}", BLS_CHAINLOAD_ACTION_PREFIX, root);
+
     // BLS is now detected, generate a configuration for it.
     let generator = BlsConfiguration {
         entry: EntryDeclaration {
             title: "$title".to_string(),
-            actions: vec![BLS_CHAINLOAD_ACTION.to_string()],
+            actions: vec![chainload_action_name.clone()],
             ..Default::default()
         },
         path: format!("{}\\loader", root),
@@ -73,31 +76,25 @@ fn scan_for_bls(
         },
     );
 
-    // We had a BLS supported configuration, so return true.
-    Ok(true)
-}
-
-/// Add the BLS actions to the configuration.
-/// We should only do this once.
-fn add_bls_actions(config: &mut RootConfiguration) -> Result<()> {
     // Generate a chainload configuration for BLS.
     // BLS will provide these values to us.
     let chainload = ChainloadConfiguration {
-        path: "$chainload".to_string(),
+        path: format!("{}\\$chainload", root),
         options: vec!["$options".to_string()],
-        linux_initrd: Some("$initrd".to_string()),
+        linux_initrd: Some(format!("{}\\$initrd", root)),
     };
 
     // Insert the chainload action into the configuration.
     config.actions.insert(
-        BLS_CHAINLOAD_ACTION.to_string(),
+        chainload_action_name,
         ActionDeclaration {
             chainload: Some(chainload),
             ..Default::default()
         },
     );
 
-    Ok(())
+    // We had a BLS supported configuration, so return true.
+    Ok(true)
 }
 
 /// Generate a [RootConfiguration] based on the environment.
@@ -106,10 +103,6 @@ pub fn autoconfigure(config: &mut RootConfiguration) -> Result<()> {
     // Find all the filesystems that are on the system.
     let filesystem_handles =
         uefi::boot::find_handles::<SimpleFileSystem>().context("unable to scan filesystems")?;
-
-    // Whether we have any BLS-supported filesystems.
-    // We will key off of this to know if we should add BLS actions.
-    let mut has_any_bls = false;
 
     // For each filesystem that was detected, scan it for supported autoconfig mechanisms.
     for handle in filesystem_handles {
@@ -128,16 +121,8 @@ pub fn autoconfigure(config: &mut RootConfiguration) -> Result<()> {
         let mut filesystem = FileSystem::new(filesystem);
 
         // Scan the filesystem for BLS supported configurations.
-        // If we find any, we will add a BLS generator to the configuration, and then
-        // at the end we will add the BLS actions to the configuration.
-        let bls_found =
-            scan_for_bls(&mut filesystem, &root, config).context("unable to scan filesystem")?;
-        has_any_bls = has_any_bls || bls_found;
-    }
-
-    // If we had any BLS-supported filesystems, add the BLS actions to the configuration.
-    if has_any_bls {
-        add_bls_actions(config).context("unable to add BLS actions")?;
+        // If we find any, we will add a BLS generator to the configuration.
+        scan_for_bls(&mut filesystem, &root, config).context("unable to scan filesystem")?;
     }
 
     Ok(())
