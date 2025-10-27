@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 
 /// The configuration of the print action.
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct PrintConfiguration {
     /// The text to print to the console.
     #[serde(default)]

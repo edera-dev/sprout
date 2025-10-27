@@ -19,7 +19,7 @@ pub mod splash;
 /// that you can specify via other concepts.
 ///
 /// Actions are the main work that Sprout gets done, like booting Linux.
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ActionDeclaration {
     /// Chainload to another EFI application.
     /// This allows you to load any EFI application, either to boot an operating system

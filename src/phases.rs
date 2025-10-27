@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 /// Configures the various phases of the boot process.
 /// This allows hooking various phases to run actions.
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct PhasesConfiguration {
     /// The early phase is run before drivers are loaded.
     #[serde(default)]
@@ -23,7 +23,7 @@ pub struct PhasesConfiguration {
 /// Configures a single phase of the boot process.
 /// There can be multiple phase configurations that are
 /// executed sequentially.
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct PhaseConfiguration {
     /// The actions to run when the phase is executed.
     #[serde(default)]

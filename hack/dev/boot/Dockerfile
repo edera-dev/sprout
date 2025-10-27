@@ -13,6 +13,7 @@ COPY xen.efi /work/XEN.EFI
 COPY xen.cfg /work/XEN.CFG
 COPY initramfs /work/INITRAMFS
 COPY edera-splash.png /work/EDERA-SPLASH.PNG
+COPY bls.conf /work/BLS.CONF
 RUN truncate -s128MiB sprout.img && \
     parted --script sprout.img mklabel gpt > /dev/null 2>&1 && \
     parted --script sprout.img mkpart primary fat32 1MiB 100% > /dev/null 2>&1 && \
@@ -20,6 +21,8 @@ RUN truncate -s128MiB sprout.img && \
     mkfs.vfat -F32 -n EFI sprout.img && \
     mmd -i sprout.img ::/EFI && \
     mmd -i sprout.img ::/EFI/BOOT && \
+    mmd -i sprout.img ::/LOADER && \
+    mmd -i sprout.img ::/LOADER/ENTRIES && \
     mcopy -i sprout.img ${EFI_NAME}.EFI ::/EFI/BOOT/ && \
     mcopy -i sprout.img KERNEL.EFI ::/EFI/BOOT/ && \
     mcopy -i sprout.img SHELL.EFI ::/EFI/BOOT/ && \
@@ -28,6 +31,7 @@ RUN truncate -s128MiB sprout.img && \
     mcopy -i sprout.img SPROUT.TOML ::/ && \
     mcopy -i sprout.img EDERA-SPLASH.PNG ::/ && \
     mcopy -i sprout.img INITRAMFS ::/ && \
+    mcopy -i sprout.img BLS.CONF ::/LOADER/ENTRIES/ && \
     mv sprout.img /sprout.img
 
 FROM scratch AS final

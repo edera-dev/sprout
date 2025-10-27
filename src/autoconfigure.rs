@@ -27,24 +27,30 @@ fn scan_for_bls(
     let bls_entries_path = Path::new(cstr16!("\\loader\\entries"));
 
     // Convert the device path root to a string we can use in the configuration.
-    let root = root
+    let mut root = root
         .to_string(DisplayOnly(false), AllowShortcuts(false))
         .context("unable to convert device root to string")?
         .to_string();
+    // Add a trailing slash to the root to ensure the path is valid.
+    root.push('/');
 
     // Whether we have a loader.conf file.
     let has_loader_conf = filesystem
         .try_exists(bls_loader_conf_path)
-        .context("unable to check for BLS entries directory")?;
+        .context("unable to check for BLS loader.conf file")?;
 
     // Whether we have an entries directory.
+    // We actually iterate the entries to see if there are any.
     let has_entries_dir = filesystem
-        .try_exists(bls_entries_path)
-        .context("unable to check for BLS loader.conf file")?;
+        .read_dir(bls_entries_path)
+        .ok()
+        .and_then(|mut iterator| iterator.next())
+        .map(|entry| entry.is_ok())
+        .unwrap_or(false);
 
     // Detect if a BLS supported configuration is on this filesystem.
     // We check both loader.conf and entries directory as only one of them is required.
-    if !has_loader_conf && !has_entries_dir {
+    if !(has_loader_conf || has_entries_dir) {
         return Ok(false);
     }
 
@@ -55,7 +61,7 @@ fn scan_for_bls(
             actions: vec![BLS_CHAINLOAD_ACTION.to_string()],
             ..Default::default()
         },
-        path: format!("{}\\loader", root,),
+        path: format!("{}\\loader", root),
     };
 
     // Generate a unique name for the BLS generator and insert the generator into the configuration.
@@ -79,7 +85,7 @@ fn add_bls_actions(config: &mut RootConfiguration) -> Result<()> {
     let chainload = ChainloadConfiguration {
         path: "$chainload".to_string(),
         options: vec!["$options".to_string()],
-        linux_initrd: Some("initrd".to_string()),
+        linux_initrd: Some("$initrd".to_string()),
     };
 
     // Insert the chainload action into the configuration.
@@ -124,8 +130,9 @@ pub fn autoconfigure(config: &mut RootConfiguration) -> Result<()> {
         // Scan the filesystem for BLS supported configurations.
         // If we find any, we will add a BLS generator to the configuration, and then
         // at the end we will add the BLS actions to the configuration.
-        has_any_bls = has_any_bls
-            || scan_for_bls(&mut filesystem, &root, config).context("unable to scan filesystem")?;
+        let bls_found =
+            scan_for_bls(&mut filesystem, &root, config).context("unable to scan filesystem")?;
+        has_any_bls = has_any_bls || bls_found;
     }
 
     // If we had any BLS-supported filesystems, add the BLS actions to the configuration.

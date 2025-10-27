@@ -18,7 +18,7 @@ pub const LATEST_VERSION: u32 = 1;
 pub const DEFAULT_MENU_TIMEOUT_SECONDS: u64 = 10;
 
 /// The Sprout configuration format.
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct RootConfiguration {
     /// The version of the configuration. This should always be declared
     /// and be the latest version that is supported. If not specified, it is assumed
@@ -66,7 +66,7 @@ pub struct RootConfiguration {
 }
 
 /// Default configuration for Sprout, used when the corresponding options are not specified.
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct DefaultsConfiguration {
     /// The entry to boot without showing the boot menu.
     /// If not specified, a boot menu is shown.

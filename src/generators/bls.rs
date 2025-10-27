@@ -20,7 +20,7 @@ const BLS_TEMPLATE_PATH: &str = "\\loader";
 /// The configuration of the BLS generator.
 /// The BLS uses the Bootloader Specification to produce
 /// entries from an input template.
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct BlsConfiguration {
     /// The entry to use for as a template.
     pub entry: EntryDeclaration,
@@ -86,7 +86,7 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         let name = entry.file_name().to_string();
 
         // Ignore files that are not .conf files.
-        if !name.ends_with(".conf") {
+        if !name.to_lowercase().ends_with(".conf") {
             continue;
         }
 

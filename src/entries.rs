@@ -7,7 +7,7 @@ use std::rc::Rc;
 ///
 /// Entries are the user-facing concept of Sprout, making it possible
 /// to run a set of actions with a specific context.
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct EntryDeclaration {
     /// The title of the entry which will be display in the boot menu.
     /// This is the pre-stamped value.

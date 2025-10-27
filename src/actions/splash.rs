@@ -15,7 +15,7 @@ use uefi::proto::console::gop::GraphicsOutput;
 const DEFAULT_SPLASH_TIME: u32 = 0;
 
 /// The configuration of the splash action.
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SplashConfiguration {
     /// The path to the image to display.
     /// Currently, only PNG images are supported.
