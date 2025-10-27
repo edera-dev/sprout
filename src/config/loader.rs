@@ -2,7 +2,7 @@ use crate::config::{RootConfiguration, latest_version};
 use crate::options::SproutOptions;
 use crate::utils;
 use anyhow::{Context, Result, bail};
-use log::debug;
+use log::info;
 use std::ops::Deref;
 use toml::Value;
 use uefi::proto::device_path::LoadedImageDevicePath;
@@ -16,7 +16,7 @@ fn load_raw_config(options: &SproutOptions) -> Result<Vec<u8>> {
     // Acquire the device path as a boxed device path.
     let path = current_image_device_path_protocol.deref().to_boxed();
 
-    debug!("configuration file: {}", options.config);
+    info!("configuration file: {}", options.config);
 
     // Read the contents of the sprout config file.
     let content = utils::read_file_contents(&path, &options.config)
