@@ -39,6 +39,7 @@ simplify installation and usage.
 
 - [Fedora Setup Guide]
 - [Generic Linux Setup Guide]
+- [Alpine Edge Setup Guide]
 - [Windows Setup Guide]
 - [Development Guide]
 - [Contributing Guide]
@@ -159,6 +160,7 @@ chainload.linux-initrd = "$boot\\$initrd"
 [Edera]: https://edera.dev
 [Fedora Setup Guide]: ./docs/fedora-setup.md
 [Generic Linux Setup Guide]: ./docs/generic-linux-setup.md
+[Alpine Edge Setup Guide]: ./docs/alpine-edge-setup.md
 [Windows Setup Guide]: ./docs/windows-setup.md
 [Development Guide]: ./DEVELOPMENT.md
 [Contributing Guide]: ./CONTRIBUTING.md
