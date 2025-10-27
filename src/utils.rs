@@ -161,3 +161,17 @@ pub fn read_file_contents(default_root_path: &DevicePath, input: &str) -> Result
     let content = fs.read(Path::new(&path));
     content.context("unable to read file contents")
 }
+
+/// Filter a string-like Option `input` such that an empty string is [None].
+pub fn empty_is_none<T: AsRef<str>>(input: Option<T>) -> Option<T> {
+    input.filter(|input| !input.as_ref().is_empty())
+}
+
+/// Combine a sequence of strings into a single string, separated by spaces, ignoring empty strings.
+pub fn combine_options<T: AsRef<str>>(options: impl Iterator<Item = T>) -> String {
+    options
+        .flat_map(|item| empty_is_none(Some(item)))
+        .map(|item| item.as_ref().to_string())
+        .collect::<Vec<_>>()
+        .join(" ")
+}

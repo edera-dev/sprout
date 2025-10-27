@@ -40,7 +40,23 @@ pub struct EderaConfiguration {
 }
 
 /// Builds a configuration string for the Xen EFI stub using the specified `configuration`.
-fn build_xen_config(configuration: &EderaConfiguration) -> String {
+fn build_xen_config(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> String {
+    // Stamp xen options and combine them.
+    let xen_options = utils::combine_options(
+        configuration
+            .xen_options
+            .iter()
+            .map(|item| context.stamp(item)),
+    );
+
+    // Stamp kernel options and combine them.
+    let kernel_options = utils::combine_options(
+        configuration
+            .kernel_options
+            .iter()
+            .map(|item| context.stamp(item)),
+    );
+
     // xen config file format is ini-like
     [
         // global section
@@ -50,10 +66,10 @@ fn build_xen_config(configuration: &EderaConfiguration) -> String {
         // configuration section for sprout
         "[sprout]".to_string(),
         // xen options
-        format!("options={}", configuration.xen_options.join(" ")),
+        format!("options={}", xen_options),
         // kernel options, stub replaces the kernel path
         // the kernel is provided via media loader
-        format!("kernel=stub {}", configuration.kernel_options.join(" ")),
+        format!("kernel=stub {}", kernel_options),
         // required or else the last line will be ignored
         "".to_string(),
     ]
@@ -94,7 +110,7 @@ fn register_media_loader_file(
 /// `configuration` and `context`. This action uses Edera-specific Xen EFI stub functionality.
 pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> Result<()> {
     // Build the Xen config file content for this configuration.
-    let config = build_xen_config(configuration);
+    let config = build_xen_config(context.clone(), configuration);
 
     // Register the media loader for the config.
     let config = register_media_loader_text(XEN_EFI_CONFIG_MEDIA_GUID, "config", config)
@@ -113,7 +129,7 @@ pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> 
     let mut media_loaders = vec![config, kernel];
 
     // Register the initrd if it is provided.
-    if let Some(ref initrd) = configuration.initrd {
+    if let Some(initrd) = utils::empty_is_none(configuration.initrd.as_ref()) {
         let initrd =
             register_media_loader_file(&context, XEN_EFI_RAMDISK_MEDIA_GUID, "initrd", initrd)
                 .context("unable to register initrd media loader")?;
@@ -131,7 +147,7 @@ pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> 
     )
     .context("unable to chainload to xen");
 
-    // Unregister the media loaders on error.
+    // Unregister the media loaders when an error happens.
     for media_loader in media_loaders {
         if let Err(error) = media_loader.unregister() {
             error!("unable to unregister media loader: {}", error);

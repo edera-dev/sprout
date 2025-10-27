@@ -53,13 +53,9 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     let mut loaded_image_protocol = uefi::boot::open_protocol_exclusive::<LoadedImage>(image)
         .context("unable to open loaded image protocol")?;
 
-    // Stamp and concatenate the options to pass to the image.
-    let options = configuration
-        .options
-        .iter()
-        .map(|item| context.stamp(item))
-        .collect::<Vec<_>>()
-        .join(" ");
+    // Stamp and combine the options to pass to the image.
+    let options =
+        utils::combine_options(configuration.options.iter().map(|item| context.stamp(item)));
 
     // Pass the options to the image, if any are provided.
     // The holder must drop at the end of this function to ensure the options are not leaked,
@@ -90,16 +86,14 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     }
 
     // The initrd can be None or empty, so we need to collapse that into a single Option.
-    let initrd = configuration
-        .linux_initrd
-        .as_ref()
-        .map(|path| context.stamp(path))
-        .and_then(|path| if path.is_empty() { None } else { Some(path) });
+    let initrd = utils::empty_is_none(configuration.linux_initrd.as_ref());
 
     // If an initrd is provided, register it with the EFI stack.
     let mut initrd_handle = None;
-    if let Some(ref linux_initrd) = initrd {
-        let content = utils::read_file_contents(context.root().loaded_image_path()?, linux_initrd)
+    if let Some(linux_initrd) = initrd {
+        // Stamp the path to the initrd.
+        let linux_initrd = context.stamp(linux_initrd);
+        let content = utils::read_file_contents(context.root().loaded_image_path()?, &linux_initrd)
             .context("unable to read linux initrd")?;
         let handle =
             MediaLoaderHandle::register(LINUX_EFI_INITRD_MEDIA_GUID, content.into_boxed_slice())
