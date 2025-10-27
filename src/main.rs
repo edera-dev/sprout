@@ -7,7 +7,7 @@ use crate::options::SproutOptions;
 use crate::options::parser::OptionsRepresentable;
 use crate::phases::phase;
 use anyhow::{Context, Result};
-use log::info;
+use log::debug;
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::time::Duration;
@@ -73,7 +73,7 @@ fn main() -> Result<()> {
         >(uefi::boot::image_handle())
         .context("unable to get loaded image device path")?;
         let loaded_image_path = current_image_device_path_protocol.deref().to_boxed();
-        info!(
+        debug!(
             "loaded image path: {}",
             loaded_image_path.to_string(DisplayOnly(false), AllowShortcuts(false))?
         );
@@ -103,7 +103,7 @@ fn main() -> Result<()> {
     for (name, extractor) in &config.extractors {
         let value = extractors::extract(context.clone(), extractor)
             .context(format!("unable to extract value {}", name))?;
-        info!("extracted value {}: {}", name, value);
+        debug!("extracted value {}: {}", name, value);
         extracted.insert(name.clone(), value);
     }
     let mut context = context.fork();

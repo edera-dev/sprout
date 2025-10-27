@@ -1,7 +1,7 @@
 use crate::context::SproutContext;
 use crate::utils;
 use anyhow::{Context, Result};
-use log::info;
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -33,7 +33,7 @@ fn load_driver(context: Rc<SproutContext>, driver: &DriverDeclaration) -> Result
     // Push the path of the driver from the root.
     full_path.push_str(&context.stamp(&driver.path));
 
-    info!("driver path: {}", full_path);
+    debug!("driver path: {}", full_path);
 
     // Convert the path to a device path.
     let device_path = utils::text_to_device_path(&full_path)?;
@@ -86,7 +86,7 @@ pub fn load(
         return Ok(());
     }
 
-    info!("loading drivers");
+    debug!("loading drivers");
 
     // Load all the drivers in no particular order.
     for (name, driver) in drivers {
@@ -95,7 +95,7 @@ pub fn load(
 
     // Reconnect all the controllers to all handles.
     reconnect().context("unable to reconnect drivers")?;
-    info!("loaded drivers");
+    debug!("loaded drivers");
 
     // We've now loaded all the drivers, so we can return.
     Ok(())
