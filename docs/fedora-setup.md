@@ -40,7 +40,7 @@ version = 1
 path = "\\sprout\\drivers\\ext4.efi"
 
 # global options.
-[defaults]
+[options]
 # enable autoconfiguration by detecting bls enabled
 # filesystems and generating boot entries for them.
 autoconfigure = true
