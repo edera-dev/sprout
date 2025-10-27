@@ -39,27 +39,11 @@ version = 1
 [drivers.ext4]
 path = "\\sprout\\drivers\\ext4.efi"
 
-# extract the full path of the first filesystem
-# that contains \loader as a directory
-# into the value called "boot"
-[extractors.boot.filesystem-device-match]
-has-item = "\\loader"
-
-# use the sprout bls module to scan a bls
-# directory for entries and load them as boot
-# entries in sprout, using the entry template
-# as specified here. the bls action below will
-# be passed the extracted values from bls.
-[generators.boot.bls]
-path = "$boot\\loader"
-entry.title = "$title"
-entry.actions = ["bls"]
-
-# the action that is used for each bls entry above.
-[actions.bls]
-chainload.path = "$boot\\$chainload"
-chainload.options = ["$options"]
-chainload.linux-initrd = "$boot\\$initrd"
+# global options.
+[defaults]
+# enable autoconfiguration by detecting bls enabled
+# filesystems and generating boot entries for them.
+autoconfigure = true
 ```
 
 ## Step 3, Option 1: Configure GRUB to load Sprout (recommended)
