@@ -48,8 +48,8 @@ simplify installation and usage.
 
 ## Features
 
-NOTE: Currently, Sprout is experimental and is not intended for production use. For example, it doesn't currently
-have secure boot support. In fact, as of writing, it doesn't even have a boot menu. Instead, it boots the first entry it sees, or fails.
+NOTE: Currently, Sprout is experimental and is not intended for production use.
+The boot menu mechanism is very rudimentary.
 
 ### Current
 
@@ -59,11 +59,11 @@ have secure boot support. In fact, as of writing, it doesn't even have a boot me
 - [x] Linux boot support via EFI stub
 - [x] Windows boot support via chainload
 - [x] Load Linux initrd from disk
-- [x] Boot first configured entry
+- [x] Basic boot menu
 
 ### Roadmap
 
-- [ ] Boot menu
+- [ ] Full-featured boot menu
 - [ ] Secure Boot support: work in progress
 - [ ] UKI support: partial
 - [ ] multiboot2 support
