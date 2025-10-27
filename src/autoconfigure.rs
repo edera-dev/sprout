@@ -12,6 +12,9 @@ pub mod bls;
 /// on BLS-enabled filesystems as it may make duplicate entries.
 pub mod linux;
 
+/// windows: autodetect and configure Windows boot configurations.
+pub mod windows;
+
 /// Generate a [RootConfiguration] based on the environment.
 /// Intakes a `config` to use as the basis of the autoconfiguration.
 pub fn autoconfigure(config: &mut RootConfiguration) -> Result<()> {
@@ -44,6 +47,10 @@ pub fn autoconfigure(config: &mut RootConfiguration) -> Result<()> {
             linux::scan(&mut filesystem, &root, config)
                 .context("unable to scan for linux configurations")?;
         }
+
+        // Always look for Windows configurations.
+        windows::scan(&mut filesystem, &root, config)
+            .context("unable to scan for windows configurations")?;
     }
 
     Ok(())

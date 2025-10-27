@@ -85,14 +85,17 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
         options_holder = Some(options);
     }
 
+    // Stamp the initrd path, if provided.
+    let initrd = configuration
+        .linux_initrd
+        .as_ref()
+        .map(|item| context.stamp(item));
     // The initrd can be None or empty, so we need to collapse that into a single Option.
-    let initrd = utils::empty_is_none(configuration.linux_initrd.as_ref());
+    let initrd = utils::empty_is_none(initrd);
 
     // If an initrd is provided, register it with the EFI stack.
     let mut initrd_handle = None;
     if let Some(linux_initrd) = initrd {
-        // Stamp the path to the initrd.
-        let linux_initrd = context.stamp(linux_initrd);
         let content = utils::read_file_contents(context.root().loaded_image_path()?, &linux_initrd)
             .context("unable to read linux initrd")?;
         let handle =

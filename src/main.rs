@@ -248,6 +248,7 @@ fn main() -> Result<()> {
         for (index, stack) in error.chain().enumerate() {
             error!("[{}]: {}", index, stack);
         }
+        uefi::boot::stall(Duration::from_secs(10));
     }
 
     // Sprout doesn't necessarily guarantee anything was booted.

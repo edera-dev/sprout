@@ -6,6 +6,7 @@ use crate::generators::GeneratorDeclaration;
 use crate::generators::list::ListConfiguration;
 use crate::utils;
 use anyhow::{Context, Result};
+use log::info;
 use std::collections::BTreeMap;
 use uefi::CString16;
 use uefi::fs::{FileSystem, Path};
@@ -23,7 +24,7 @@ const SCAN_LOCATIONS: &[&str] = &["/boot", "/"];
 const KERNEL_PREFIXES: &[&str] = &["vmlinuz"];
 
 /// Prefixes of initramfs files to match to.
-const INITRAMFS_PREFIXES: &[&str] = &["initramfs", "initrd"];
+const INITRAMFS_PREFIXES: &[&str] = &["initramfs", "initrd", "initrd.img"];
 
 /// Pair of kernel and initramfs.
 /// This is what scanning a directory is meant to find.
@@ -158,7 +159,7 @@ pub fn scan(
     // Kernel pairs are detected, generate a list configuration for it.
     let generator = ListConfiguration {
         entry: EntryDeclaration {
-            title: "Boot Linux $kernel".to_string(),
+            title: "Boot Linux $name".to_string(),
             actions: vec![chainload_action_name.clone()],
             ..Default::default()
         },
@@ -166,8 +167,14 @@ pub fn scan(
             .into_iter()
             .map(|pair| {
                 BTreeMap::from_iter(vec![
-                    ("kernel".to_string(), pair.kernel),
-                    ("initrd".to_string(), pair.initramfs.unwrap_or_default()),
+                    ("name".to_string(), pair.kernel.clone()),
+                    ("kernel".to_string(), format!("{}{}", root, pair.kernel)),
+                    (
+                        "initrd".to_string(),
+                        pair.initramfs
+                            .map(|initramfs| format!("{}{}", root, initramfs))
+                            .unwrap_or_default(),
+                    ),
                 ])
             })
             .collect(),
@@ -194,9 +201,9 @@ pub fn scan(
     // Note that we don't need an extra \\ in the paths here.
     // The root already contains a trailing slash.
     let chainload = ChainloadConfiguration {
-        path: format!("{}$kernel", root),
+        path: "$kernel".to_string(),
         options: vec!["$linux-options".to_string()],
-        linux_initrd: Some(format!("{}$initrd", root)),
+        linux_initrd: Some("$initrd".to_string()),
     };
 
     // Insert the chainload action into the configuration.
@@ -207,6 +214,8 @@ pub fn scan(
             ..Default::default()
         },
     );
+
+    info!("{:?}", config);
 
     // We had a Linux kernel, so return true to indicate something was found.
     Ok(true)
