@@ -33,8 +33,6 @@ fn load_driver(context: Rc<SproutContext>, driver: &DriverDeclaration) -> Result
     // Push the path of the driver from the root.
     full_path.push_str(&context.stamp(&driver.path));
 
-    info!("driver path: {}", full_path);
-
     // Convert the path to a device path.
     let device_path = utils::text_to_device_path(&full_path)?;
 

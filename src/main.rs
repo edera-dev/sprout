@@ -13,7 +13,6 @@ use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::time::Duration;
 use uefi::proto::device_path::LoadedImageDevicePath;
-use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
 
 /// actions: Code that can be configured and executed by Sprout.
 pub mod actions;
@@ -78,10 +77,6 @@ fn run() -> Result<()> {
         >(uefi::boot::image_handle())
         .context("unable to get loaded image device path")?;
         let loaded_image_path = current_image_device_path_protocol.deref().to_boxed();
-        info!(
-            "loaded image path: {}",
-            loaded_image_path.to_string(DisplayOnly(false), AllowShortcuts(false))?
-        );
         RootContext::new(loaded_image_path, options)
     };
 
