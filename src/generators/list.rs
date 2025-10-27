@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 /// List generator configuration.
-/// The matrix generator produces multiple entries based
+/// The list generator produces multiple entries based
 /// on a set of input maps.
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ListConfiguration {
