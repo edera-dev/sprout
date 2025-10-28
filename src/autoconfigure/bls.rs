@@ -31,7 +31,7 @@ pub fn scan(
         .to_string(DisplayOnly(false), AllowShortcuts(false))
         .context("unable to convert device root to string")?
         .to_string();
-    // Add a trailing slash to the root to ensure the path is valid.
+    // Add a trailing forward-slash to the root to ensure the device root is completed.
     root.push('/');
 
     // Generate a unique hash of the root path.
