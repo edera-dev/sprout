@@ -118,6 +118,9 @@ fn run() -> Result<()> {
 
         // Extend the root context with the autoconfigured actions.
         root.actions_mut().extend(config.actions);
+
+        // Insert any modified root values.
+        context.insert(&config.values);
     }
 
     // Refreeze the context to ensure that further operations can share the context.
@@ -248,6 +251,7 @@ fn main() -> Result<()> {
         for (index, stack) in error.chain().enumerate() {
             error!("[{}]: {}", index, stack);
         }
+        // Sleep for 10 seconds to allow the user to read the error.
         uefi::boot::stall(Duration::from_secs(10));
     }
 

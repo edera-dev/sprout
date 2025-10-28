@@ -3,7 +3,7 @@ use crate::utils;
 use crate::utils::media_loader::MediaLoaderHandle;
 use crate::utils::media_loader::constants::linux::LINUX_EFI_INITRD_MEDIA_GUID;
 use anyhow::{Context, Result, bail};
-use log::{error, info};
+use log::error;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use uefi::CString16;
@@ -68,8 +68,6 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
             CString16::try_from(&options[..])
                 .context("unable to convert chainloader options to CString16")?,
         );
-
-        info!("options: {}", options);
 
         if options.num_bytes() > u32::MAX as usize {
             bail!("chainloader options too large");
