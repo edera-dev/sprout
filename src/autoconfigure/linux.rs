@@ -89,7 +89,7 @@ fn scan_directory(filesystem: &mut FileSystem, path: &str) -> Result<Vec<KernelP
 
         // Find a matching initramfs, if any.
         let mut initramfs_prefix_iter = INITRAMFS_PREFIXES.iter();
-        let initramfs = loop {
+        let matched_initramfs_path = loop {
             let Some(prefix) = initramfs_prefix_iter.next() else {
                 break None;
             };
@@ -112,7 +112,7 @@ fn scan_directory(filesystem: &mut FileSystem, path: &str) -> Result<Vec<KernelP
         let mut kernel = path.clone();
         kernel.push(Path::new(&item.file_name()));
         let kernel = kernel.to_string();
-        let initramfs = initramfs.map(|initramfs| initramfs.to_string());
+        let initramfs = matched_initramfs_path.map(|initramfs_path| initramfs_path.to_string());
 
         // Produce a kernel pair.
         let pair = KernelPair { kernel, initramfs };
