@@ -1,0 +1,29 @@
+name: Request a feature
+description: Request a feature.
+title: "want: "
+labels: ["enhancement", "triage"]
+type: feature
+assignees:
+- edera-dev/engineering
+body:
+- type: markdown
+  attributes:
+    value: |
+      Thanks for taking the time to fill out a feature request!
+- type: textarea
+  id: description
+  attributes:
+    label: Description
+    description:
+    placeholder: Tell us what you want to see!
+    value: "Your hopes and dreams here!"
+  validations:
+    required: true
+- type: checkboxes
+  id: terms
+  attributes:
+    label: Code of Conduct
+    description: By submitting this report, you agree to follow our [Code of Conduct](https://github.com/edera-dev/sprout/blob/main/CODE_OF_CONDUCT.md).
+    options:
+    - label: I agree to follow the Sprout Code of Conduct.
+      required: true
