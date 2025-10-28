@@ -18,6 +18,9 @@ existing UEFI bootloader or booted by the hardware directly.
 
 Sprout is licensed under Apache 2.0 and is open to modifications and contributions.
 
+**IMPORTANT WARNING**: Sprout does not support UEFI Secure Boot yet.
+See [this issue](https://github.com/edera-dev/sprout/issues/20) for updates.
+
 ## Background
 
 At [Edera] we make compute isolation technology for a wide variety of environments, often ones we do not fully control.
@@ -55,7 +58,7 @@ The boot menu mechanism is very rudimentary.
 ### Current
 
 - [x] Loadable driver support
-- [x] [Bootloader specification (BLS)](https://uapi-group.org/specifications/specs/boot_loader_specification/) support
+- [x] Basic [Bootloader specification (BLS)](https://uapi-group.org/specifications/specs/boot_loader_specification/) support
 - [x] Chainload support
 - [x] Linux boot support via EFI stub
 - [x] Windows boot support via chainload
@@ -65,15 +68,18 @@ The boot menu mechanism is very rudimentary.
 
 ### Roadmap
 
-- [ ] Full-featured boot menu
-- [ ] Secure Boot support: work in progress
-- [ ] UKI support: partial
-- [ ] multiboot2 support
-- [ ] Linux boot protocol (boot without EFI stub)
+- [ ] [Bootloader interface support](https://github.com/edera-dev/sprout/issues/21)
+- [ ] [BLS specification conformance](https://github.com/edera-dev/sprout/issues/2)
+- [ ] [Full-featured boot menu](https://github.com/edera-dev/sprout/issues/1)
+- [ ] [Secure Boot support](https://github.com/edera-dev/sprout/issues/20): work in progress
+- [ ] [UKI support](https://github.com/edera-dev/sprout/issues/6): partial
+- [ ] [multiboot2 support](https://github.com/edera-dev/sprout/issues/7)
+- [ ] [Linux boot protocol (boot without EFI stub)](https://github.com/edera-dev/sprout/issues/7)
 
 ## Concepts
 
 - drivers: loadable EFI modules that can add functionality to the EFI system.
+- autoconfiguration: code that can automatically generate sprout.toml based on the EFI environment.
 - actions: executable code with a configuration that can be run by various other sprout concepts.
 - generators: code that can generate boot entries based on inputs or runtime code.
 - extractors: code that can extract values from the EFI environment.
