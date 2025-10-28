@@ -50,6 +50,7 @@ fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
         .context("unable to wait for event")?;
 
     // Close the timer event that we acquired.
+    // We don't need to close the key event because it is owned globally.
     if let Some(timer_event) = events.into_iter().next() {
         uefi::boot::close_event(timer_event).context("unable to close timer event")?;
     }
