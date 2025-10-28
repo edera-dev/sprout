@@ -19,8 +19,8 @@ use uefi_raw::Status;
 /// on a particular filesystem.
 /// The fallback value can be used to provide a value if no match is found.
 ///
-/// This function only requires all the criteria to match. If no criteria is provided,
-/// no filesystem is matched, and the fallback value is used if it is provided.
+/// This extractor requires all the criteria to match. If no criteria is provided,
+/// an error is returned.
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct FilesystemDeviceMatchExtractor {
     /// Matches a filesystem that has the specified label.
