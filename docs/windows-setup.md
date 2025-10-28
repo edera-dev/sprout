@@ -33,15 +33,10 @@ Write the following file to `X:\sprout.toml`:
 # sprout configuration: version 1
 version = 1
 
-# add a boot entry for booting Windows
-# which will run the boot-windows action.
-[entries.windows]
-title = "Windows"
-actions = ["boot-windows"]
-
-# use the chainload action to boot the Windows bootloader.
-[actions.boot-windows]
-chainload.path = "\\EFI\\Microsoft\\Boot\\bootmgfw.efi"
+# global options.
+[options]
+# enable autoconfiguration to detect Windows.
+autoconfigure = true
 ```
 
 ## Step 4: Configure EFI Firmware to boot Sprout
