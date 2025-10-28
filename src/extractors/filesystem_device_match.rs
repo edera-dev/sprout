@@ -10,7 +10,7 @@ use uefi::proto::device_path::DevicePath;
 use uefi::proto::media::file::{File, FileSystemVolumeLabel};
 use uefi::proto::media::fs::SimpleFileSystem;
 use uefi::proto::media::partition::PartitionInfo;
-use uefi::{CString16, Guid};
+use uefi::{CString16, Guid, Handle};
 use uefi_raw::Status;
 
 /// The filesystem device match extractor.
@@ -40,6 +40,48 @@ pub struct FilesystemDeviceMatchExtractor {
     pub fallback: Option<String>,
 }
 
+/// Represents the partition UUIDs for a filesystem.
+struct PartitionIds {
+    /// The UUID of the partition.
+    partition_uuid: Guid,
+    /// The type UUID of the partition.
+    type_uuid: Guid,
+}
+
+/// Fetches the partition UUIDs for the specified filesystem handle.
+fn fetch_partition_uuids(handle: Handle) -> Result<Option<PartitionIds>> {
+    // Open the partition info protocol for this handle.
+    let partition_info = uefi::boot::open_protocol_exclusive::<PartitionInfo>(handle);
+
+    match partition_info {
+        Ok(partition_info) => {
+            // GPT partitions have a unique partition GUID.
+            // MBR does not.
+            if let Some(gpt) = partition_info.gpt_partition_entry() {
+                let uuid = gpt.unique_partition_guid;
+                let type_uuid = gpt.partition_type_guid;
+                Ok(Some(PartitionIds {
+                    partition_uuid: uuid,
+                    type_uuid: type_uuid.0,
+                }))
+            } else {
+                Ok(None)
+            }
+        }
+
+        Err(error) => {
+            // If the filesystem does not have a partition, that is okay.
+            if error.status() == Status::NOT_FOUND || error.status() == Status::UNSUPPORTED {
+                Ok(None)
+            } else {
+                // We should still handle other errors gracefully.
+                Err(error).context("unable to open filesystem partition info")?;
+                unreachable!()
+            }
+        }
+    }
+}
+
 /// Extract a filesystem device path using the specified `context` and `extractor` configuration.
 pub fn extract(
     context: Rc<SproutContext>,
@@ -56,56 +98,28 @@ pub fn extract(
 
         // Extract the partition info for this filesystem.
         // There is no guarantee that the filesystem has a partition.
-        let partition_info = {
-            // Open the partition info protocol for this handle.
-            let partition_info = uefi::boot::open_protocol_exclusive::<PartitionInfo>(handle);
-
-            match partition_info {
-                Ok(partition_info) => {
-                    // GPT partitions have a unique partition GUID.
-                    // MBR does not.
-                    if let Some(gpt) = partition_info.gpt_partition_entry() {
-                        let uuid = gpt.unique_partition_guid;
-                        let type_uuid = gpt.partition_type_guid;
-                        Some((uuid, type_uuid.0))
-                    } else {
-                        None
-                    }
-                }
-
-                Err(error) => {
-                    // If the filesystem does not have a partition, that is okay.
-                    if error.status() == Status::NOT_FOUND || error.status() == Status::UNSUPPORTED
-                    {
-                        None
-                    } else {
-                        // We should still handle other errors gracefully.
-                        Err(error).context("unable to open filesystem partition info")?;
-                        unreachable!()
-                    }
-                }
-            }
-        };
+        let partition_info =
+            fetch_partition_uuids(handle).context("unable to fetch partition info")?;
 
         // Check if the partition info matches partition uuid criteria.
-        if let Some((partition_uuid, _partition_type_guid)) = partition_info
+        if let Some(ref partition_info) = partition_info
             && let Some(ref has_partition_uuid) = extractor.has_partition_uuid
         {
             let parsed_uuid = Guid::from_str(has_partition_uuid)
                 .map_err(|e| anyhow!("unable to parse has-partition-uuid: {}", e))?;
-            if partition_uuid != parsed_uuid {
+            if partition_info.partition_uuid != parsed_uuid {
                 continue;
             }
             has_match = true;
         }
 
         // Check if the partition info matches partition type uuid criteria.
-        if let Some((_partition_uuid, partition_type_guid)) = partition_info
+        if let Some(ref partition_info) = partition_info
             && let Some(ref has_partition_type_uuid) = extractor.has_partition_type_uuid
         {
             let parsed_uuid = Guid::from_str(has_partition_type_uuid)
                 .map_err(|e| anyhow!("unable to parse has-partition-type-uuid: {}", e))?;
-            if partition_type_guid != parsed_uuid {
+            if partition_info.type_uuid != parsed_uuid {
                 continue;
             }
             has_match = true;
