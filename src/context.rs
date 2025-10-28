@@ -168,13 +168,13 @@ impl SproutContext {
         let mut current_values = self.all_values();
 
         // To ensure that there is no possible infinite loop, we need to check
-        // the number of iterations. If it exceeds 100, we bail.
+        // the number of iterations. If it exceeds CONTEXT_FINALIZE_ITERATION_LIMIT, we bail.
         let mut iterations: usize = 0;
         loop {
             iterations += 1;
 
             if iterations > CONTEXT_FINALIZE_ITERATION_LIMIT {
-                bail!("infinite loop detected in context finalization");
+                bail!("maximum number of replacement iterations reached while finalizing context");
             }
 
             let mut did_change = false;
