@@ -160,7 +160,7 @@ impl MediaLoaderHandle {
 
         // Install a protocol interface for the device path.
         // This ensures it can be located by other EFI programs.
-        let mut handle = unsafe {
+        let primary_handle = unsafe {
             uefi::boot::install_protocol_interface(
                 None,
                 &DevicePathProtocol::GUID,
@@ -183,25 +183,54 @@ impl MediaLoaderHandle {
         let protocol = Box::leak(protocol);
 
         // Install a protocol interface for the load file protocol for the media loader protocol.
-        handle = unsafe {
+        let secondary_handle = unsafe {
             uefi::boot::install_protocol_interface(
-                Some(handle),
+                Some(primary_handle),
                 &LoadFile2Protocol::GUID,
-                protocol as *mut _ as *mut c_void,
+                // The UEFI API expects an opaque pointer here.
+                protocol as *mut MediaLoaderProtocol as *mut c_void,
             )
-        }
-        .context("unable to install media loader load file handle")?;
+        };
 
-        // Check if the media loader is registered.
-        // If it is not, we can't continue safely because something went wrong.
-        if !Self::already_registered(guid)? {
-            bail!("media loader not registered when expected to be registered");
+        // If installing the second protocol interface failed, we need to clean up after ourselves.
+        if secondary_handle.is_err() {
+            // Uninstall the protocol interface for the device path protocol.
+            // SAFETY: If we have reached this point, we know that the protocol is registered.
+            // If this fails, we have no choice but to leak memory. The error will be shown
+            // to the user, so at least they can see it. In most cases, catching this error
+            // will exit, so leaking is safe.
+            unsafe {
+                uefi::boot::uninstall_protocol_interface(
+                    primary_handle,
+                    &DevicePathProtocol::GUID,
+                    path.as_ffi_ptr() as *mut c_void,
+                )
+                .context(
+                    "unable to uninstall media loader device path handle, this will leak memory",
+                )?;
+            }
+
+            // SAFETY: We know that the protocol is leaked, so we can safely take a reference to it.
+            let protocol = unsafe { Box::from_raw(protocol) };
+            // SAFETY: We know that the data is leaked, so we can safely take a reference to it.
+            let data = unsafe { Box::from_raw(data) };
+            // SAFETY: We know that the path is leaked, so we can safely take a reference to it.
+            let path = unsafe { Box::from_raw(path) };
+
+            // Drop all the allocations explicitly to clarify the lifetime.
+            drop(protocol);
+            drop(data);
+            drop(path);
         }
+
+        // If installing the second protocol interface failed, this will return the error.
+        // We should have already cleaned up after ourselves, so this is safe.
+        secondary_handle.context("unable to install media loader load file handle")?;
 
         // Return a handle to the media loader.
         Ok(Self {
             guid,
-            handle,
+            handle: primary_handle,
             protocol,
             path,
         })
