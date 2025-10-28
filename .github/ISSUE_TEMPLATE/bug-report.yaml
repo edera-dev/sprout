@@ -1,7 +1,8 @@
-name: Bug Report
+name: Report a bug
 description: File a bug report.
 title: "bug: "
 labels: ["bug", "triage"]
+type: bug
 assignees:
 - edera-dev/engineering
 body:
@@ -9,6 +10,13 @@ body:
   attributes:
     value: |
       Thanks for taking the time to fill out this bug report!
+- type: input
+  id: version
+  attributes:
+    label: Version / Commit
+    description: What version of Sprout are you running?
+  validations:
+    required: true
 - type: textarea
   id: what-happened
   attributes:
@@ -18,16 +26,17 @@ body:
     value: "A bug happened!"
   validations:
     required: true
-- type: input
-  id: version
-  attributes:
-    label: Version / Commit
-    description: What version of Sprout are you running?
-  validations:
-    required: true
 - type: textarea
   id: logs
   attributes:
     label: Relevant log output
-    description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
-    render: shell
+    description: Please provide any relevant log output.
+    render: log
+- type: checkboxes
+  id: terms
+  attributes:
+    label: Code of Conduct
+    description: By submitting this report, you agree to follow our [Code of Conduct](https://github.com/edera-dev/sprout/blob/main/CODE_OF_CONDUCT.md).
+    options:
+    - label: I agree to follow the Sprout Code of Conduct.
+      required: true
