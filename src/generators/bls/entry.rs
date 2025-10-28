@@ -41,7 +41,8 @@ impl FromStr for BlsEntry {
                 continue;
             }
 
-            // Split the line once by whitespace.
+            // Split the line once by whitespace. This technically includes newlines but since
+            // the lines iterator is used, there should never be a newline here.
             let Some((key, value)) = line.split_once(char::is_whitespace) else {
                 continue;
             };
