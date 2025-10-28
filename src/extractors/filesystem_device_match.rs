@@ -88,6 +88,15 @@ pub fn extract(
     context: Rc<SproutContext>,
     extractor: &FilesystemDeviceMatchExtractor,
 ) -> Result<String> {
+    // If no criteria are provided, bail with an error.
+    if extractor.has_label.is_none()
+        && extractor.has_item.is_none()
+        && extractor.has_partition_uuid.is_none()
+        && extractor.has_partition_type_uuid.is_none()
+    {
+        bail!("at least one criteria is required for filesystem-device-match");
+    }
+
     // Find all the filesystems inside the UEFI stack.
     let handles = uefi::boot::find_handles::<SimpleFileSystem>()
         .context("unable to find filesystem handles")?;
