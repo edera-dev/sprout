@@ -6,7 +6,6 @@ use crate::generators::GeneratorDeclaration;
 use crate::generators::list::ListConfiguration;
 use crate::utils;
 use anyhow::{Context, Result};
-use log::info;
 use std::collections::BTreeMap;
 use uefi::CString16;
 use uefi::fs::{FileSystem, Path};
@@ -214,8 +213,6 @@ pub fn scan(
             ..Default::default()
         },
     );
-
-    info!("{:?}", config);
 
     // We had a Linux kernel, so return true to indicate something was found.
     Ok(true)
