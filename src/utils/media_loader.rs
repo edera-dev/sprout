@@ -51,6 +51,11 @@ impl MediaLoaderHandle {
     /// The next call will pass a buffer of the right size, and we should copy
     /// data into that buffer, checking whether it is safe to copy based on
     /// the buffer size.
+    ///
+    /// SAFETY: `this.address` and `this.length` are set by leaking a Box<[u8]>, so we can
+    /// be sure their pointers are valid when this is called. The caller must call this function
+    /// while inside UEFI boot services to ensure pointers are valid. Copying to `buffer` is
+    /// assumed valid because the caller must ensure `buffer` is valid by function contract.
     unsafe extern "efiapi" fn load_file(
         this: *mut MediaLoaderProtocol,
         file_path: *const DevicePathProtocol,
