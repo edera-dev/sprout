@@ -1,4 +1,5 @@
 use crate::context::SproutContext;
+use crate::integrations::bootloader_interface::BootloaderInterface;
 use crate::utils;
 use crate::utils::media_loader::MediaLoaderHandle;
 use crate::utils::media_loader::constants::linux::LINUX_EFI_INITRD_MEDIA_GUID;
@@ -101,6 +102,10 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
                 .context("unable to register linux initrd")?;
         initrd_handle = Some(handle);
     }
+
+    // Mark execution of an entry in the bootloader interface.
+    BootloaderInterface::mark_exec()
+        .context("unable to mark execution of boot entry in bootloader interface")?;
 
     // Start the loaded image.
     // This call might return, or it may pass full control to another image that will never return.

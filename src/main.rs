@@ -4,9 +4,11 @@
 use crate::config::RootConfiguration;
 use crate::context::{RootContext, SproutContext};
 use crate::entries::BootableEntry;
+use crate::integrations::bootloader_interface::BootloaderInterface;
 use crate::options::SproutOptions;
 use crate::options::parser::OptionsRepresentable;
 use crate::phases::phase;
+use crate::utils::PartitionGuidForm;
 use anyhow::{Context, Result, bail};
 use log::{error, info};
 use std::collections::BTreeMap;
@@ -41,6 +43,9 @@ pub mod generators;
 /// menu: Display a boot menu to select an entry to boot.
 pub mod menu;
 
+/// integrations: Code that interacts with other systems.
+pub mod integrations;
+
 /// phases: Hooks into specific parts of the boot process.
 pub mod phases;
 
@@ -55,6 +60,10 @@ pub mod utils;
 
 /// Run Sprout, returning an error if one occurs.
 fn run() -> Result<()> {
+    // Mark the initialization of Sprout in the bootloader interface.
+    BootloaderInterface::mark_init()
+        .context("unable to mark initialization in bootloader interface")?;
+
     // Parse the options to the sprout executable.
     let options = SproutOptions::parse().context("unable to parse options")?;
 
@@ -69,16 +78,30 @@ fn run() -> Result<()> {
         config::loader::load(&options)?
     };
 
-    // Load the root context.
+    // Grab the sprout.efi loaded image path.
     // This is done in a block to ensure the release of the LoadedImageDevicePath protocol.
-    let mut root = {
+    let loaded_image_path = {
         let current_image_device_path_protocol = uefi::boot::open_protocol_exclusive::<
             LoadedImageDevicePath,
         >(uefi::boot::image_handle())
         .context("unable to get loaded image device path")?;
-        let loaded_image_path = current_image_device_path_protocol.deref().to_boxed();
-        RootContext::new(loaded_image_path, options)
+        current_image_device_path_protocol.deref().to_boxed()
     };
+
+    // Grab the partition GUID of the ESP that sprout was loaded from.
+    let loaded_image_partition_guid =
+        utils::partition_guid(&loaded_image_path, PartitionGuidForm::Partition)
+            .context("unable to retrieve loaded image partition guid")?;
+
+    // Set the partition GUID of the ESP that sprout was loaded from in the bootloader interface.
+    if let Some(loaded_image_partition_guid) = loaded_image_partition_guid {
+        // Tell the system about the partition GUID.
+        BootloaderInterface::set_partition_guid(&loaded_image_partition_guid)
+            .context("unable to set partition guid in bootloader interface")?;
+    }
+
+    // Create the root context.
+    let mut root = RootContext::new(loaded_image_path, options);
 
     // Insert the configuration actions into the root context.
     root.actions_mut().extend(config.actions.clone());
@@ -200,6 +223,21 @@ fn run() -> Result<()> {
         entry.mark_default();
     }
 
+    // Iterate over all the entries and tell the bootloader interface what the entries are.
+    for entry in &entries {
+        // If the entry is the default entry, tell the bootloader interface it is the default.
+        if entry.is_default() {
+            // Tell the bootloader interface what the default entry is.
+            BootloaderInterface::set_default_entry(entry.name().to_string())
+                .context("unable to set default entry in bootloader interface")?;
+            break;
+        }
+    }
+
+    // Tell the bootloader interface what entries are available.
+    BootloaderInterface::set_entries(entries.iter().map(|entry| entry.name()))
+        .context("unable to set entries in bootloader interface")?;
+
     // Execute the late phase.
     phase(context.clone(), &config.phases.late).context("unable to execute late phase")?;
 
@@ -225,6 +263,10 @@ fn run() -> Result<()> {
         // Delegate to the menu to select an entry to boot.
         menu::select(menu_timeout, &entries).context("unable to select entry via boot menu")?
     };
+
+    // Tell the bootloader interface what the selected entry is.
+    BootloaderInterface::set_selected_entry(entry.name().to_string())
+        .context("unable to set selected entry in bootloader interface")?;
 
     // Execute all the actions for the selected entry.
     for action in &entry.declaration().actions {
