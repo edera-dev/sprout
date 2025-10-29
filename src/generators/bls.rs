@@ -83,12 +83,15 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         }
 
         // Get the file name of the filesystem item.
-        let name = entry.file_name().to_string();
+        let mut name = entry.file_name().to_string();
 
         // Ignore files that are not .conf files.
         if !name.to_lowercase().ends_with(".conf") {
             continue;
         }
+
+        // Remove the .conf extension.
+        name.truncate(name.len() - 5);
 
         // Create a mutable path so we can append the file name to produce the full path.
         let mut full_entry_path = entries_path.to_path_buf();
@@ -125,13 +128,21 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         context.set("options", options);
         context.set("initrd", initrd);
 
-        // Add the entry to the list with a frozen context.
-        entries.push(BootableEntry::new(
+        // Produce a new bootable entry.
+        let mut entry = BootableEntry::new(
             name,
             bls.entry.title.clone(),
             context.freeze(),
             bls.entry.clone(),
-        ));
+        );
+
+        // Pin the entry name to prevent prefixing.
+        // This is needed as the bootloader interface requires the name to be
+        // the same as the entry file name, minus the .conf extension.
+        entry.mark_pin_name();
+
+        // Add the entry to the list with a frozen context.
+        entries.push(entry);
     }
 
     Ok(entries)
