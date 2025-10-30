@@ -11,15 +11,21 @@ impl BootloaderInterface {
     const VENDOR: VariableVendor = VariableVendor(guid!("4a67b082-0a4c-41cf-b6c7-440b29bb8c4f"));
 
     /// Tell the system that Sprout was initialized at the current time.
-    pub fn mark_init() -> Result<()> {
-        Self::set_cstr16("LoaderTimeInitUSec", "0")
+    pub fn mark_init(timer: &PlatformTimer) -> Result<()> {
+        Self::mark_time("LoaderTimeInitUSec", timer)
     }
 
     /// Tell the system that Sprout is about to execute the boot entry.
     pub fn mark_exec(timer: &PlatformTimer) -> Result<()> {
-        // Measure the elapsed time since the bootloader was started.
-        let elapsed = timer.elapsed();
-        Self::set_cstr16("LoaderTimeExecUSec", &elapsed.as_micros().to_string())
+        Self::mark_time("LoaderTimeExecUSec", timer)
+    }
+
+    /// Tell the system about the current time as measured by the platform timer.
+    /// Sets the variable specified by `key` to the number of microseconds.
+    fn mark_time(key: &str, timer: &PlatformTimer) -> Result<()> {
+        // Measure the elapsed time since the hardware timer was started.
+        let elapsed = timer.elapsed_since_lifetime();
+        Self::set_cstr16(key, &elapsed.as_micros().to_string())
     }
 
     /// Tell the system what the partition GUID of the ESP Sprout was booted from is.

@@ -73,8 +73,13 @@ impl PlatformTimer {
         }
     }
 
+    /// Measure the elapsed duration since the hardware started ticking upwards.
+    pub fn elapsed_since_lifetime(&self) -> Duration {
+        self.frequency.duration(arch_ticks())
+    }
+
     /// Measure the elapsed duration since the timer was started.
-    pub fn elapsed(&self) -> Duration {
+    pub fn elapsed_since_start(&self) -> Duration {
         let duration = arch_ticks() - self.start;
         self.frequency.duration(duration)
     }

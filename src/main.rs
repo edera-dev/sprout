@@ -69,7 +69,7 @@ fn run() -> Result<()> {
     let timer = PlatformTimer::start();
 
     // Mark the initialization of Sprout in the bootloader interface.
-    BootloaderInterface::mark_init()
+    BootloaderInterface::mark_init(&timer)
         .context("unable to mark initialization in bootloader interface")?;
 
     // Parse the options to the sprout executable.

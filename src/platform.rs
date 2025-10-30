@@ -1,2 +1,2 @@
-/// timer: Platform timer support code.
+/// timer: Platform timer support.
 pub mod timer;
