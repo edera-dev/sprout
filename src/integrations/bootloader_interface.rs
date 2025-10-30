@@ -5,6 +5,9 @@ use uefi::proto::device_path::DevicePath;
 use uefi::{CString16, Guid, guid};
 use uefi_raw::table::runtime::{VariableAttributes, VariableVendor};
 
+/// The name of the bootloader to tell the system.
+const LOADER_NAME: &str = "Sprout";
+
 /// Bootloader Interface support.
 pub struct BootloaderInterface;
 
@@ -28,6 +31,11 @@ impl BootloaderInterface {
         // Measure the elapsed time since the hardware timer was started.
         let elapsed = timer.elapsed_since_lifetime();
         Self::set_cstr16(key, &elapsed.as_micros().to_string())
+    }
+
+    /// Tell the system what loader is being used.
+    pub fn set_loader_info() -> Result<()> {
+        Self::set_cstr16("LoaderInfo", LOADER_NAME)
     }
 
     /// Tell the system the relative path to the partition root of the current bootloader.

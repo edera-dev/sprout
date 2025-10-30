@@ -76,6 +76,10 @@ fn run() -> Result<()> {
     BootloaderInterface::set_firmware_info()
         .context("unable to set firmware info in bootloader interface")?;
 
+    // Tell the bootloader interface what loader is being used.
+    BootloaderInterface::set_loader_info()
+        .context("unable to set loader info in bootloader interface")?;
+
     // Parse the options to the sprout executable.
     let options = SproutOptions::parse().context("unable to parse options")?;
 
