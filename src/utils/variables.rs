@@ -1,0 +1,93 @@
+use anyhow::{Context, Result};
+use uefi::{CString16, guid};
+use uefi_raw::Status;
+use uefi_raw::table::runtime::{VariableAttributes, VariableVendor};
+
+/// The classification of a variable.
+/// This is an abstraction over various variable attributes.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum VariableClass {
+    /// The variable is available in Boot Services and Runtime Services and is not persistent.
+    BootAndRuntimeTemporary,
+}
+
+impl VariableClass {
+    /// The [VariableAttributes] for this classification.
+    fn attributes(&self) -> VariableAttributes {
+        match self {
+            VariableClass::BootAndRuntimeTemporary => {
+                VariableAttributes::BOOTSERVICE_ACCESS | VariableAttributes::RUNTIME_ACCESS
+            }
+        }
+    }
+}
+
+/// Provides access to a particular set of vendor variables.
+pub struct VariableController {
+    /// The GUID of the vendor.
+    vendor: VariableVendor,
+}
+
+impl VariableController {
+    /// Global variables.
+    pub const GLOBAL: VariableController = VariableController::new(VariableVendor(guid!(
+        "8be4df61-93ca-11d2-aa0d-00e098032b8c"
+    )));
+
+    /// Create a new [VariableController] for the `vendor`.
+    pub const fn new(vendor: VariableVendor) -> Self {
+        Self { vendor }
+    }
+
+    /// Convert `key` to a variable name as a CString16.
+    fn name(key: &str) -> Result<CString16> {
+        CString16::try_from(key).context("unable to convert variable name to CString16")
+    }
+
+    /// Retrieve a boolean value specified by the `key`.
+    pub fn get_bool(&self, key: &str) -> Result<bool> {
+        let name = Self::name(key)?;
+
+        // Retrieve the variable data, handling variable not existing as false.
+        match uefi::runtime::get_variable_boxed(&name, &self.vendor) {
+            Ok((data, _)) => {
+                // If the variable is zero-length, we treat it as false.
+                if data.is_empty() {
+                    Ok(false)
+                } else {
+                    // We treat the variable as true if the first byte is non-zero.
+                    Ok(data[0] > 0)
+                }
+            }
+
+            Err(error) => {
+                // If the variable does not exist, we treat it as false.
+                if error.status() == Status::NOT_FOUND {
+                    Ok(false)
+                } else {
+                    Err(error).with_context(|| format!("unable to get efi variable {}", key))
+                }
+            }
+        }
+    }
+
+    /// Set a variable specified by `key` to `value`.
+    /// The variable `class` controls the attributes for the variable.
+    pub fn set(&self, key: &str, value: &[u8], class: VariableClass) -> Result<()> {
+        let name = Self::name(key)?;
+        uefi::runtime::set_variable(&name, &self.vendor, class.attributes(), value)
+            .with_context(|| format!("unable to set efi variable {}", key))?;
+        Ok(())
+    }
+
+    /// Set a variable specified by `key` to `value`, converting the value to
+    /// a [CString16]. The variable `class` controls the attributes for the variable.
+    pub fn set_cstr16(&self, key: &str, value: &str, class: VariableClass) -> Result<()> {
+        // Encode the value as a CString16 little endian.
+        let encoded = value
+            .encode_utf16()
+            .flat_map(|c| c.to_le_bytes())
+            .collect::<Vec<u8>>();
+        self.set(key, &encoded, class)
+    }
+}

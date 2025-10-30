@@ -13,6 +13,7 @@ use crate::options::SproutOptions;
 use crate::options::parser::OptionsRepresentable;
 use crate::phases::phase;
 use crate::platform::timer::PlatformTimer;
+use crate::secure::SecureBoot;
 use crate::utils::PartitionGuidForm;
 use anyhow::{Context, Result, bail};
 use log::{error, info};
@@ -57,6 +58,9 @@ pub mod integrations;
 /// phases: Hooks into specific parts of the boot process.
 pub mod phases;
 
+/// secure: Secure Boot support.
+pub mod secure;
+
 /// setup: Code that initializes the UEFI environment for Sprout.
 pub mod setup;
 
@@ -68,6 +72,11 @@ pub mod utils;
 
 /// Run Sprout, returning an error if one occurs.
 fn run() -> Result<()> {
+    // For safety reasons, we will bail early if Secure Boot is enabled.
+    if SecureBoot::enabled().context("unable to determine Secure Boot status")? {
+        bail!("Secure Boot is enabled. Sprout does not currently support Secure Boot.");
+    }
+
     // Start the platform timer.
     let timer = PlatformTimer::start();
 

@@ -14,6 +14,9 @@ pub mod framebuffer;
 /// Support code for the media loader protocol.
 pub mod media_loader;
 
+/// Support code for EFI variables.
+pub mod variables;
+
 /// Parses the input `path` as a [DevicePath].
 /// Uses the [DevicePathFromText] protocol exclusively, and will fail if it cannot acquire the protocol.
 pub fn text_to_device_path(path: &str) -> Result<PoolDevicePath> {
