@@ -58,6 +58,22 @@ impl BootloaderInterface {
         Self::set_cstr16("LoaderEntrySelected", &entry)
     }
 
+    /// Tell the system about the UEFI firmware we are running on.
+    pub fn set_firmware_info() -> Result<()> {
+        // Format the firmware information string into something human-readable.
+        let firmware_info = format!(
+            "{} {}.{:02}",
+            uefi::system::firmware_vendor(),
+            uefi::system::firmware_revision() >> 16,
+            uefi::system::firmware_revision() & 0xFFFFF,
+        );
+        Self::set_cstr16("LoaderFirmwareInfo", &firmware_info)?;
+
+        // Format the firmware revision into something human-readable.
+        let firmware_type = format!("UEFI {:02}", uefi::system::firmware_revision());
+        Self::set_cstr16("LoaderFirmwareType", &firmware_type)
+    }
+
     /// The [VariableAttributes] for bootloader interface variables.
     fn attributes() -> VariableAttributes {
         VariableAttributes::BOOTSERVICE_ACCESS | VariableAttributes::RUNTIME_ACCESS
