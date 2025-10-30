@@ -285,7 +285,8 @@ fn run() -> Result<()> {
             .context(format!("unable to find entry: {force_boot_entry}"))?
     } else {
         // Delegate to the menu to select an entry to boot.
-        menu::select(menu_timeout, &entries).context("unable to select entry via boot menu")?
+        menu::select(&timer, menu_timeout, &entries)
+            .context("unable to select entry via boot menu")?
     };
 
     // Tell the bootloader interface what the selected entry is.
