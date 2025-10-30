@@ -28,6 +28,7 @@ pub struct BootableEntry {
     context: Rc<SproutContext>,
     declaration: EntryDeclaration,
     default: bool,
+    pin_name: bool,
 }
 
 impl BootableEntry {
@@ -44,6 +45,7 @@ impl BootableEntry {
             context,
             declaration,
             default: false,
+            pin_name: false,
         }
     }
 
@@ -72,6 +74,11 @@ impl BootableEntry {
         self.default
     }
 
+    /// Fetch whether the entry is pinned, which prevents prefixing.
+    pub fn is_pin_name(&self) -> bool {
+        self.pin_name
+    }
+
     /// Swap out the context of the entry.
     pub fn swap_context(&mut self, context: Rc<SproutContext>) {
         self.context = context;
@@ -85,6 +92,11 @@ impl BootableEntry {
     /// Mark this entry as the default entry.
     pub fn mark_default(&mut self) {
         self.default = true;
+    }
+
+    /// Mark this entry as being pinned, which prevents prefixing.
+    pub fn mark_pin_name(&mut self) {
+        self.pin_name = true;
     }
 
     /// Prepend the name of the entry with `prefix`.

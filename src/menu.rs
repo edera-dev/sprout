@@ -1,4 +1,6 @@
 use crate::entries::BootableEntry;
+use crate::integrations::bootloader_interface::BootloaderInterface;
+use crate::platform::timer::PlatformTimer;
 use anyhow::{Context, Result, bail};
 use log::info;
 use std::time::Duration;
@@ -162,7 +164,15 @@ fn select_with_input<'a>(
 /// Shows a boot menu to select a bootable entry to boot.
 /// The actual work is done internally in [select_with_input] which is called
 /// within the context of the standard input device.
-pub fn select(timeout: Duration, entries: &[BootableEntry]) -> Result<&BootableEntry> {
+pub fn select<'live>(
+    timer: &'live PlatformTimer,
+    timeout: Duration,
+    entries: &'live [BootableEntry],
+) -> Result<&'live BootableEntry> {
+    // Notify the bootloader interface that we are about to display the menu.
+    BootloaderInterface::mark_menu(timer)
+        .context("unable to mark menu display in bootloader interface")?;
+
     // Acquire the standard input device and run the boot menu.
     uefi::system::with_stdin(move |input| select_with_input(input, timeout, entries))
 }
