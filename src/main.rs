@@ -112,6 +112,10 @@ fn run() -> Result<()> {
             .context("unable to set partition guid in bootloader interface")?;
     }
 
+    // Tell the bootloader interface what the loaded image path is.
+    BootloaderInterface::set_loader_path(&loaded_image_path)
+        .context("unable to set loader path in bootloader interface")?;
+
     // Create the root context.
     let mut root = RootContext::new(loaded_image_path, timer, options);
 

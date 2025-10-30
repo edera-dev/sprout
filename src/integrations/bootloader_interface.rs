@@ -1,5 +1,7 @@
 use crate::platform::timer::PlatformTimer;
+use crate::utils::device_path_subpath;
 use anyhow::{Context, Result};
+use uefi::proto::device_path::DevicePath;
 use uefi::{CString16, Guid, guid};
 use uefi_raw::table::runtime::{VariableAttributes, VariableVendor};
 
@@ -28,6 +30,12 @@ impl BootloaderInterface {
         Self::set_cstr16(key, &elapsed.as_micros().to_string())
     }
 
+    /// Tell the system the relative path to the partition root of the current bootloader.
+    pub fn set_loader_path(path: &DevicePath) -> Result<()> {
+        let subpath = device_path_subpath(path).context("unable to get loader path subpath")?;
+        Self::set_cstr16("LoaderImageIdentifier", &subpath)
+    }
+
     /// Tell the system what the partition GUID of the ESP Sprout was booted from is.
     pub fn set_partition_guid(guid: &Guid) -> Result<()> {
         Self::set_cstr16("LoaderDevicePartUUID", &guid.to_string())
@@ -39,11 +47,14 @@ impl BootloaderInterface {
         // Iterate over the entries and convert them to CString16 placing them into data.
         let mut data = Vec::new();
         for entry in entries {
-            // Convert the entry to a CString16.
-            let entry = CString16::try_from(entry.as_ref())
-                .context("unable to convert entry to CString16")?;
+            // Convert the entry to CString16 little endian.
+            let encoded = entry
+                .as_ref()
+                .encode_utf16()
+                .flat_map(|c| c.to_le_bytes())
+                .collect::<Vec<u8>>();
             // Write the bytes (including the null terminator) into the data buffer.
-            data.extend_from_slice(entry.as_bytes());
+            data.extend_from_slice(&encoded);
         }
         Self::set("LoaderEntries", &data)
     }
@@ -91,8 +102,11 @@ impl BootloaderInterface {
     /// Set a bootloader interface variable specified by `key` to `value`, converting the value to
     /// a [CString16].
     fn set_cstr16(key: &str, value: &str) -> Result<()> {
-        let value =
-            CString16::try_from(value).context("unable to convert variable value to CString16")?;
-        Self::set(key, value.as_bytes())
+        // Encode the value as a CString16 little endian.
+        let encoded = value
+            .encode_utf16()
+            .flat_map(|c| c.to_le_bytes())
+            .collect::<Vec<u8>>();
+        Self::set(key, &encoded)
     }
 }
