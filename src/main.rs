@@ -2,6 +2,9 @@
 #![feature(uefi_std)]
 extern crate core;
 
+/// The delay to wait for when an error occurs in Sprout.
+const DELAY_ON_ERROR: Duration = Duration::from_secs(10);
+
 use crate::config::RootConfiguration;
 use crate::context::{RootContext, SproutContext};
 use crate::entries::BootableEntry;
@@ -318,8 +321,8 @@ fn main() -> Result<()> {
         for (index, stack) in error.chain().enumerate() {
             error!("[{}]: {}", index, stack);
         }
-        // Sleep for 10 seconds to allow the user to read the error.
-        uefi::boot::stall(Duration::from_secs(10));
+        // Sleep to allow the user to read the error.
+        uefi::boot::stall(DELAY_ON_ERROR);
     }
 
     // Sprout doesn't necessarily guarantee anything was booted.
