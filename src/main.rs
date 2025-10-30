@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![feature(uefi_std)]
+extern crate core;
 
 use crate::config::RootConfiguration;
 use crate::context::{RootContext, SproutContext};
@@ -8,6 +9,7 @@ use crate::integrations::bootloader_interface::BootloaderInterface;
 use crate::options::SproutOptions;
 use crate::options::parser::OptionsRepresentable;
 use crate::phases::phase;
+use crate::platform::timer::PlatformTimer;
 use crate::utils::PartitionGuidForm;
 use anyhow::{Context, Result, bail};
 use log::{error, info};
@@ -40,6 +42,9 @@ pub mod extractors;
 /// generators: Runtime code that can generate entries with specific values.
 pub mod generators;
 
+/// platform: Integration or support code for specific hardware platforms.
+pub mod platform;
+
 /// menu: Display a boot menu to select an entry to boot.
 pub mod menu;
 
@@ -60,6 +65,9 @@ pub mod utils;
 
 /// Run Sprout, returning an error if one occurs.
 fn run() -> Result<()> {
+    // Start the platform timer.
+    let timer = PlatformTimer::start();
+
     // Mark the initialization of Sprout in the bootloader interface.
     BootloaderInterface::mark_init()
         .context("unable to mark initialization in bootloader interface")?;
@@ -101,7 +109,7 @@ fn run() -> Result<()> {
     }
 
     // Create the root context.
-    let mut root = RootContext::new(loaded_image_path, options);
+    let mut root = RootContext::new(loaded_image_path, timer, options);
 
     // Insert the configuration actions into the root context.
     root.actions_mut().extend(config.actions.clone());

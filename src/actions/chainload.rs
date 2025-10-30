@@ -104,7 +104,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     }
 
     // Mark execution of an entry in the bootloader interface.
-    BootloaderInterface::mark_exec()
+    BootloaderInterface::mark_exec(context.root().timer())
         .context("unable to mark execution of boot entry in bootloader interface")?;
 
     // Start the loaded image.

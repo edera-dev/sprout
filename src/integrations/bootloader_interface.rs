@@ -1,3 +1,4 @@
+use crate::platform::timer::PlatformTimer;
 use anyhow::{Context, Result};
 use uefi::{CString16, Guid, guid};
 use uefi_raw::table::runtime::{VariableAttributes, VariableVendor};
@@ -11,14 +12,14 @@ impl BootloaderInterface {
 
     /// Tell the system that Sprout was initialized at the current time.
     pub fn mark_init() -> Result<()> {
-        // TODO(azenla): Implement support for LoaderTimeInitUSec here.
-        Ok(())
+        Self::set_cstr16("LoaderTimeInitUSec", "0")
     }
 
     /// Tell the system that Sprout is about to execute the boot entry.
-    pub fn mark_exec() -> Result<()> {
-        // TODO(azenla): Implement support for LoaderTimeExecUSec here.
-        Ok(())
+    pub fn mark_exec(timer: &PlatformTimer) -> Result<()> {
+        // Measure the elapsed time since the bootloader was started.
+        let elapsed = timer.elapsed();
+        Self::set_cstr16("LoaderTimeExecUSec", &elapsed.as_micros().to_string())
     }
 
     /// Tell the system what the partition GUID of the ESP Sprout was booted from is.

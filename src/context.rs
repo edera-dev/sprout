@@ -1,5 +1,6 @@
 use crate::actions::ActionDeclaration;
 use crate::options::SproutOptions;
+use crate::platform::timer::PlatformTimer;
 use anyhow::anyhow;
 use anyhow::{Result, bail};
 use std::cmp::Reverse;
@@ -12,22 +13,29 @@ const CONTEXT_FINALIZE_ITERATION_LIMIT: usize = 100;
 
 /// Declares a root context for Sprout.
 /// This contains data that needs to be shared across Sprout.
-#[derive(Default)]
 pub struct RootContext {
     /// The actions that are available in Sprout.
     actions: BTreeMap<String, ActionDeclaration>,
     /// The device path of the loaded Sprout image.
     loaded_image_path: Option<Box<DevicePath>>,
+    /// Platform timer started at the beginning of the boot process.
+    timer: PlatformTimer,
     /// The global options of Sprout.
     options: SproutOptions,
 }
 
 impl RootContext {
     /// Creates a new root context with the `loaded_image_device_path` which will be stored
-    /// in the context for easy access.
-    pub fn new(loaded_image_device_path: Box<DevicePath>, options: SproutOptions) -> Self {
+    /// in the context for easy access. We also provide a `timer` which is used to measure elapsed
+    /// time for the bootloader.
+    pub fn new(
+        loaded_image_device_path: Box<DevicePath>,
+        timer: PlatformTimer,
+        options: SproutOptions,
+    ) -> Self {
         Self {
             actions: BTreeMap::new(),
+            timer,
             loaded_image_path: Some(loaded_image_device_path),
             options,
         }
@@ -41,6 +49,11 @@ impl RootContext {
     /// Access the actions configured inside Sprout mutably for modification.
     pub fn actions_mut(&mut self) -> &mut BTreeMap<String, ActionDeclaration> {
         &mut self.actions
+    }
+
+    /// Access the platform timer that is started at the beginning of the boot process.
+    pub fn timer(&self) -> &PlatformTimer {
+        &self.timer
     }
 
     /// Access the device path of the loaded Sprout image.
