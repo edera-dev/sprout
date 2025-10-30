@@ -72,7 +72,7 @@ pub fn scan(
 
     // Generate a unique name for the BLS generator and insert the generator into the configuration.
     config.generators.insert(
-        format!("autoconfigure-bls-{}", root_unique_hash),
+        format!("auto-bls-{}", root_unique_hash),
         GeneratorDeclaration {
             bls: Some(generator),
             ..Default::default()

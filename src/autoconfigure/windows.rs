@@ -49,7 +49,7 @@ pub fn scan(
     let chainload_action_name = format!("{}{}", WINDOWS_CHAINLOAD_ACTION_PREFIX, root_unique_hash,);
 
     // Generate an entry name for Windows.
-    let entry_name = format!("autoconfigure-windows-{}", root_unique_hash,);
+    let entry_name = format!("auto-windows-{}", root_unique_hash,);
 
     // Create an entry for Windows and insert it into the configuration.
     let entry = EntryDeclaration {

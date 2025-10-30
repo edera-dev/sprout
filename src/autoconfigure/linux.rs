@@ -181,7 +181,7 @@ pub fn scan(
 
     // Generate a unique name for the Linux generator and insert the generator into the configuration.
     config.generators.insert(
-        format!("autoconfigure-linux-{}", root_unique_hash),
+        format!("auto-linux-{}", root_unique_hash),
         GeneratorDeclaration {
             list: Some(generator),
             ..Default::default()
