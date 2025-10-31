@@ -85,8 +85,10 @@ impl BootloaderInterface {
                 .encode_utf16()
                 .flat_map(|c| c.to_le_bytes())
                 .collect::<Vec<u8>>();
-            // Write the bytes (including the null terminator) into the data buffer.
+            // Write the bytes into the data buffer.
             data.extend_from_slice(&encoded);
+            // Add a null terminator to the end of the entry.
+            data.push(0);
         }
         Self::VENDOR.set(
             "LoaderEntries",

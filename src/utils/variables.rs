@@ -84,10 +84,12 @@ impl VariableController {
     /// a [CString16]. The variable `class` controls the attributes for the variable.
     pub fn set_cstr16(&self, key: &str, value: &str, class: VariableClass) -> Result<()> {
         // Encode the value as a CString16 little endian.
-        let encoded = value
+        let mut encoded = value
             .encode_utf16()
             .flat_map(|c| c.to_le_bytes())
             .collect::<Vec<u8>>();
+        // Add a null terminator to the end of the value.
+        encoded.push(0);
         self.set(key, &encoded, class)
     }
 
