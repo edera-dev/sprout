@@ -98,9 +98,9 @@ pub fn extract(
                 .deref()
                 .to_boxed();
 
-            // Fetch the partition uuid for this filesystem.
+            // Fetch the partition type uuid for this filesystem.
             let partition_type_uuid =
-                utils::partition_guid(&root, utils::PartitionGuidForm::Partition)
+                utils::partition_guid(&root, utils::PartitionGuidForm::PartitionType)
                     .context("unable to fetch the partition uuid of the filesystem")?;
             // Compare the partition type uuid to the parsed uuid.
             // If it does not match, continue to the next filesystem.
