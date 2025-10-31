@@ -112,7 +112,7 @@ impl SecurityHook {
         }
 
         // Construct a slice out of the file buffer and size.
-        let buffer = unsafe { std::slice::from_raw_parts_mut(file_buffer, file_size) };
+        let buffer = unsafe { std::slice::from_raw_parts(file_buffer, file_size) };
 
         // Construct a shim input from the path.
         let input = ShimInput::SecurityHookBuffer(Some(path), buffer);
