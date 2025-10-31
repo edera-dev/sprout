@@ -54,7 +54,7 @@ fn measure_frequency(duration: &Duration) -> u64 {
     let start = start();
     uefi::boot::stall(*duration);
     let stop = stop();
-    let elapsed = (stop - start) as f64;
+    let elapsed = stop.wrapping_sub(start) as f64;
     (elapsed / duration.as_secs_f64()) as u64
 }
 
