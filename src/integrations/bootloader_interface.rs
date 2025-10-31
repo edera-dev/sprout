@@ -118,14 +118,17 @@ impl BootloaderInterface {
     /// Tell the system about the UEFI firmware we are running on.
     pub fn set_firmware_info() -> Result<()> {
         // Access the firmware revision.
-        let revision = uefi::system::firmware_revision();
+        let firmware_revision = uefi::system::firmware_revision();
+
+        // Access the UEFI revision.
+        let uefi_revision = uefi::system::uefi_revision();
 
         // Format the firmware information string into something human-readable.
         let firmware_info = format!(
             "{} {}.{:02}",
             uefi::system::firmware_vendor(),
-            revision >> 16,
-            revision & 0xffff,
+            firmware_revision >> 16,
+            firmware_revision & 0xffff,
         );
         Self::VENDOR.set_cstr16(
             "LoaderFirmwareInfo",
@@ -134,7 +137,11 @@ impl BootloaderInterface {
         )?;
 
         // Format the firmware revision into something human-readable.
-        let firmware_type = format!("UEFI {}.{:02}", revision >> 16, revision & 0xffff);
+        let firmware_type = format!(
+            "UEFI {}.{:02}",
+            uefi_revision.major(),
+            uefi_revision.minor()
+        );
         Self::VENDOR.set_cstr16(
             "LoaderFirmwareType",
             &firmware_type,

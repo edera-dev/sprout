@@ -198,7 +198,8 @@ impl ShimSupport {
 
         // Call the shim verify function.
         // SAFETY: The shim verify function is specified by the shim lock protocol.
-        // Calling this function is considered safe because
+        // Calling this function is considered safe because the shim verify function is
+        // guaranteed to be defined by the environment if we are able to acquire the protocol.
         let status =
             unsafe { (protocol.shim_verify)(buffer.as_ptr() as *mut c_void, buffer.len() as u32) };
 
