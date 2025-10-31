@@ -201,12 +201,15 @@ pub fn unique_hash(input: &str) -> String {
 /// Represents the type of partition GUID that can be retrieved.
 #[derive(PartialEq, Eq)]
 pub enum PartitionGuidForm {
+    /// The partition GUID is the unique partition GUID.
     Partition,
+    /// The partition GUID is the partition type GUID.
     PartitionType,
 }
 
 /// Retrieve the partition / partition type GUID of the device root `path`.
 /// This only works on GPT partitions. If the root is not a GPT partition, None is returned.
+/// If the GUID is all zeros, this will return None.
 pub fn partition_guid(path: &DevicePath, form: PartitionGuidForm) -> Result<Option<Guid>> {
     // Clone the path so we can pass it to the UEFI stack.
     let path = path.to_boxed();
@@ -238,7 +241,8 @@ pub fn partition_guid(path: &DevicePath, form: PartitionGuidForm) -> Result<Opti
                 // Match the form of the partition GUID.
                 PartitionGuidForm::Partition => entry.unique_partition_guid,
                 PartitionGuidForm::PartitionType => entry.partition_type_guid.0,
-            }))
+            })
+            .filter(|guid| !guid.is_zero()))
     } else {
         Ok(None)
     }
