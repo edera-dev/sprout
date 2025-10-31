@@ -88,7 +88,7 @@ impl BootloaderInterface {
             // Write the bytes into the data buffer.
             data.extend_from_slice(&encoded);
             // Add a null terminator to the end of the entry.
-            data.push(0);
+            data.extend_from_slice(&[0, 0]);
         }
         Self::VENDOR.set(
             "LoaderEntries",
@@ -117,12 +117,15 @@ impl BootloaderInterface {
 
     /// Tell the system about the UEFI firmware we are running on.
     pub fn set_firmware_info() -> Result<()> {
+        // Access the firmware revision.
+        let revision = uefi::system::firmware_revision();
+
         // Format the firmware information string into something human-readable.
         let firmware_info = format!(
             "{} {}.{:02}",
             uefi::system::firmware_vendor(),
-            uefi::system::firmware_revision() >> 16,
-            uefi::system::firmware_revision() & 0xFFFFF,
+            revision >> 16,
+            revision & 0xffff,
         );
         Self::VENDOR.set_cstr16(
             "LoaderFirmwareInfo",
@@ -131,7 +134,7 @@ impl BootloaderInterface {
         )?;
 
         // Format the firmware revision into something human-readable.
-        let firmware_type = format!("UEFI {:02}", uefi::system::firmware_revision());
+        let firmware_type = format!("UEFI {}.{:02}", revision >> 16, revision & 0xffff);
         Self::VENDOR.set_cstr16(
             "LoaderFirmwareType",
             &firmware_type,

@@ -89,7 +89,7 @@ impl VariableController {
             .flat_map(|c| c.to_le_bytes())
             .collect::<Vec<u8>>();
         // Add a null terminator to the end of the value.
-        encoded.push(0);
+        encoded.extend_from_slice(&[0, 0]);
         self.set(key, &encoded, class)
     }
 
