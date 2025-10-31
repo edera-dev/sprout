@@ -148,4 +148,16 @@ impl BootloaderInterface {
             VariableClass::BootAndRuntimeTemporary,
         )
     }
+
+    /// Tell the system what the number of active PCR banks is.
+    /// If this is zero, that is okay.
+    pub fn set_tpm2_active_pcr_banks(value: u32) -> Result<()> {
+        // Format the value into the specification format.
+        let value = format!("0x{:08x}", value);
+        Self::VENDOR.set_cstr16(
+            "LoaderTpm2ActivePcrBanks",
+            &value,
+            VariableClass::BootAndRuntimeTemporary,
+        )
+    }
 }

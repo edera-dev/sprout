@@ -13,6 +13,7 @@ use crate::options::SproutOptions;
 use crate::options::parser::OptionsRepresentable;
 use crate::phases::phase;
 use crate::platform::timer::PlatformTimer;
+use crate::platform::tpm::PlatformTpm;
 use crate::secure::SecureBoot;
 use crate::utils::PartitionGuidForm;
 use anyhow::{Context, Result, bail};
@@ -91,6 +92,13 @@ fn run() -> Result<()> {
     // Tell the bootloader interface what loader is being used.
     BootloaderInterface::set_loader_info()
         .context("unable to set loader info in bootloader interface")?;
+
+    // Acquire the number of active PCR banks on the TPM.
+    // If no TPM is available, this will return zero.
+    let active_pcr_banks = PlatformTpm::active_pcr_banks()?;
+    // Tell the bootloader interface what the number of active PCR banks is.
+    BootloaderInterface::set_tpm2_active_pcr_banks(active_pcr_banks)
+        .context("unable to set tpm2 active PCR banks in bootloader interface")?;
 
     // Parse the options to the sprout executable.
     let options = SproutOptions::parse().context("unable to parse options")?;
