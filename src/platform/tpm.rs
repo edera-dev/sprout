@@ -1,8 +1,10 @@
 use crate::utils;
 use anyhow::{Context, Result};
 use uefi::boot::ScopedProtocol;
-use uefi::proto::tcg::v2::Tcg;
-use uefi_raw::protocol::tcg::v2::{Tcg2Protocol, Tcg2Version};
+use uefi::proto::tcg::PcrIndex;
+use uefi::proto::tcg::v2::{PcrEventInputs, Tcg};
+use uefi_raw::protocol::tcg::EventType;
+use uefi_raw::protocol::tcg::v2::{Tcg2HashLogExtendEventFlags, Tcg2Protocol, Tcg2Version};
 
 /// Represents the platform TPM.
 pub struct PlatformTpm;
@@ -33,6 +35,9 @@ impl TpmProtocolHandle {
 }
 
 impl PlatformTpm {
+    /// The PCR for measuring the bootloader configuration into.
+    pub const PCR_BOOT_LOADER_CONFIG: PcrIndex = PcrIndex(5);
+
     /// Acquire access to the TPM protocol handle, if possible.
     /// Returns None if TPM is not available.
     fn protocol() -> Result<Option<TpmProtocolHandle>> {
@@ -92,5 +97,33 @@ impl PlatformTpm {
 
         // Return the number of active PCR banks.
         Ok(banks.bits())
+    }
+
+    /// Log an event into the TPM pcr `pcr_index` with `buffer` as data. The `description`
+    /// is used to describe what the event is.
+    ///
+    /// If a TPM is not available, this will do nothing.
+    pub fn log_event(pcr_index: PcrIndex, buffer: &[u8], description: &str) -> Result<()> {
+        // Acquire access to the TPM protocol handle.
+        let Some(mut handle) = PlatformTpm::protocol()? else {
+            return Ok(());
+        };
+
+        // Encode the description as a UTF-16 little endian string.
+        let description = description
+            .encode_utf16()
+            .flat_map(|c| c.to_le_bytes())
+            .collect::<Vec<u8>>();
+
+        // Construct an event input for the TPM.
+        let event = PcrEventInputs::new_in_box(pcr_index, EventType::IPL, &description)
+            .context("unable to construct pcr event inputs")?;
+
+        // Log the event into the TPM.
+        handle
+            .protocol()
+            .hash_log_extend_event(Tcg2HashLogExtendEventFlags::empty(), buffer, &event)
+            .context("unable to log event to tpm")?;
+        Ok(())
     }
 }

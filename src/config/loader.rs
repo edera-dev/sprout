@@ -1,5 +1,6 @@
 use crate::config::{RootConfiguration, latest_version};
 use crate::options::SproutOptions;
+use crate::platform::tpm::PlatformTpm;
 use crate::utils;
 use anyhow::{Context, Result, bail};
 use log::info;
@@ -21,6 +22,11 @@ fn load_raw_config(options: &SproutOptions) -> Result<Vec<u8>> {
     // Read the contents of the sprout config file.
     let content = utils::read_file_contents(Some(&path), &options.config)
         .context("unable to read sprout config file")?;
+
+    // Measure the sprout.toml into the TPM, if needed and possible.
+    PlatformTpm::log_event(PlatformTpm::PCR_BOOT_LOADER_CONFIG, &content, "sprout.toml")
+        .context("unable to measure the sprout.toml file into the TPM")?;
+
     // Return the contents of the sprout config file.
     Ok(content)
 }
