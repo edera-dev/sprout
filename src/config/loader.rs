@@ -24,8 +24,12 @@ fn load_raw_config(options: &SproutOptions) -> Result<Vec<u8>> {
         .context("unable to read sprout config file")?;
 
     // Measure the sprout.toml into the TPM, if needed and possible.
-    PlatformTpm::log_event(PlatformTpm::PCR_BOOT_LOADER_CONFIG, &content, "sprout.toml")
-        .context("unable to measure the sprout.toml file into the TPM")?;
+    PlatformTpm::log_event(
+        PlatformTpm::PCR_BOOT_LOADER_CONFIG,
+        &content,
+        "sprout: configuration file",
+    )
+    .context("unable to measure the sprout.toml file into the TPM")?;
 
     // Return the contents of the sprout config file.
     Ok(content)

@@ -1,5 +1,6 @@
 use crate::utils;
 use anyhow::{Context, Result};
+use uefi::ResultExt;
 use uefi::boot::ScopedProtocol;
 use uefi::proto::tcg::PcrIndex;
 use uefi::proto::tcg::v2::{PcrEventInputs, Tcg};
@@ -110,13 +111,11 @@ impl PlatformTpm {
         };
 
         // Encode the description as a UTF-16 little endian string.
-        let description = description
-            .encode_utf16()
-            .flat_map(|c| c.to_le_bytes())
-            .collect::<Vec<u8>>();
+        let description = description.as_bytes().to_vec();
 
         // Construct an event input for the TPM.
         let event = PcrEventInputs::new_in_box(pcr_index, EventType::IPL, &description)
+            .discard_errdata()
             .context("unable to construct pcr event inputs")?;
 
         // Log the event into the TPM.
