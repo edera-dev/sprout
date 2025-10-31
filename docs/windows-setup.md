@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Secure Boot disabled
+- Secure Boot is disabled or configured to allow Sprout
 - UEFI Windows installation
 
 ## Step 1: Base Installation

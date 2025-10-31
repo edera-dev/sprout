@@ -72,9 +72,9 @@ pub mod utils;
 
 /// Run Sprout, returning an error if one occurs.
 fn run() -> Result<()> {
-    // For safety reasons, we will bail early if Secure Boot is enabled.
+    // For safety reasons, we will note that Secure Boot is in beta on Sprout.
     if SecureBoot::enabled().context("unable to determine Secure Boot status")? {
-        warn!("Secure Boot is enabled. Sprout does not currently support Secure Boot.");
+        warn!("Secure Boot is enabled. Sprout Secure Boot is in beta.");
     }
 
     // Start the platform timer.

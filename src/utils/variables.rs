@@ -90,4 +90,10 @@ impl VariableController {
             .collect::<Vec<u8>>();
         self.set(key, &encoded, class)
     }
+
+    /// Set a boolean variable specified by `key` to `value`, converting the value.
+    /// The variable `class` controls the attributes for the variable.
+    pub fn set_bool(&self, key: &str, value: bool) -> Result<()> {
+        self.set(key, &[value as u8], VariableClass::BootAndRuntimeTemporary)
+    }
 }

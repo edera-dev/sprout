@@ -121,7 +121,7 @@ impl ResolvedPath {
 /// Resolve a path specified by `input` to its various components.
 /// Uses `default_root_path` as the base root if one is not specified in the path.
 /// Returns [ResolvedPath] which contains the resolved components.
-pub fn resolve_path(default_root_path: &DevicePath, input: &str) -> Result<ResolvedPath> {
+pub fn resolve_path(default_root_path: Option<&DevicePath>, input: &str) -> Result<ResolvedPath> {
     let mut path = text_to_device_path(input).context("unable to convert text to path")?;
     let path_has_device = path
         .node_iter()
@@ -137,6 +137,9 @@ pub fn resolve_path(default_root_path: &DevicePath, input: &str) -> Result<Resol
         if !input.starts_with('\\') {
             input.insert(0, '\\');
         }
+
+        let default_root_path = default_root_path.context("unable to get default root path")?;
+
         input.insert_str(
             0,
             device_path_root(default_root_path)
@@ -170,7 +173,7 @@ pub fn resolve_path(default_root_path: &DevicePath, input: &str) -> Result<Resol
 /// This acquires exclusive protocol access to the [SimpleFileSystem] protocol of the resolved
 /// filesystem handle, so care must be taken to call this function outside a scope with
 /// the filesystem handle protocol acquired.
-pub fn read_file_contents(default_root_path: &DevicePath, input: &str) -> Result<Vec<u8>> {
+pub fn read_file_contents(default_root_path: Option<&DevicePath>, input: &str) -> Result<Vec<u8>> {
     let resolved = resolve_path(default_root_path, input)?;
     resolved.read_file()
 }

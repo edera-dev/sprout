@@ -18,7 +18,7 @@ existing UEFI bootloader or booted by the hardware directly.
 
 Sprout is licensed under Apache 2.0 and is open to modifications and contributions.
 
-**IMPORTANT WARNING**: Sprout does not support UEFI Secure Boot yet.
+**IMPORTANT WARNING**: Sprout does not support all of UEFI Secure Boot yet.
 See [this issue](https://github.com/edera-dev/sprout/issues/20) for updates.
 
 ## Background
@@ -65,13 +65,13 @@ The boot menu mechanism is very rudimentary.
 - [x] Load Linux initrd from disk
 - [x] Basic boot menu
 - [x] BLS autoconfiguration support
+- [x] [Secure Boot support](https://github.com/edera-dev/sprout/issues/20): partial
 
 ### Roadmap
 
 - [ ] [Bootloader interface support](https://github.com/edera-dev/sprout/issues/21)
 - [ ] [BLS specification conformance](https://github.com/edera-dev/sprout/issues/2)
 - [ ] [Full-featured boot menu](https://github.com/edera-dev/sprout/issues/1)
-- [ ] [Secure Boot support](https://github.com/edera-dev/sprout/issues/20): work in progress
 - [ ] [UKI support](https://github.com/edera-dev/sprout/issues/6): partial
 - [ ] [multiboot2 support](https://github.com/edera-dev/sprout/issues/7)
 - [ ] [Linux boot protocol (boot without EFI stub)](https://github.com/edera-dev/sprout/issues/7)

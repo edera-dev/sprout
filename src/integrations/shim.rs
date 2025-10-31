@@ -1,12 +1,19 @@
+use crate::integrations::shim::hook::SecurityHook;
 use crate::utils;
 use crate::utils::ResolvedPath;
+use crate::utils::variables::VariableController;
 use anyhow::{Context, Result, anyhow, bail};
 use std::ffi::c_void;
 use uefi::Handle;
 use uefi::boot::LoadImageSource;
-use uefi::proto::device_path::DevicePath;
+use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
+use uefi::proto::device_path::{DevicePath, FfiDevicePath};
 use uefi::proto::unsafe_protocol;
+use uefi_raw::table::runtime::VariableVendor;
 use uefi_raw::{Guid, Status, guid};
+
+/// Security hook support.
+mod hook;
 
 /// Support for the shim loader application for Secure Boot.
 pub struct ShimSupport;
@@ -17,6 +24,12 @@ pub enum ShimInput<'a> {
     OwnedDataBuffer(Option<&'a ResolvedPath>, Vec<u8>),
     /// Data loaded into a buffer and ready to be verified.
     DataBuffer(Option<&'a ResolvedPath>, &'a [u8]),
+    /// Low-level data buffer provided by the security hook.
+    SecurityHookBuffer(Option<*const FfiDevicePath>, &'a [u8]),
+    /// Low-level owned data buffer provided by the security hook.
+    SecurityHookOwnedBuffer(Option<*const FfiDevicePath>, Vec<u8>),
+    /// Low-level path provided by the security hook.
+    SecurityHookPath(*const FfiDevicePath),
     /// Data is provided as a resolved path. We will need to load the data to verify it.
     /// The output will them return the loaded data.
     ResolvedPath(&'a ResolvedPath),
@@ -27,6 +40,9 @@ impl<'a> ShimInput<'a> {
     pub fn buffer(&self) -> Option<&[u8]> {
         match self {
             ShimInput::OwnedDataBuffer(_, data) => Some(data),
+            ShimInput::SecurityHookOwnedBuffer(_, data) => Some(data),
+            ShimInput::SecurityHookBuffer(_, data) => Some(data),
+            ShimInput::SecurityHookPath(_) => None,
             ShimInput::DataBuffer(_, data) => Some(data),
             ShimInput::ResolvedPath(_) => None,
         }
@@ -37,7 +53,14 @@ impl<'a> ShimInput<'a> {
         match self {
             ShimInput::OwnedDataBuffer(path, _) => path.as_ref().map(|it| it.full_path.as_ref()),
             ShimInput::DataBuffer(path, _) => path.as_ref().map(|it| it.full_path.as_ref()),
+            ShimInput::SecurityHookBuffer(path, _) => {
+                path.map(|it| unsafe { DevicePath::from_ffi_ptr(it) })
+            }
+            ShimInput::SecurityHookPath(path) => unsafe { Some(DevicePath::from_ffi_ptr(*path)) },
             ShimInput::ResolvedPath(path) => Some(path.full_path.as_ref()),
+            ShimInput::SecurityHookOwnedBuffer(path, _) => {
+                path.map(|it| unsafe { DevicePath::from_ffi_ptr(it) })
+            }
         }
     }
 
@@ -51,8 +74,32 @@ impl<'a> ShimInput<'a> {
                 Ok(ShimInput::OwnedDataBuffer(root, data.to_vec()))
             }
 
+            ShimInput::SecurityHookPath(ffi_path) => {
+                // Acquire the file path.
+                let Some(path) = self.file_path() else {
+                    bail!("unable to convert security hook path to device path");
+                };
+                // Convert the underlying path to a string.
+                let path = path
+                    .to_string(DisplayOnly(false), AllowShortcuts(false))
+                    .context("unable to convert device path to string")?;
+                let path = utils::resolve_path(None, &path.to_string())
+                    .context("unable to resolve path")?;
+                // Read the file path.
+                let data = path.read_file()?;
+                Ok(ShimInput::SecurityHookOwnedBuffer(Some(ffi_path), data))
+            }
+
+            ShimInput::SecurityHookBuffer(_, _) => {
+                bail!("unable to convert security hook buffer to owned data buffer")
+            }
+
             ShimInput::ResolvedPath(path) => {
                 Ok(ShimInput::OwnedDataBuffer(Some(path), path.read_file()?))
+            }
+
+            ShimInput::SecurityHookOwnedBuffer(path, data) => {
+                Ok(ShimInput::SecurityHookOwnedBuffer(path, data))
             }
         }
     }
@@ -83,6 +130,10 @@ struct ShimLockProtocol {
 }
 
 impl ShimSupport {
+    /// Variable controller for the shim lock.
+    const SHIM_LOCK_VARIABLES: VariableController =
+        VariableController::new(VariableVendor(Self::SHIM_LOCK_GUID));
+
     /// GUID for the shim lock protocol.
     const SHIM_LOCK_GUID: Guid = guid!("605dab50-e046-4300-abb6-3dd810dd8b23");
     /// GUID for the shim image loader protocol.
@@ -103,7 +154,7 @@ impl ShimSupport {
     }
 
     /// Use the shim to validate the `input`, returning [ShimVerificationOutput] when complete.
-    pub fn validate(input: ShimInput) -> Result<ShimVerificationOutput> {
+    pub fn verify(input: ShimInput) -> Result<ShimVerificationOutput> {
         // Acquire the handle to the shim lock protocol.
         let handle = utils::find_handle(&Self::SHIM_LOCK_GUID)
             .context("unable to find shim lock protocol")?
@@ -117,21 +168,27 @@ impl ShimSupport {
             ShimInput::OwnedDataBuffer(_, _data) => {
                 bail!("owned data buffer is not supported in the verification function");
             }
+            ShimInput::SecurityHookBuffer(_, _) => None,
+            ShimInput::SecurityHookOwnedBuffer(_, _) => None,
             ShimInput::DataBuffer(_, _) => None,
             ShimInput::ResolvedPath(path) => Some(path.read_file()?),
+            ShimInput::SecurityHookPath(_) => None,
         };
 
         // Convert the input to a buffer.
         // If the input provides the data buffer, we will use that.
         // Otherwise, we will use the data loaded by this function.
-        let buffer = match input {
-            ShimInput::OwnedDataBuffer(_root, _data) => {
-                bail!("owned data buffer is not supported in the verification function");
-            }
-            ShimInput::DataBuffer(_root, data) => data,
+        let buffer = match &input {
+            ShimInput::OwnedDataBuffer(_root, data) => data,
+            ShimInput::DataBuffer(_root, data) => *data,
             ShimInput::ResolvedPath(_path) => maybe_loaded_data
                 .as_deref()
                 .context("expected data buffer to be loaded already")?,
+            ShimInput::SecurityHookBuffer(_, data) => data,
+            ShimInput::SecurityHookOwnedBuffer(_, data) => data,
+            ShimInput::SecurityHookPath(_) => {
+                bail!("security hook path input not supported in the verification function")
+            }
         };
 
         // Check if the buffer is too large to verify.
@@ -168,12 +225,19 @@ impl ShimSupport {
 
         // Determines whether LoadImage in Boot Services must be patched.
         // Version 16 of the shim doesn't require extra effort to load Secure Boot binaries.
-        // If the image loader is installed, we can skip over the security override.
-        let requires_security_override = shim_loaded && !shim_loader_available;
+        // If the image loader is installed, we can skip over the security hook.
+        let requires_security_hook = shim_loaded && !shim_loader_available;
 
-        // If the security override is required, we will bail for now.
-        if requires_security_override {
-            bail!("shim image loader protocol is not available, please upgrade to shim version 16");
+        // If the security hook is required, we will bail for now.
+        if requires_security_hook {
+            // Install the security hook, if possible. If it's not, this is necessary to continue
+            // so we should bail.
+            let installed = SecurityHook::install().context("unable to install security hook")?;
+            if !installed {
+                bail!("unable to install security hook require for this platform");
+            }
+            // Retain the shim protocol after load.
+            Self::retain()?
         }
 
         // Converts the shim input to an owned data buffer.
@@ -188,6 +252,21 @@ impl ShimSupport {
         };
 
         // Loads the image using Boot Services LoadImage function.
-        uefi::boot::load_image(current_image, source).context("unable to load image")
+        let result = uefi::boot::load_image(current_image, source).context("unable to load image");
+
+        // If the security override is required, we will uninstall the security hook.
+        if requires_security_hook {
+            SecurityHook::uninstall().context("unable to uninstall security hook")?;
+        }
+        result
+    }
+
+    /// Set the ShimRetainProtocol variable to indicate that shim should retain the protocols
+    /// for the full lifetime of boot services.
+    pub fn retain() -> Result<()> {
+        Self::SHIM_LOCK_VARIABLES
+            .set_bool("ShimRetainProtocol", true)
+            .context("unable to retain shim protocol")?;
+        Ok(())
     }
 }

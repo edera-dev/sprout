@@ -19,7 +19,7 @@ fn load_raw_config(options: &SproutOptions) -> Result<Vec<u8>> {
     info!("configuration file: {}", options.config);
 
     // Read the contents of the sprout config file.
-    let content = utils::read_file_contents(&path, &options.config)
+    let content = utils::read_file_contents(Some(&path), &options.config)
         .context("unable to read sprout config file")?;
     // Return the contents of the sprout config file.
     Ok(content)
