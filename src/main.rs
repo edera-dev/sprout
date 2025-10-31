@@ -59,6 +59,9 @@ pub mod integrations;
 /// phases: Hooks into specific parts of the boot process.
 pub mod phases;
 
+/// sbat: Secure Boot Attestation section.
+pub mod sbat;
+
 /// secure: Secure Boot support.
 pub mod secure;
 
