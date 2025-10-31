@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use std::ops::Deref;
+use uefi::boot::SearchType;
 use uefi::fs::{FileSystem, Path};
 use uefi::proto::device_path::text::{AllowShortcuts, DevicePathFromText, DisplayOnly};
 use uefi::proto::device_path::{DevicePath, PoolDevicePath};
@@ -103,10 +104,24 @@ pub struct ResolvedPath {
     pub filesystem_handle: Handle,
 }
 
+impl ResolvedPath {
+    /// Read the file specified by this path into a buffer and return it.
+    pub fn read_file(&self) -> Result<Vec<u8>> {
+        let fs = uefi::boot::open_protocol_exclusive::<SimpleFileSystem>(self.filesystem_handle)
+            .context("unable to open filesystem protocol")?;
+        let mut fs = FileSystem::new(fs);
+        let path = self
+            .sub_path
+            .to_string(DisplayOnly(false), AllowShortcuts(false))?;
+        let content = fs.read(Path::new(&path));
+        content.context("unable to read file contents")
+    }
+}
+
 /// Resolve a path specified by `input` to its various components.
 /// Uses `default_root_path` as the base root if one is not specified in the path.
 /// Returns [ResolvedPath] which contains the resolved components.
-pub fn resolve_path(default_root_path: &DevicePath, input: &str) -> Result<ResolvedPath> {
+pub fn resolve_path(default_root_path: Option<&DevicePath>, input: &str) -> Result<ResolvedPath> {
     let mut path = text_to_device_path(input).context("unable to convert text to path")?;
     let path_has_device = path
         .node_iter()
@@ -122,6 +137,9 @@ pub fn resolve_path(default_root_path: &DevicePath, input: &str) -> Result<Resol
         if !input.starts_with('\\') {
             input.insert(0, '\\');
         }
+
+        let default_root_path = default_root_path.context("unable to get default root path")?;
+
         input.insert_str(
             0,
             device_path_root(default_root_path)
@@ -155,16 +173,9 @@ pub fn resolve_path(default_root_path: &DevicePath, input: &str) -> Result<Resol
 /// This acquires exclusive protocol access to the [SimpleFileSystem] protocol of the resolved
 /// filesystem handle, so care must be taken to call this function outside a scope with
 /// the filesystem handle protocol acquired.
-pub fn read_file_contents(default_root_path: &DevicePath, input: &str) -> Result<Vec<u8>> {
+pub fn read_file_contents(default_root_path: Option<&DevicePath>, input: &str) -> Result<Vec<u8>> {
     let resolved = resolve_path(default_root_path, input)?;
-    let fs = uefi::boot::open_protocol_exclusive::<SimpleFileSystem>(resolved.filesystem_handle)
-        .context("unable to open filesystem protocol")?;
-    let mut fs = FileSystem::new(fs);
-    let path = resolved
-        .sub_path
-        .to_string(DisplayOnly(false), AllowShortcuts(false))?;
-    let content = fs.read(Path::new(&path));
-    content.context("unable to read file contents")
+    resolved.read_file()
 }
 
 /// Filter a string-like Option `input` such that an empty string is [None].
@@ -230,5 +241,27 @@ pub fn partition_guid(path: &DevicePath, form: PartitionGuidForm) -> Result<Opti
             }))
     } else {
         Ok(None)
+    }
+}
+
+/// Find a handle that provides the specified `protocol`.
+pub fn find_handle(protocol: &Guid) -> Result<Option<Handle>> {
+    // Locate the requested protocol handle.
+    match uefi::boot::locate_handle_buffer(SearchType::ByProtocol(protocol)) {
+        // If a handle is found, the protocol is available.
+        Ok(handles) => Ok(if handles.is_empty() {
+            None
+        } else {
+            Some(handles[0])
+        }),
+        // If an error occurs, check if it is because the protocol is not available.
+        // If so, return false. Otherwise, return the error.
+        Err(error) => {
+            if error.status() == Status::NOT_FOUND {
+                Ok(None)
+            } else {
+                Err(error).context("unable to determine if the protocol is available")
+            }
+        }
     }
 }

@@ -16,7 +16,7 @@ use crate::platform::timer::PlatformTimer;
 use crate::secure::SecureBoot;
 use crate::utils::PartitionGuidForm;
 use anyhow::{Context, Result, bail};
-use log::{error, info};
+use log::{error, info, warn};
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::time::Duration;
@@ -72,9 +72,9 @@ pub mod utils;
 
 /// Run Sprout, returning an error if one occurs.
 fn run() -> Result<()> {
-    // For safety reasons, we will bail early if Secure Boot is enabled.
+    // For safety reasons, we will note that Secure Boot is in beta on Sprout.
     if SecureBoot::enabled().context("unable to determine Secure Boot status")? {
-        bail!("Secure Boot is enabled. Sprout does not currently support Secure Boot.");
+        warn!("Secure Boot is enabled. Sprout Secure Boot is in beta.");
     }
 
     // Start the platform timer.

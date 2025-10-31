@@ -98,7 +98,7 @@ fn register_media_loader_file(
     // Stamp the path to the file.
     let path = context.stamp(path);
     // Read the file contents.
-    let content = utils::read_file_contents(context.root().loaded_image_path()?, &path)
+    let content = utils::read_file_contents(Some(context.root().loaded_image_path()?), &path)
         .context(format!("unable to read {} file", what))?;
     // Register the media loader.
     let handle = MediaLoaderHandle::register(guid, content.into_boxed_slice())

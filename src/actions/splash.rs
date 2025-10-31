@@ -143,7 +143,7 @@ pub fn splash(context: Rc<SproutContext>, configuration: &SplashConfiguration) -
     // Stamp the image path value.
     let image = context.stamp(&configuration.image);
     // Read the image contents.
-    let image = read_file_contents(context.root().loaded_image_path()?, &image)?;
+    let image = read_file_contents(Some(context.root().loaded_image_path()?), &image)?;
     // Decode the image as a PNG.
     let image = ImageReader::with_format(Cursor::new(image), ImageFormat::Png)
         .decode()
