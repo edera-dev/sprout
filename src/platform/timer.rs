@@ -83,7 +83,7 @@ impl PlatformTimer {
 
     /// Measure the elapsed duration since the timer was started.
     pub fn elapsed_since_start(&self) -> Duration {
-        let duration = arch_ticks() - self.start;
+        let duration = arch_ticks().wrapping_sub(self.start);
         self.frequency.duration(duration)
     }
 }
