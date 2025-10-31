@@ -237,8 +237,13 @@ impl ShimSupport {
             if !installed {
                 bail!("unable to install security hook require for this platform");
             }
-            // Retain the shim protocol after load.
-            Self::retain()?
+        }
+
+        // If the shim is loaded, we will need to retain the shim protocol to allow
+        // loading multiple images.
+        if shim_loaded {
+            // Retain the shim protocol after loading the image.
+            Self::retain()?;
         }
 
         // Converts the shim input to an owned data buffer.
