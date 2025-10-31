@@ -1,4 +1,5 @@
 use crate::context::SproutContext;
+use crate::integrations::shim::{ShimInput, ShimSupport};
 use crate::utils;
 use anyhow::{Context, Result};
 use log::info;
@@ -6,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use uefi::boot::SearchType;
-use uefi::proto::device_path::LoadedImageDevicePath;
 
 /// Declares a driver configuration.
 /// Drivers allow extending the functionality of Sprout.
@@ -23,28 +23,17 @@ pub struct DriverDeclaration {
 fn load_driver(context: Rc<SproutContext>, driver: &DriverDeclaration) -> Result<()> {
     // Acquire the handle and device path of the loaded image.
     let sprout_image = uefi::boot::image_handle();
-    let image_device_path_protocol =
-        uefi::boot::open_protocol_exclusive::<LoadedImageDevicePath>(sprout_image)
-            .context("unable to open loaded image device path protocol")?;
 
-    // Get the device path root of the sprout image.
-    let mut full_path = utils::device_path_root(&image_device_path_protocol)?;
-
-    // Push the path of the driver from the root.
-    full_path.push_str(&context.stamp(&driver.path));
-
-    // Convert the path to a device path.
-    let device_path = utils::text_to_device_path(&full_path)?;
-
-    // Load the driver image.
-    let image = uefi::boot::load_image(
-        sprout_image,
-        uefi::boot::LoadImageSource::FromDevicePath {
-            device_path: &device_path,
-            boot_policy: uefi::proto::BootPolicy::ExactMatch,
-        },
+    // Resolve the path to the driver image.
+    let resolved = utils::resolve_path(
+        context.root().loaded_image_path()?,
+        &context.stamp(&driver.path),
     )
-    .context("unable to load image")?;
+    .context("unable to resolve path to driver")?;
+
+    // Load the driver image using the shim support integration.
+    // It will determine if the image needs to be loaded via the shim or can be loaded directly.
+    let image = ShimSupport::load(sprout_image, ShimInput::ResolvedPath(&resolved))?;
 
     // Start the driver image, this is expected to return control to sprout.
     // There is no guarantee that the driver will actually return control as it is

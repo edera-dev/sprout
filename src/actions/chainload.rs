@@ -1,5 +1,6 @@
 use crate::context::SproutContext;
 use crate::integrations::bootloader_interface::BootloaderInterface;
+use crate::integrations::shim::{ShimInput, ShimSupport};
 use crate::utils;
 use crate::utils::media_loader::MediaLoaderHandle;
 use crate::utils::media_loader::constants::linux::LINUX_EFI_INITRD_MEDIA_GUID;
@@ -40,15 +41,9 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     )
     .context("unable to resolve chainload path")?;
 
-    // Load the image to chainload.
-    let image = uefi::boot::load_image(
-        sprout_image,
-        uefi::boot::LoadImageSource::FromDevicePath {
-            device_path: &resolved.full_path,
-            boot_policy: uefi::proto::BootPolicy::ExactMatch,
-        },
-    )
-    .context("unable to load image")?;
+    // Load the image to chainload using the shim support integration.
+    // It will determine if the image needs to be loaded via the shim or can be loaded directly.
+    let image = ShimSupport::load(sprout_image, ShimInput::ResolvedPath(&resolved))?;
 
     // Open the LoadedImage protocol of the image to chainload.
     let mut loaded_image_protocol = uefi::boot::open_protocol_exclusive::<LoadedImage>(image)
