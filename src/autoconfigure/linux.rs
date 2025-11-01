@@ -1,17 +1,16 @@
-use crate::actions::ActionDeclaration;
 use crate::actions::chainload::ChainloadConfiguration;
+use crate::actions::ActionDeclaration;
 use crate::config::RootConfiguration;
 use crate::entries::EntryDeclaration;
-use crate::generators::GeneratorDeclaration;
 use crate::generators::list::ListConfiguration;
+use crate::generators::GeneratorDeclaration;
 use crate::utils;
 use anyhow::{Context, Result};
-use log::info;
 use std::collections::BTreeMap;
-use uefi::CString16;
 use uefi::fs::{FileSystem, Path, PathBuf};
-use uefi::proto::device_path::DevicePath;
 use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
+use uefi::proto::device_path::DevicePath;
+use uefi::CString16;
 
 /// The name prefix of the Linux chainload action that will be used to boot Linux.
 const LINUX_CHAINLOAD_ACTION_PREFIX: &str = "linux-chainload-";
@@ -117,7 +116,6 @@ fn scan_directory(filesystem: &mut FileSystem, path: &str) -> Result<Vec<KernelP
             let mut initramfs_path = path_for_join.clone();
             initramfs_path.push(Path::new(&initramfs));
 
-            info!("initramfs path: {:?} ({})", initramfs_path, initramfs);
             // Check if the initramfs path exists, if it does, break out of the loop.
             if filesystem
                 .try_exists(&initramfs_path)
