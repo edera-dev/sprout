@@ -62,9 +62,5 @@ fn measure_frequency() -> u64 {
 /// On x86_64, this is slightly expensive, so it should be done once.
 pub fn frequency() -> TickFrequency {
     let frequency = measure_frequency();
-    // If the frequency is 0, then something went very wrong and we should panic.
-    if frequency == 0 {
-        panic!("unable to measure frequency");
-    }
     TickFrequency::Measured(frequency, MEASURE_FREQUENCY_DURATION)
 }

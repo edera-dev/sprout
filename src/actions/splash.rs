@@ -1,7 +1,7 @@
 use crate::context::SproutContext;
 use crate::utils::framebuffer::Framebuffer;
 use crate::utils::read_file_contents;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use image::imageops::{FilterType, resize};
 use image::math::Rect;
 use image::{DynamicImage, ImageBuffer, ImageFormat, ImageReader, Rgba};
@@ -117,6 +117,11 @@ fn draw(image: DynamicImage) -> Result<()> {
 
     // Fit the image to the display frame.
     let fit = fit_to_frame(&image, display_frame);
+
+    // If the image is zero-sized, then we should bail with an error.
+    if fit.width == 0 || fit.height == 0 {
+        bail!("calculated frame size is zero");
+    }
 
     // Resize the image to fit the display frame.
     let image = resize_to_fit(&image, fit);

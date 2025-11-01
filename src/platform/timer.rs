@@ -53,9 +53,14 @@ fn arch_ticks() -> u64 {
 /// Acquire the tick frequency reported by the platform.
 fn arch_frequency() -> TickFrequency {
     #[cfg(target_arch = "aarch64")]
-    return aarch64::frequency();
+    let frequency = aarch64::frequency();
     #[cfg(target_arch = "x86_64")]
-    return x86_64::frequency();
+    let frequency = x86_64::frequency();
+    // If the frequency is 0, then something went very wrong and we should panic.
+    if frequency.ticks() == 0 {
+        panic!("timer frequency is zero");
+    }
+    frequency
 }
 
 /// Platform timer that allows measurement of the elapsed time.
