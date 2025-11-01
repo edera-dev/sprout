@@ -1,16 +1,16 @@
-use crate::actions::chainload::ChainloadConfiguration;
 use crate::actions::ActionDeclaration;
+use crate::actions::chainload::ChainloadConfiguration;
 use crate::config::RootConfiguration;
 use crate::entries::EntryDeclaration;
-use crate::generators::list::ListConfiguration;
 use crate::generators::GeneratorDeclaration;
+use crate::generators::list::ListConfiguration;
 use crate::utils;
 use anyhow::{Context, Result};
 use std::collections::BTreeMap;
-use uefi::fs::{FileSystem, Path, PathBuf};
-use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
-use uefi::proto::device_path::DevicePath;
 use uefi::CString16;
+use uefi::fs::{FileSystem, Path, PathBuf};
+use uefi::proto::device_path::DevicePath;
+use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
 
 /// The name prefix of the Linux chainload action that will be used to boot Linux.
 const LINUX_CHAINLOAD_ACTION_PREFIX: &str = "linux-chainload-";

@@ -6,11 +6,11 @@
 
 </div>
 
-Sprout is an **EXPERIMENTAL** programmable UEFI bootloader written in Rust.
+Sprout is a programmable UEFI bootloader written in Rust.
 
-Sprout is in use at Edera today in development environments and is intended to ship to production soon.
+It is in use at Edera today in development environments and is intended to ship to production soon.
 
-The name "sprout" is derived from our company name "Edera" which means "ivy."
+The name "Sprout" is derived from our company name "Edera" which means "ivy."
 Given that Sprout is the first thing intended to start on an Edera system, the name was apt.
 
 It supports `x86_64` and `ARM64` EFI-capable systems. It is designed to require UEFI and can be chainloaded from an
@@ -18,16 +18,13 @@ existing UEFI bootloader or booted by the hardware directly.
 
 Sprout is licensed under Apache 2.0 and is open to modifications and contributions.
 
-**IMPORTANT WARNING**: Sprout does not support all of UEFI Secure Boot yet.
-See [this issue](https://github.com/edera-dev/sprout/issues/20) for updates.
-
 ## Background
 
 At [Edera] we make compute isolation technology for a wide variety of environments, often ones we do not fully control.
-Our technology utilizes a hypervisor to boot the host system to provide a new isolation mechanism that works
-with or without hardware virtualization support. To do this we need to inject our hypervisor at boot time.
+Our technology uses a hypervisor to boot the host system to provide a new isolation mechanism that works
+with or without hardware virtualization support. To do this, we need to inject our hypervisor at boot time.
 
-Unfortunately, GRUB, the most common bootloader on Linux systems today, utilizes a shell-script like
+Unfortunately, GRUB, the most common bootloader on Linux systems today, uses a shell-script like
 configuration system. Both the code that runs to generate a GRUB config and the GRUB config
 itself is fully turing complete. This makes modifying boot configuration difficult and error-prone.
 
@@ -52,8 +49,7 @@ simplify installation and usage.
 
 ## Features
 
-NOTE: Currently, Sprout is experimental and is not intended for production use.
-The boot menu mechanism is very rudimentary.
+**NOTE**: Sprout is still in beta.
 
 ### Current
 
