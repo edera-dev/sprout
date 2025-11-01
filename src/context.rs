@@ -219,6 +219,14 @@ impl SproutContext {
 
     /// Stamps the `text` value with the specified `values` map. The returned value indicates
     /// whether the `text` has been changed and the value that was stamped and changed.
+    ///
+    /// Stamping works like this:
+    /// - Start with the input text.
+    /// - Sort all the keys in reverse length order (longest keys first)
+    /// - For each key, if the key is not empty, replace $KEY in the text.
+    /// - Each follow-up iteration acts upon the last iterations result.
+    /// - We keep track if the text changes during the replacement.
+    /// - We return both whether the text changed during any iteration and the final result.
     fn stamp_values(values: &BTreeMap<String, String>, text: impl AsRef<str>) -> (bool, String) {
         let mut result = text.as_ref().to_string();
         let mut did_change = false;

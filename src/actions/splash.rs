@@ -12,6 +12,8 @@ use std::time::Duration;
 use uefi::boot::ScopedProtocol;
 use uefi::proto::console::gop::GraphicsOutput;
 
+/// We set the default splash time to zero, as this makes it so any logging shows up
+/// on top of the splash and does not hold up the boot process.
 const DEFAULT_SPLASH_TIME: u32 = 0;
 
 /// The configuration of the splash action.
