@@ -154,8 +154,11 @@ pub fn resolve_path(default_root_path: Option<&DevicePath>, input: &str) -> Resu
     let root_path = text_to_device_path(root.as_str())
         .context("unable to convert root to path")?
         .to_boxed();
-    let mut root_path = root_path.as_ref();
-    let handle = uefi::boot::locate_device_path::<SimpleFileSystem>(&mut root_path)
+    let root_path = root_path.as_ref();
+
+    // locate_device_path modifies the path, so we need to clone it.
+    let root_path_modifiable = root_path.to_owned();
+    let handle = uefi::boot::locate_device_path::<SimpleFileSystem>(&mut &*root_path_modifiable)
         .context("unable to locate filesystem device path")?;
     let subpath = device_path_subpath(path.deref()).context("unable to get device subpath")?;
     Ok(ResolvedPath {
