@@ -61,7 +61,7 @@ impl BootloaderInterface {
 
     /// Tell the system that Sprout is about to display the menu.
     pub fn mark_menu(timer: &PlatformTimer) -> Result<()> {
-        Self::mark_time("LoaderTimeMenuUsec", timer)
+        Self::mark_time("LoaderTimeMenuUSec", timer)
     }
 
     /// Tell the system about the current time as measured by the platform timer.
