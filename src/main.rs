@@ -301,13 +301,8 @@ fn run() -> Result<()> {
             force_boot_menu = true;
         }
 
-        BootloaderInterfaceTimeout::MenuHidden => {
+        BootloaderInterfaceTimeout::MenuHidden | BootloaderInterfaceTimeout::MenuDisabled => {
             // Hide the boot menu by setting the timeout to zero.
-            menu_timeout = 0;
-        }
-
-        BootloaderInterfaceTimeout::MenuDisabled => {
-            // Disable the boot menu by setting the timeout to zero.
             menu_timeout = 0;
         }
 
