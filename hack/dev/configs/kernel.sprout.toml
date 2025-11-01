@@ -5,10 +5,10 @@ default-entry = "kernel"
 menu-timeout = 0
 
 [extractors.boot.filesystem-device-match]
-has-item = "\\EFI\\BOOT\\kernel.efi"
+has-item = "\\vmlinuz"
 
 [actions.chainload-kernel]
-chainload.path = "$boot\\EFI\\BOOT\\kernel.efi"
+chainload.path = "$boot\\vmlinuz"
 chainload.options = ["console=hvc0"]
 chainload.linux-initrd = "$boot\\initramfs"
 

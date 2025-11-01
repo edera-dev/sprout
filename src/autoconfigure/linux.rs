@@ -6,9 +6,10 @@ use crate::generators::GeneratorDeclaration;
 use crate::generators::list::ListConfiguration;
 use crate::utils;
 use anyhow::{Context, Result};
+use log::info;
 use std::collections::BTreeMap;
 use uefi::CString16;
-use uefi::fs::{FileSystem, Path};
+use uefi::fs::{FileSystem, Path, PathBuf};
 use uefi::proto::device_path::DevicePath;
 use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
 
@@ -17,7 +18,8 @@ const LINUX_CHAINLOAD_ACTION_PREFIX: &str = "linux-chainload-";
 
 /// The locations to scan for kernel pairs.
 /// We will check for symlinks and if this directory is a symlink, we will skip it.
-const SCAN_LOCATIONS: &[&str] = &["/boot", "/"];
+/// The empty string represents the root of the filesystem.
+const SCAN_LOCATIONS: &[&str] = &["\\boot", "\\"];
 
 /// Prefixes of kernel files to scan for.
 const KERNEL_PREFIXES: &[&str] = &["vmlinuz"];
@@ -38,6 +40,9 @@ struct KernelPair {
 fn scan_directory(filesystem: &mut FileSystem, path: &str) -> Result<Vec<KernelPair>> {
     // All the discovered kernel pairs.
     let mut pairs = Vec::new();
+
+    // We have to special-case the root directory due to path logic in the uefi crate.
+    let is_root = path.is_empty() || path == "\\";
 
     // Construct a filesystem path from the path string.
     let path = CString16::try_from(path).context("unable to convert path to CString16")?;
@@ -62,6 +67,16 @@ fn scan_directory(filesystem: &mut FileSystem, path: &str) -> Result<Vec<KernelP
         return Ok(pairs);
     };
 
+    // Create a new path used for joining file names below.
+    // All attempts to derive paths for the files in the directory should use this instead.
+    // The uefi crate does not handle push correctly for the root directory.
+    // It will add a second slash, which will cause our path logic to fail.
+    let path_for_join = if is_root {
+        PathBuf::new()
+    } else {
+        path.clone()
+    };
+
     // For each item in the directory, find a kernel.
     for item in directory {
         let item = item.context("unable to read directory item")?;
@@ -74,11 +89,14 @@ fn scan_directory(filesystem: &mut FileSystem, path: &str) -> Result<Vec<KernelP
         // Convert the name from a CString16 to a String.
         let name = item.file_name().to_string();
 
+        // Convert the name to lowercase to make all of this case-insensitive.
+        let name_for_match = name.to_lowercase();
+
         // Find a kernel prefix that matches, if any.
-        let Some(prefix) = KERNEL_PREFIXES
-            .iter()
-            .find(|prefix| name == **prefix || name.starts_with(&format!("{}-", prefix)))
-        else {
+        // This is case-insensitive to ensure we pick up all possibilities.
+        let Some(prefix) = KERNEL_PREFIXES.iter().find(|prefix| {
+            name_for_match == **prefix || name_for_match.starts_with(&format!("{}-", prefix))
+        }) else {
             // Skip over anything that doesn't match a kernel prefix.
             continue;
         };
@@ -96,8 +114,10 @@ fn scan_directory(filesystem: &mut FileSystem, path: &str) -> Result<Vec<KernelP
             let initramfs = format!("{}{}", prefix, suffix);
             let initramfs = CString16::try_from(initramfs.as_str())
                 .context("unable to convert initramfs name to CString16")?;
-            let mut initramfs_path = path.clone();
+            let mut initramfs_path = path_for_join.clone();
             initramfs_path.push(Path::new(&initramfs));
+
+            info!("initramfs path: {:?} ({})", initramfs_path, initramfs);
             // Check if the initramfs path exists, if it does, break out of the loop.
             if filesystem
                 .try_exists(&initramfs_path)
@@ -108,7 +128,7 @@ fn scan_directory(filesystem: &mut FileSystem, path: &str) -> Result<Vec<KernelP
         };
 
         // Construct a kernel path from the kernel name.
-        let mut kernel = path.clone();
+        let mut kernel = path_for_join.clone();
         kernel.push(Path::new(&item.file_name()));
         let kernel = kernel.to_string();
         let initramfs = matched_initramfs_path.map(|initramfs_path| initramfs_path.to_string());

@@ -7,7 +7,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -
 WORKDIR /work
 COPY sprout.efi /work/${EFI_NAME}.EFI
 COPY sprout.toml /work/SPROUT.TOML
-COPY kernel.efi /work/KERNEL.EFI
+COPY kernel.efi /work/VMLINUZ
 COPY shell.efi /work/SHELL.EFI
 COPY xen.efi /work/XEN.EFI
 COPY xen.cfg /work/XEN.CFG
@@ -24,7 +24,7 @@ RUN truncate -s128MiB sprout.img && \
     mmd -i sprout.img ::/LOADER && \
     mmd -i sprout.img ::/LOADER/ENTRIES && \
     mcopy -i sprout.img ${EFI_NAME}.EFI ::/EFI/BOOT/ && \
-    mcopy -i sprout.img KERNEL.EFI ::/EFI/BOOT/ && \
+    mcopy -i sprout.img VMLINUZ ::/VMLINUZ && \
     mcopy -i sprout.img SHELL.EFI ::/EFI/BOOT/ && \
     mcopy -i sprout.img XEN.EFI ::/EFI/BOOT/ && \
     mcopy -i sprout.img XEN.CFG ::/EFI/BOOT/ && \
