@@ -110,7 +110,7 @@ impl PlatformTpm {
             return Ok(());
         };
 
-        // Encode the description as a UTF-16 little endian string.
+        // Encode the description as UTF-8.
         let description = description.as_bytes().to_vec();
 
         // Construct an event input for the TPM.
