@@ -96,7 +96,7 @@ pub trait OptionsRepresentable {
                 let maybe_next = iterator.peek();
 
                 // If the next value isn't another option, set the value to the next value.
-                // Otherwise, it is an empty string.
+                // Otherwise, it is None.
                 value = if let Some(next) = maybe_next
                     && !next.starts_with("--")
                 {
