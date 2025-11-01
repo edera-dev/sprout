@@ -2,7 +2,7 @@ use crate::entries::BootableEntry;
 use crate::integrations::bootloader_interface::BootloaderInterface;
 use crate::platform::timer::PlatformTimer;
 use anyhow::{Context, Result, bail};
-use log::info;
+use log::{info, warn};
 use std::time::Duration;
 use uefi::ResultExt;
 use uefi::boot::TimerTrigger;
@@ -66,7 +66,20 @@ fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
     // Close the timer event that we acquired.
     // We don't need to close the key event because it is owned globally.
     if let Some(timer_event) = events.into_iter().next() {
-        uefi::boot::close_event(timer_event).context("unable to close timer event")?;
+        // Store the result of the close event so we can determine if we can safely assert it.
+        let close_event_result =
+            uefi::boot::close_event(timer_event).context("unable to close timer event");
+        if event_result.is_err()
+            && let Err(ref close_event_error) = close_event_result
+        {
+            // Log a warning if we failed to close the timer event.
+            // This is done to ensure we don't mask the wait_for_event error.
+            warn!("unable to close timer event: {}", close_event_error);
+        } else {
+            // If we reach here, we can safely assert that the close event succeeded without
+            // masking the wait_for_event error.
+            close_event_result?;
+        }
     }
 
     // Acquire the event that triggered.
