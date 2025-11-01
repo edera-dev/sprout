@@ -16,7 +16,7 @@ bitflags! {
         const BootCounting = 1 << 4;
         /// Bootloader supports detection from XBOOTLDR partitions.
         const Xbootldr = 1 << 5;
-        /// Bootloader supports handling of random seeds.
+        /// Bootloader supports the handling of random seeds.
         const RandomSeed = 1 << 6;
         /// Bootloader supports loading drivers.
         const LoadDriver = 1 << 7;
@@ -30,7 +30,7 @@ bitflags! {
         const SecureBootEnroll = 1 << 11;
         /// Bootloader retains the shim.
         const RetainShim = 1 << 12;
-        /// Bootloader supports disabling the menu via menu timeout variable.
+        /// Bootloader supports disabling the menu via the menu timeout variable.
         const MenuDisable = 1 << 13;
         /// Bootloader supports multi-profile UKI.
         const MultiProfileUki = 1 << 14;

@@ -24,7 +24,10 @@ impl BootloaderInterface {
 
     /// The feature we support in Sprout.
     fn features() -> LoaderFeatures {
-        LoaderFeatures::LoadDriver | LoaderFeatures::Tpm2ActivePcrBanks | LoaderFeatures::RetainShim
+        LoaderFeatures::Xbootldr
+            | LoaderFeatures::LoadDriver
+            | LoaderFeatures::Tpm2ActivePcrBanks
+            | LoaderFeatures::RetainShim
     }
 
     /// Tell the system that Sprout was initialized at the current time.
