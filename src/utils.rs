@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use std::ops::Deref;
 use uefi::boot::SearchType;
 use uefi::fs::{FileSystem, Path};
@@ -271,4 +271,20 @@ pub fn find_handle(protocol: &Guid) -> Result<Option<Handle>> {
             }
         }
     }
+}
+
+/// Convert a byte slice into a CString16.
+pub fn utf16_bytes_to_cstring16(bytes: &[u8]) -> Result<CString16> {
+    // Validate the input bytes are the right length.
+    if !bytes.len().is_multiple_of(2) {
+        bail!("utf16 bytes must be a multiple of 2");
+    }
+
+    // SAFETY: reinterpret &[u8] as &[u16].
+    // We just validated it has the right length.
+    let ptr = bytes.as_ptr() as *const u16;
+    let len = bytes.len() / 2;
+    let utf16 = unsafe { std::slice::from_raw_parts(ptr, len) };
+
+    CString16::try_from(utf16.to_vec()).context("unable to convert utf16 bytes to CString16")
 }

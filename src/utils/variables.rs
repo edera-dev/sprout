@@ -1,4 +1,6 @@
+use crate::utils;
 use anyhow::{Context, Result};
+use log::warn;
 use uefi::{CString16, guid};
 use uefi_raw::Status;
 use uefi_raw::table::runtime::{VariableAttributes, VariableVendor};
@@ -42,6 +44,41 @@ impl VariableController {
     /// Convert `key` to a variable name as a CString16.
     fn name(key: &str) -> Result<CString16> {
         CString16::try_from(key).context("unable to convert variable name to CString16")
+    }
+
+    /// Retrieve the cstr16 value specified by the `key`.
+    /// Returns None if the value isn't set.
+    /// If the value is not decodable, we will return None and log a warning.
+    pub fn get_cstr16(&self, key: &str) -> Result<Option<String>> {
+        let name = Self::name(key)?;
+
+        // Retrieve the variable data, handling variable not existing as None.
+        match uefi::runtime::get_variable_boxed(&name, &self.vendor) {
+            Ok((data, _)) => {
+                // Try to decode UTF-16 bytes to a CString16.
+                match utils::utf16_bytes_to_cstring16(&data) {
+                    Ok(value) => {
+                        // We have a value, so return the UTF-8 value.
+                        Ok(Some(value.to_string()))
+                    }
+
+                    Err(error) => {
+                        // We encountered an error, so warn and return None.
+                        warn!("efi variable '{}' is not valid UTF-16: {}", key, error);
+                        Ok(None)
+                    }
+                }
+            }
+
+            Err(error) => {
+                // If the variable does not exist, we will return None.
+                if error.status() == Status::NOT_FOUND {
+                    Ok(None)
+                } else {
+                    Err(error).with_context(|| format!("unable to get efi variable {}", key))
+                }
+            }
+        }
     }
 
     /// Retrieve a boolean value specified by the `key`.
@@ -103,5 +140,13 @@ impl VariableController {
     /// The variable `class` controls the attributes for the variable.
     pub fn set_u64le(&self, key: &str, value: u64, class: VariableClass) -> Result<()> {
         self.set(key, &value.to_le_bytes(), class)
+    }
+
+    pub fn remove(&self, key: &str) -> Result<()> {
+        let name = Self::name(key)?;
+
+        // Delete the variable from UEFI.
+        uefi::runtime::delete_variable(&name, &self.vendor)
+            .with_context(|| format!("unable to remove efi variable {}", key))
     }
 }

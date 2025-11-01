@@ -1,6 +1,5 @@
 #![doc = include_str!("../README.md")]
 #![feature(uefi_std)]
-extern crate core;
 
 /// The delay to wait for when an error occurs in Sprout.
 const DELAY_ON_ERROR: Duration = Duration::from_secs(10);
@@ -8,7 +7,7 @@ const DELAY_ON_ERROR: Duration = Duration::from_secs(10);
 use crate::config::RootConfiguration;
 use crate::context::{RootContext, SproutContext};
 use crate::entries::BootableEntry;
-use crate::integrations::bootloader_interface::BootloaderInterface;
+use crate::integrations::bootloader_interface::{BootloaderInterface, BootloaderInterfaceTimeout};
 use crate::options::SproutOptions;
 use crate::options::parser::OptionsRepresentable;
 use crate::phases::phase;
@@ -288,18 +287,51 @@ fn run() -> Result<()> {
     // Execute the late phase.
     phase(context.clone(), &config.phases.late).context("unable to execute late phase")?;
 
+    // Acquire the timeout setting from the bootloader interface.
+    let bootloader_interface_timeout =
+        BootloaderInterface::get_timeout().context("unable to get bootloader interface timeout")?;
+
     // If --boot is specified, boot that entry immediately.
     let force_boot_entry = context.root().options().boot.as_ref();
     // If --force-menu is specified, show the boot menu regardless of the value of --boot.
-    let force_boot_menu = context.root().options().force_menu;
+    let mut force_boot_menu = context.root().options().force_menu;
 
     // Determine the menu timeout in seconds based on the options or configuration.
     // We prefer the options over the configuration to allow for overriding.
-    let menu_timeout = context
+    let mut menu_timeout = context
         .root()
         .options()
         .menu_timeout
         .unwrap_or(config.options.menu_timeout);
+
+    // Apply bootloader interface timeout settings.
+    match bootloader_interface_timeout {
+        BootloaderInterfaceTimeout::MenuForce => {
+            // Force the boot menu.
+            force_boot_menu = true;
+        }
+
+        BootloaderInterfaceTimeout::MenuHidden => {
+            // Hide the boot menu by setting the timeout to zero.
+            menu_timeout = 0;
+        }
+
+        BootloaderInterfaceTimeout::MenuDisabled => {
+            // Disable the boot menu by setting the timeout to zero.
+            menu_timeout = 0;
+        }
+
+        BootloaderInterfaceTimeout::Timeout(timeout) => {
+            // Configure the timeout to the specified value.
+            menu_timeout = timeout;
+        }
+
+        BootloaderInterfaceTimeout::Unspecified => {
+            // Do nothing.
+        }
+    }
+
+    // Convert the menu timeout to a duration.
     let menu_timeout = Duration::from_secs(menu_timeout);
 
     // Use the forced boot entry if possible, otherwise pick the first entry using a boot menu.

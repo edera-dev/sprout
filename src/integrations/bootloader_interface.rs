@@ -13,6 +13,20 @@ mod bitflags;
 /// The name of the bootloader to tell the system.
 const LOADER_NAME: &str = "Sprout";
 
+/// Represents the configured timeout for the bootloader interface.
+pub enum BootloaderInterfaceTimeout {
+    /// Force the menu to be shown.
+    MenuForce,
+    /// Hide the menu.
+    MenuHidden,
+    /// Disable the menu.
+    MenuDisabled,
+    /// Set a timeout for the menu.
+    Timeout(u64),
+    /// Timeout is unspecified.
+    Unspecified,
+}
+
 /// Bootloader Interface support.
 pub struct BootloaderInterface;
 
@@ -28,6 +42,9 @@ impl BootloaderInterface {
             | LoaderFeatures::LoadDriver
             | LoaderFeatures::Tpm2ActivePcrBanks
             | LoaderFeatures::RetainShim
+            | LoaderFeatures::ConfigTimeout
+            | LoaderFeatures::ConfigTimeoutOneShot
+            | LoaderFeatures::MenuDisable
     }
 
     /// Tell the system that Sprout was initialized at the current time.
@@ -184,5 +201,87 @@ impl BootloaderInterface {
             &value,
             VariableClass::BootAndRuntimeTemporary,
         )
+    }
+
+    /// Retrieve the timeout value from the bootloader interface, using the specified `key`.
+    /// `remove` indicates whether, when found, we remove the variable.
+    fn get_timeout_value(key: &str, remove: bool) -> Result<Option<BootloaderInterfaceTimeout>> {
+        // Retrieve the timeout value from the bootloader interface.
+        let Some(value) = Self::VENDOR
+            .get_cstr16(key)
+            .context("unable to get timeout value")?
+        else {
+            return Ok(None);
+        };
+
+        // If we reach here, we know the value was specified.
+        // If `remove` is true, remove the variable.
+        if remove {
+            Self::VENDOR
+                .remove(key)
+                .context("unable to remove timeout variable")?;
+        }
+
+        // If the value is empty, return Unspecified.
+        if value.is_empty() {
+            return Ok(Some(BootloaderInterfaceTimeout::Unspecified));
+        }
+
+        // If the value is "menu-force", return MenuForce.
+        if value == "menu-force" {
+            return Ok(Some(BootloaderInterfaceTimeout::MenuForce));
+        }
+
+        // If the value is "menu-hidden", return MenuHidden.
+        if value == "menu-hidden" {
+            return Ok(Some(BootloaderInterfaceTimeout::MenuHidden));
+        }
+
+        // If the value is "menu-disabled", return MenuDisabled.
+        if value == "menu-disabled" {
+            return Ok(Some(BootloaderInterfaceTimeout::MenuDisabled));
+        }
+
+        // Parse the value as a u64 to decode an numeric value.
+        let value = value
+            .parse::<u64>()
+            .context("unable to parse timeout value")?;
+
+        // The specification says that a value of 0 means that the menu should be hidden.
+        if value == 0 {
+            return Ok(Some(BootloaderInterfaceTimeout::MenuHidden));
+        }
+
+        // If we reach here, we know it must be a real timeout value.
+        Ok(Some(BootloaderInterfaceTimeout::Timeout(value)))
+    }
+
+    /// Get the timeout from the bootloader interface.
+    /// This indicates how the menu should behave.
+    /// If no values are set, Unspecified is returned.
+    pub fn get_timeout() -> Result<BootloaderInterfaceTimeout> {
+        // Attempt to acquire the value of the LoaderConfigTimeoutOneShot variable.
+        // This should take precedence over the LoaderConfigTimeout variable.
+        let oneshot = Self::get_timeout_value("LoaderConfigTimeoutOneShot", true)
+            .context("unable to check for LoaderConfigTimeoutOneShot variable")?;
+
+        // If oneshot was found, return it.
+        if let Some(oneshot) = oneshot {
+            return Ok(oneshot);
+        }
+
+        // Attempt to acquire the value of the LoaderConfigTimeout variable.
+        // This will be used if the LoaderConfigTimeoutOneShot variable is not set.
+        let direct = Self::get_timeout_value("LoaderConfigTimeout", false)
+            .context("unable to check for LoaderConfigTimeout variable")?;
+
+        // If direct was found, return it.
+        if let Some(direct) = direct {
+            return Ok(direct);
+        }
+
+        // If we reach here, we know that neither variable was set.
+        // We provide the unspecified value instead.
+        Ok(BootloaderInterfaceTimeout::Unspecified)
     }
 }
