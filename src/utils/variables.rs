@@ -98,4 +98,10 @@ impl VariableController {
     pub fn set_bool(&self, key: &str, value: bool, class: VariableClass) -> Result<()> {
         self.set(key, &[value as u8], class)
     }
+
+    /// Set the u64 little-endian variable specified by `key` to `value`.
+    /// The variable `class` controls the attributes for the variable.
+    pub fn set_u64le(&self, key: &str, value: u64, class: VariableClass) -> Result<()> {
+        self.set(key, &value.to_le_bytes(), class)
+    }
 }

@@ -1,3 +1,4 @@
+use crate::integrations::bootloader_interface::bitflags::LoaderFeatures;
 use crate::platform::timer::PlatformTimer;
 use crate::utils::device_path_subpath;
 use crate::utils::variables::{VariableClass, VariableController};
@@ -5,6 +6,9 @@ use anyhow::{Context, Result};
 use uefi::proto::device_path::DevicePath;
 use uefi::{Guid, guid};
 use uefi_raw::table::runtime::VariableVendor;
+
+/// bitflags: LoaderFeatures bitflags.
+mod bitflags;
 
 /// The name of the bootloader to tell the system.
 const LOADER_NAME: &str = "Sprout";
@@ -17,6 +21,11 @@ impl BootloaderInterface {
     const VENDOR: VariableController = VariableController::new(VariableVendor(guid!(
         "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f"
     )));
+
+    /// The feature we support in Sprout.
+    fn features() -> LoaderFeatures {
+        LoaderFeatures::LoadDriver | LoaderFeatures::Tpm2ActivePcrBanks | LoaderFeatures::RetainShim
+    }
 
     /// Tell the system that Sprout was initialized at the current time.
     pub fn mark_init(timer: &PlatformTimer) -> Result<()> {
@@ -45,13 +54,26 @@ impl BootloaderInterface {
         )
     }
 
-    /// Tell the system what loader is being used.
+    /// Tell the system what loader is being used and our features.
     pub fn set_loader_info() -> Result<()> {
-        Self::VENDOR.set_cstr16(
-            "LoaderInfo",
-            LOADER_NAME,
-            VariableClass::BootAndRuntimeTemporary,
-        )
+        // Set the LoaderInfo variable with the name of the loader.
+        Self::VENDOR
+            .set_cstr16(
+                "LoaderInfo",
+                LOADER_NAME,
+                VariableClass::BootAndRuntimeTemporary,
+            )
+            .context("unable to set loader info variable")?;
+
+        // Set the LoaderFeatures variable with the features we support.
+        Self::VENDOR
+            .set_u64le(
+                "LoaderFeatures",
+                Self::features().bits(),
+                VariableClass::BootAndRuntimeTemporary,
+            )
+            .context("unable to set loader features variable")?;
+        Ok(())
     }
 
     /// Tell the system the relative path to the partition root of the current bootloader.

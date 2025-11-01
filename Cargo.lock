@@ -119,6 +119,7 @@ name = "edera-sprout"
 version = "0.0.16"
 dependencies = [
  "anyhow",
+ "bitflags",
  "image",
  "log",
  "serde",
