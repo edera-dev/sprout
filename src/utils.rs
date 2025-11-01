@@ -280,11 +280,14 @@ pub fn utf16_bytes_to_cstring16(bytes: &[u8]) -> Result<CString16> {
         bail!("utf16 bytes must be a multiple of 2");
     }
 
-    // SAFETY: reinterpret &[u8] as &[u16].
-    // We just validated it has the right length.
-    let ptr = bytes.as_ptr() as *const u16;
-    let len = bytes.len() / 2;
-    let utf16 = unsafe { std::slice::from_raw_parts(ptr, len) };
+    // Convert the bytes to UTF-16 data.
+    let data = bytes
+        // Chunk everything into two bytes.
+        .chunks_exact(2)
+        // Reinterpret the bytes as u16 little-endian.
+        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        // Collect the result into a vector.
+        .collect::<Vec<_>>();
 
-    CString16::try_from(utf16.to_vec()).context("unable to convert utf16 bytes to CString16")
+    CString16::try_from(data).context("unable to convert utf16 bytes to CString16")
 }

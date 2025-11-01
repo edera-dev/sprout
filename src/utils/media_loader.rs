@@ -33,8 +33,6 @@ struct MediaLoaderProtocol {
 /// You MUST call [MediaLoaderHandle::unregister] when ready to unregister.
 /// [Drop] is not implemented for this type.
 pub struct MediaLoaderHandle {
-    /// The vendor GUID of the media loader.
-    guid: Guid,
     /// The handle of the media loader in the UEFI stack.
     handle: Handle,
     /// The protocol interface pointer.
@@ -229,7 +227,6 @@ impl MediaLoaderHandle {
 
         // Return a handle to the media loader.
         Ok(Self {
-            guid,
             handle: primary_handle,
             protocol,
             path,
@@ -239,13 +236,8 @@ impl MediaLoaderHandle {
     /// Unregisters a media loader from the UEFI stack.
     /// This will free the memory allocated by the passed data.
     pub fn unregister(self) -> Result<()> {
-        // Check if the media loader is registered.
-        // If it is not, we don't need to do anything.
-        if !Self::already_registered(self.guid)? {
-            return Ok(());
-        }
-
-        // SAFETY: We know that the media loader is registered, so we can safely uninstall it.
+        // SAFETY: We know that the media loader is registered if the handle is valid,
+        // so we can safely uninstall it.
         // We should have allocated the pointers involved, so we can safely free them.
         unsafe {
             // Uninstall the protocol interface for the device path protocol.
