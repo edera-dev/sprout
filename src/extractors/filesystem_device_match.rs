@@ -138,14 +138,11 @@ pub fn extract(
             let mut filesystem = FileSystem::new(filesystem);
 
             // Check the metadata of the item.
-            let metadata = filesystem.metadata(Path::new(&want_item));
-
             // Ignore filesystem errors as we can't do anything useful with the error.
-            if metadata.is_err() {
+            let Some(metadata) = filesystem.metadata(Path::new(&want_item)).ok() else {
                 continue;
-            }
+            };
 
-            let metadata = metadata?;
             // Only check directories and files.
             if !(metadata.is_directory() || metadata.is_regular_file()) {
                 continue;
