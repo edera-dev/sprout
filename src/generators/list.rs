@@ -18,7 +18,7 @@ pub struct ListConfiguration {
     pub values: Vec<BTreeMap<String, String>>,
 }
 
-/// Generates a set of entries using the specified `matrix` configuration in the `context`.
+/// Generates a set of entries using the specified `list` configuration in the `context`.
 pub fn generate(
     context: Rc<SproutContext>,
     list: &ListConfiguration,
