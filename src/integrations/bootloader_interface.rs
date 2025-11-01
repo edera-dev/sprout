@@ -139,15 +139,6 @@ impl BootloaderInterface {
         )
     }
 
-    /// Tell the system what the default boot entry is.
-    pub fn set_default_entry(entry: String) -> Result<()> {
-        Self::VENDOR.set_cstr16(
-            "LoaderEntryDefault",
-            &entry,
-            VariableClass::BootAndRuntimeTemporary,
-        )
-    }
-
     /// Tell the system what the selected boot entry is.
     pub fn set_selected_entry(entry: String) -> Result<()> {
         Self::VENDOR.set_cstr16(

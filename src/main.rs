@@ -269,17 +269,6 @@ fn run() -> Result<()> {
         entry.mark_default();
     }
 
-    // Iterate over all the entries and tell the bootloader interface what the entries are.
-    for entry in &entries {
-        // If the entry is the default entry, tell the bootloader interface it is the default.
-        if entry.is_default() {
-            // Tell the bootloader interface what the default entry is.
-            BootloaderInterface::set_default_entry(entry.name().to_string())
-                .context("unable to set default entry in bootloader interface")?;
-            break;
-        }
-    }
-
     // Tell the bootloader interface what entries are available.
     BootloaderInterface::set_entries(entries.iter().map(|entry| entry.name()))
         .context("unable to set entries in bootloader interface")?;
