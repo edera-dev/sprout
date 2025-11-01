@@ -93,6 +93,11 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         // Remove the .conf extension.
         name.truncate(name.len() - 5);
 
+        // Skip over files that are named just ".conf" as they are not valid entry files.
+        if name.is_empty() {
+            continue;
+        }
+
         // Create a mutable path so we can append the file name to produce the full path.
         let mut full_entry_path = entries_path.to_path_buf();
         full_entry_path.push(entry.file_name());
