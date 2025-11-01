@@ -45,6 +45,8 @@ impl BootloaderInterface {
             | LoaderFeatures::ConfigTimeout
             | LoaderFeatures::ConfigTimeoutOneShot
             | LoaderFeatures::MenuDisable
+            | LoaderFeatures::EntryDefault
+            | LoaderFeatures::EntryOneShot
     }
 
     /// Tell the system that Sprout was initialized at the current time.
@@ -274,5 +276,33 @@ impl BootloaderInterface {
         // If we reach here, we know that neither variable was set.
         // We provide the unspecified value instead.
         Ok(BootloaderInterfaceTimeout::Unspecified)
+    }
+
+    /// Get the default entry set by the bootloader interface.
+    pub fn get_default_entry() -> Result<Option<String>> {
+        Self::VENDOR
+            .get_cstr16("LoaderEntryDefault")
+            .context("unable to get default entry from bootloader interface")
+    }
+
+    /// Get the oneshot entry set by the bootloader interface.
+    /// This should be the entry we boot.
+    pub fn get_oneshot_entry() -> Result<Option<String>> {
+        // Acquire the value of the LoaderEntryOneShot variable.
+        // If it is not set, return None.
+        let Some(value) = Self::VENDOR
+            .get_cstr16("LoaderEntryOneShot")
+            .context("unable to get oneshot entry from bootloader interface")?
+        else {
+            return Ok(None);
+        };
+
+        // Remove the oneshot entry from the bootloader interface.
+        Self::VENDOR
+            .remove("LoaderEntryOneShot")
+            .context("unable to remove oneshot entry")?;
+
+        // Return the oneshot value.
+        Ok(Some(value))
     }
 }

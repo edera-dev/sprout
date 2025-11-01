@@ -94,6 +94,11 @@ impl BootableEntry {
         self.default = true;
     }
 
+    // Unmark this entry as the default entry.
+    pub fn unmark_default(&mut self) {
+        self.default = false;
+    }
+
     /// Mark this entry as being pinned, which prevents prefixing.
     pub fn mark_pin_name(&mut self) {
         self.pin_name = true;

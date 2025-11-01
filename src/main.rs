@@ -262,13 +262,6 @@ fn run() -> Result<()> {
         }
     }
 
-    // If no entries were the default, pick the first entry as the default entry.
-    if entries.iter().all(|entry| !entry.is_default())
-        && let Some(entry) = entries.first_mut()
-    {
-        entry.mark_default();
-    }
-
     // Tell the bootloader interface what entries are available.
     BootloaderInterface::set_entries(entries.iter().map(|entry| entry.name()))
         .context("unable to set entries in bootloader interface")?;
@@ -280,8 +273,16 @@ fn run() -> Result<()> {
     let bootloader_interface_timeout =
         BootloaderInterface::get_timeout().context("unable to get bootloader interface timeout")?;
 
+    // Acquire the default entry from the bootloader interface.
+    let bootloader_interface_default_entry = BootloaderInterface::get_default_entry()
+        .context("unable to get bootloader interface default entry")?;
+
+    // Acquire the oneshot entry from the bootloader interface.
+    let bootloader_interface_oneshot_entry = BootloaderInterface::get_oneshot_entry()
+        .context("unable to get bootloader interface oneshot entry")?;
+
     // If --boot is specified, boot that entry immediately.
-    let force_boot_entry = context.root().options().boot.as_ref();
+    let mut force_boot_entry = context.root().options().boot.clone();
     // If --force-menu is specified, show the boot menu regardless of the value of --boot.
     let mut force_boot_menu = context.root().options().force_menu;
 
@@ -318,6 +319,33 @@ fn run() -> Result<()> {
         BootloaderInterfaceTimeout::Unspecified => {
             // Do nothing.
         }
+    }
+
+    // Apply bootloader interface default entry settings.
+    if let Some(ref bootloader_interface_default_entry) = bootloader_interface_default_entry {
+        // Iterate over all the entries and mark the default entry as the one specified.
+        for entry in &mut entries {
+            // Mark the entry as the default entry if it matches the specified entry.
+            // If the entry does not match the specified entry, unmark it as the default entry.
+            if entry.is_match(bootloader_interface_default_entry) {
+                entry.mark_default();
+            } else {
+                entry.unmark_default();
+            }
+        }
+    }
+
+    // Apply bootloader interface oneshot entry settings.
+    // If set, we will force booting the oneshot entry.
+    if let Some(ref bootloader_interface_oneshot_entry) = bootloader_interface_oneshot_entry {
+        force_boot_entry = Some(bootloader_interface_oneshot_entry.clone());
+    }
+
+    // If no entries were the default, pick the first entry as the default entry.
+    if entries.iter().all(|entry| !entry.is_default())
+        && let Some(entry) = entries.first_mut()
+    {
+        entry.mark_default();
     }
 
     // Convert the menu timeout to a duration.
