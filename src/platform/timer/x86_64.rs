@@ -50,17 +50,21 @@ pub fn stop() -> u64 {
 }
 
 /// Measure the frequency of the platform timer.
-fn measure_frequency(duration: &Duration) -> u64 {
+fn measure_frequency() -> u64 {
     let start = start();
-    uefi::boot::stall(*duration);
+    uefi::boot::stall(MEASURE_FREQUENCY_DURATION);
     let stop = stop();
     let elapsed = stop.wrapping_sub(start) as f64;
-    (elapsed / duration.as_secs_f64()) as u64
+    (elapsed / MEASURE_FREQUENCY_DURATION.as_secs_f64()) as u64
 }
 
 /// Acquire the platform timer frequency.
 /// On x86_64, this is slightly expensive, so it should be done once.
 pub fn frequency() -> TickFrequency {
-    let frequency = measure_frequency(&MEASURE_FREQUENCY_DURATION);
+    let frequency = measure_frequency();
+    // If the frequency is 0, then something went very wrong and we should panic.
+    if frequency == 0 {
+        panic!("unable to measure frequency");
+    }
     TickFrequency::Measured(frequency, MEASURE_FREQUENCY_DURATION)
 }
