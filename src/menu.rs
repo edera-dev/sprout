@@ -56,15 +56,21 @@ fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
     uefi::boot::set_timer(&timer_event, trigger).context("unable to set timeout timer")?;
 
     let mut events = vec![timer_event, key_event];
-    let event = uefi::boot::wait_for_event(&mut events)
+
+    // Wait for either the timer event or the key event to trigger.
+    // Store the result so that we can free the timer event.
+    let event_result = uefi::boot::wait_for_event(&mut events)
         .discard_errdata()
-        .context("unable to wait for event")?;
+        .context("unable to wait for event");
 
     // Close the timer event that we acquired.
     // We don't need to close the key event because it is owned globally.
     if let Some(timer_event) = events.into_iter().next() {
         uefi::boot::close_event(timer_event).context("unable to close timer event")?;
     }
+
+    // Acquire the event that triggered.
+    let event = event_result?;
 
     // The first event is the timer event.
     // If it has triggered, the user did not select a numbered entry.
