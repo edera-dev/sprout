@@ -3,6 +3,7 @@ use crate::utils;
 use crate::utils::ResolvedPath;
 use crate::utils::variables::VariableController;
 use anyhow::{Context, Result, anyhow, bail};
+use log::warn;
 use std::ffi::c_void;
 use uefi::Handle;
 use uefi::boot::LoadImageSource;
@@ -231,11 +232,11 @@ impl ShimSupport {
 
         // If the security hook is required, we will bail for now.
         if requires_security_hook {
-            // Install the security hook, if possible. If it's not, this is necessary to continue
+            // Install the security hook, if possible. If it's not, this is necessary to continue,
             // so we should bail.
             let installed = SecurityHook::install().context("unable to install security hook")?;
             if !installed {
-                bail!("unable to install security hook require for this platform");
+                bail!("unable to install security hook required for this platform");
             }
         }
 
@@ -262,7 +263,17 @@ impl ShimSupport {
 
         // If the security override is required, we will uninstall the security hook.
         if requires_security_hook {
-            SecurityHook::uninstall().context("unable to uninstall security hook")?;
+            let uninstall_result = SecurityHook::uninstall();
+            // Ensure we don't mask load image errors if uninstalling fails.
+            if result.is_err()
+                && let Err(uninstall_error) = &uninstall_result
+            {
+                // Warn on the error since the load image error is more important.
+                warn!("unable to uninstall security hook: {}", uninstall_error);
+            } else {
+                // Otherwise, ensure we handle the original uninstallation result.
+                uninstall_result?;
+            }
         }
         result
     }
