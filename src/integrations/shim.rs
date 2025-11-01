@@ -1,7 +1,7 @@
 use crate::integrations::shim::hook::SecurityHook;
 use crate::utils;
 use crate::utils::ResolvedPath;
-use crate::utils::variables::VariableController;
+use crate::utils::variables::{VariableClass, VariableController};
 use anyhow::{Context, Result, anyhow, bail};
 use log::warn;
 use std::ffi::c_void;
@@ -282,7 +282,11 @@ impl ShimSupport {
     /// for the full lifetime of boot services.
     pub fn retain() -> Result<()> {
         Self::SHIM_LOCK_VARIABLES
-            .set_bool("ShimRetainProtocol", true)
+            .set_bool(
+                "ShimRetainProtocol",
+                true,
+                VariableClass::BootAndRuntimeTemporary,
+            )
             .context("unable to retain shim protocol")?;
         Ok(())
     }
