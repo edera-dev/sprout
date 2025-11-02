@@ -124,7 +124,7 @@ pub enum ShimVerificationOutput {
 #[unsafe_protocol(ShimSupport::SHIM_LOCK_GUID)]
 struct ShimLockProtocol {
     /// Verify the data in `buffer` with the size `buffer_size` to determine if it is valid.
-    pub shim_verify: unsafe extern "efiapi" fn(buffer: *mut c_void, buffer_size: u32) -> Status,
+    pub shim_verify: unsafe extern "efiapi" fn(buffer: *const c_void, buffer_size: u32) -> Status,
     /// Unused function that is defined by the shim.
     _generate_header: *mut c_void,
     /// Unused function that is defined by the shim.
@@ -202,8 +202,9 @@ impl ShimSupport {
         // SAFETY: The shim verify function is specified by the shim lock protocol.
         // Calling this function is considered safe because the shim verify function is
         // guaranteed to be defined by the environment if we are able to acquire the protocol.
-        let status =
-            unsafe { (protocol.shim_verify)(buffer.as_ptr() as *mut c_void, buffer.len() as u32) };
+        let status = unsafe {
+            (protocol.shim_verify)(buffer.as_ptr() as *const c_void, buffer.len() as u32)
+        };
 
         // If the verification failed, return the verification failure output.
         if !status.is_success() {
