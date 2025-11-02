@@ -46,8 +46,22 @@ pub trait OptionsRepresentable {
         let configured: BTreeMap<_, _> = BTreeMap::from_iter(Self::options().to_vec());
 
         // Collect all the arguments to Sprout.
-        // Skip the first argument which is the path to our executable.
-        let args = std::env::args().skip(1).collect::<Vec<_>>();
+        // Skip the first argument, which is the path to our executable.
+        let mut args = std::env::args().skip(1).collect::<Vec<_>>();
+
+        // Correct firmware that may add invalid arguments at the start.
+        // Witnessed this on a Dell Precision 5690 when direct booting.
+        loop {
+            // Grab the first argument or break.
+            let Some(arg) = args.first() else {
+                break;
+            };
+
+            // If the argument starts with a tilde, remove it.
+            if arg.starts_with("`") {
+                args.remove(0);
+            }
+        }
 
         // Represent options as key-value pairs.
         let mut options = BTreeMap::new();
