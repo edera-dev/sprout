@@ -20,7 +20,7 @@ pub struct SecurityArchProtocol {
     pub file_authentication_state: unsafe extern "efiapi" fn(
         this: *const SecurityArchProtocol,
         status: u32,
-        path: *mut FfiDevicePath,
+        path: *const FfiDevicePath,
     ) -> Status,
 }
 
@@ -30,8 +30,8 @@ pub struct SecurityArch2Protocol {
     /// Determines the file authentication.
     pub file_authentication: unsafe extern "efiapi" fn(
         this: *const SecurityArch2Protocol,
-        path: *mut FfiDevicePath,
-        file_buffer: *mut u8,
+        path: *const FfiDevicePath,
+        file_buffer: *const u8,
         file_size: usize,
         boot_policy: bool,
     ) -> Status,
@@ -87,7 +87,7 @@ impl SecurityHook {
     unsafe extern "efiapi" fn arch_file_authentication_state(
         this: *const SecurityArchProtocol,
         status: u32,
-        path: *mut FfiDevicePath,
+        path: *const FfiDevicePath,
     ) -> Status {
         // Verify the path is not null.
         if path.is_null() {
@@ -145,8 +145,8 @@ impl SecurityHook {
     /// Takes the `path` and a file buffer to determine the verification.
     unsafe extern "efiapi" fn arch2_file_authentication(
         this: *const SecurityArch2Protocol,
-        path: *mut FfiDevicePath,
-        file_buffer: *mut u8,
+        path: *const FfiDevicePath,
+        file_buffer: *const u8,
         file_size: usize,
         boot_policy: bool,
     ) -> Status {
