@@ -45,6 +45,13 @@ impl OptionsRepresentable for SproutOptions {
     fn options() -> &'static [(&'static str, OptionDescription<'static>)] {
         &[
             (
+                "autoconfigure",
+                OptionDescription {
+                    description: "Enable Sprout Autoconfiguration",
+                    form: OptionForm::Flag,
+                },
+            ),
+            (
                 "config",
                 OptionDescription {
                     description: "Path to Sprout configuration file",
