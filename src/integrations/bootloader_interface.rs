@@ -134,6 +134,12 @@ impl BootloaderInterface {
             // Add a null terminator to the end of the entry.
             data.extend_from_slice(&[0, 0]);
         }
+
+        // If no data was generated, we will do nothing.
+        if data.is_empty() {
+            return Ok(());
+        }
+
         Self::VENDOR.set(
             "LoaderEntries",
             &data,
