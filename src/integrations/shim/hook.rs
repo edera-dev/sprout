@@ -97,6 +97,16 @@ impl SecurityHook {
         // Construct a shim input from the path.
         let input = ShimInput::SecurityHookPath(path);
 
+        // Convert the input to an owned data buffer.
+        let input = match input.into_owned_data_buffer() {
+            Ok(input) => input,
+            // If an error occurs, log the error and return the not found status.
+            Err(error) => {
+                warn!("unable to read data to be authenticated: {}", error);
+                return Status::NOT_FOUND;
+            }
+        };
+
         // Verify the input, if it fails, call the original hook.
         if !Self::verify(input) {
             // Acquire the global hook state to grab the original hook.
@@ -116,7 +126,7 @@ impl SecurityHook {
                 Err(error) => {
                     warn!(
                         "unable to acquire global hook state lock to call original hook: {}",
-                        error
+                        error,
                     );
                     return Status::LOAD_ERROR;
                 }
