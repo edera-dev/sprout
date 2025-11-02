@@ -133,7 +133,7 @@ fn select_with_input<'a>(
             info!("Boot Menu:");
             for (index, entry) in entries.iter().enumerate() {
                 let title = entry.context().stamp(&entry.declaration().title);
-                info!("  [{}] {} ({})", index, title, entry.name());
+                info!("  [{}] {}", index, title);
             }
         }
 
