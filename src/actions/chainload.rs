@@ -53,30 +53,25 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     let options =
         utils::combine_options(configuration.options.iter().map(|item| context.stamp(item)));
 
-    // Pass the options to the image, if any are provided.
-    // The holder must drop at the end of this function to ensure the options are not leaked,
-    // and the holder here ensures it outlives the if block here, as a pointer has to be
-    // passed to the image.
-    // SAFETY: The options outlive the usage of the image, and the image is not used after this.
-    let mut options_holder: Option<Box<CString16>> = None;
-    if !options.is_empty() {
-        let options = Box::new(
-            CString16::try_from(&options[..])
-                .context("unable to convert chainloader options to CString16")?,
-        );
+    // Pass the load options to the image.
+    // If no options are provided, the resulting string will be empty.
+    // The options are pinned and boxed to ensure that they are valid for the lifetime of this
+    // function, which ensures the lifetime of the options for the image runtime.
+    let options = Box::pin(
+        CString16::try_from(&options[..])
+            .context("unable to convert chainloader options to CString16")?,
+    );
 
-        if options.num_bytes() > u32::MAX as usize {
-            bail!("chainloader options too large");
-        }
+    if options.num_bytes() > u32::MAX as usize {
+        bail!("chainloader options too large");
+    }
 
-        // SAFETY: option size is checked to validate it is safe to pass.
-        // Additionally, the pointer is allocated and retained on heap, which makes
-        // passing the `options` pointer safe to the next image.
-        unsafe {
-            loaded_image_protocol
-                .set_load_options(options.as_ptr() as *const u8, options.num_bytes() as u32);
-        }
-        options_holder = Some(options);
+    // SAFETY: option size is checked to validate it is safe to pass.
+    // Additionally, the pointer is allocated and retained on heap, which makes
+    // passing the `options` pointer safe to the next image.
+    unsafe {
+        loaded_image_protocol
+            .set_load_options(options.as_ptr() as *const u8, options.num_bytes() as u32);
     }
 
     // Stamp the initrd path, if provided.
@@ -118,8 +113,9 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
 
     // Assert there was no error starting the image.
     result.context("unable to start image")?;
-    // Explicitly drop the option holder to clarify the lifetime.
-    drop(options_holder);
+
+    // Explicitly drop the options to clarify the lifetime.
+    drop(options);
 
     // Return control to sprout.
     Ok(())
