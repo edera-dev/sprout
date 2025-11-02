@@ -171,19 +171,29 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         // Produce a new sprout context for the entry with the extracted values.
         let mut context = context.fork();
 
-        let title = entry.title().unwrap_or_else(|| name.clone());
+        let title_base = entry.title().unwrap_or_else(|| name.clone());
         let chainload = entry.chainload_path().unwrap_or_default();
         let options = entry.options().unwrap_or_default();
+        let version = entry.version().unwrap_or_default();
+        let machine_id = entry.machine_id().unwrap_or_default();
 
         // Put the initrd through a quirk modifier to support Fedora.
         let initrd = quirk_initrd_remove_tuned(entry.initrd_path().unwrap_or_default());
 
-        context.set("title", title);
+        // Combine the title with the version if a version is present.
+        let title_full = if !version.is_empty() {
+            format!("{} {}", title_base, version)
+        } else {
+            title_base.clone()
+        };
+
+        context.set("title-base", title_base);
+        context.set("title", title_full);
         context.set("chainload", chainload);
         context.set("options", options);
         context.set("initrd", initrd);
-        context.set("version", entry.version().unwrap_or_default());
-        context.set("machine-id", entry.machine_id().unwrap_or_default());
+        context.set("version", version);
+        context.set("machine-id", machine_id);
 
         // Produce a new bootable entry.
         let mut boot = BootableEntry::new(
