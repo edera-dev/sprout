@@ -60,7 +60,9 @@ pub trait OptionsRepresentable {
             // If the argument starts with a tilde, remove it.
             if arg.starts_with("`") {
                 args.remove(0);
+                continue;
             }
+            break;
         }
 
         // Represent options as key-value pairs.
