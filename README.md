@@ -37,6 +37,7 @@ simplify installation and usage.
 
 ## Documentation
 
+- [Ubuntu Secure Boot Setup Guide]
 - [Fedora Setup Guide]
 - [Generic Linux Setup Guide]
 - [Alpine Edge Setup Guide]
@@ -61,12 +62,12 @@ simplify installation and usage.
 - [x] Load Linux initrd from disk
 - [x] Basic boot menu
 - [x] BLS autoconfiguration support
-- [x] [Secure Boot support](https://github.com/edera-dev/sprout/issues/20): partial
+- [x] [Secure Boot support](https://github.com/edera-dev/sprout/issues/20): beta
+- [x] [Bootloader interface support](https://github.com/edera-dev/sprout/issues/21): beta
+- [x] [BLS specification conformance](https://github.com/edera-dev/sprout/issues/2): beta
 
 ### Roadmap
 
-- [ ] [Bootloader interface support](https://github.com/edera-dev/sprout/issues/21)
-- [ ] [BLS specification conformance](https://github.com/edera-dev/sprout/issues/2)
 - [ ] [Full-featured boot menu](https://github.com/edera-dev/sprout/issues/1)
 - [ ] [UKI support](https://github.com/edera-dev/sprout/issues/6): partial
 - [ ] [multiboot2 support](https://github.com/edera-dev/sprout/issues/7)
@@ -147,6 +148,7 @@ autoconfigure = true
 ```
 
 [Edera]: https://edera.dev
+[Ubuntu Secure Boot Setup Guide]: ./docs/ubuntu-secure-boot-setup.md
 [Fedora Setup Guide]: ./docs/fedora-setup.md
 [Generic Linux Setup Guide]: ./docs/generic-linux-setup.md
 [Alpine Edge Setup Guide]: ./docs/alpine-edge-setup.md
