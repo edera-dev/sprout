@@ -1,4 +1,5 @@
 use crate::integrations::shim::hook::SecurityHook;
+use crate::secure::SecureBoot;
 use crate::utils;
 use crate::utils::ResolvedPath;
 use crate::utils::variables::{VariableClass, VariableController};
@@ -218,6 +219,10 @@ impl ShimSupport {
 
     /// Load the image specified by the `input` and returns an image handle.
     pub fn load(current_image: Handle, input: ShimInput) -> Result<Handle> {
+        // Determine whether Secure Boot is enabled.
+        let secure_boot =
+            SecureBoot::enabled().context("unable to determine if secure boot is enabled")?;
+
         // Determine whether the shim is loaded.
         let shim_loaded = Self::loaded().context("unable to determine if shim is loaded")?;
 
@@ -228,7 +233,7 @@ impl ShimSupport {
         // Determines whether LoadImage in Boot Services must be patched.
         // Version 16 of the shim doesn't require extra effort to load Secure Boot binaries.
         // If the image loader is installed, we can skip over the security hook.
-        let requires_security_hook = shim_loaded && !shim_loader_available;
+        let requires_security_hook = secure_boot && shim_loaded && !shim_loader_available;
 
         // If the security hook is required, we will bail for now.
         if requires_security_hook {
