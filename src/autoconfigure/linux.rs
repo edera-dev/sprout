@@ -5,6 +5,7 @@ use crate::entries::EntryDeclaration;
 use crate::generators::GeneratorDeclaration;
 use crate::generators::list::ListConfiguration;
 use crate::utils;
+use crate::utils::vercmp;
 use anyhow::{Context, Result};
 use std::collections::BTreeMap;
 use uefi::CString16;
@@ -169,6 +170,9 @@ pub fn scan(
     if pairs.is_empty() {
         return Ok(false);
     }
+
+    // Sort the kernel pairs by kernel version, if it has one, newer kernels first.
+    pairs.sort_by(|a, b| vercmp::compare_versions(&a.kernel, &b.kernel).reverse());
 
     // Generate a unique name for the linux chainload action.
     let chainload_action_name = format!("{}{}", LINUX_CHAINLOAD_ACTION_PREFIX, root_unique_hash,);
