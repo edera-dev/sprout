@@ -58,7 +58,7 @@ impl SecurityHook {
         match ShimSupport::verify(input) {
             Ok(output) => match output {
                 // If the verification failed, return the access-denied status.
-                ShimVerificationOutput::VerificationFailed => Status::ACCESS_DENIED,
+                ShimVerificationOutput::VerificationFailed(status) => status,
                 // If the verification succeeded, return the success status.
                 ShimVerificationOutput::VerifiedDataNotLoaded => Status::SUCCESS,
                 ShimVerificationOutput::VerifiedDataBuffer(_) => Status::SUCCESS,

@@ -111,7 +111,7 @@ impl<'a> ShimInput<'a> {
 /// to actually boot.
 pub enum ShimVerificationOutput {
     /// The verification failed.
-    VerificationFailed,
+    VerificationFailed(Status),
     /// The data provided to the verifier was already a buffer.
     VerifiedDataNotLoaded,
     /// Verifying the data resulted in loading the data from the source.
@@ -206,7 +206,7 @@ impl ShimSupport {
 
         // If the verification failed, return the verification failure output.
         if !status.is_success() {
-            return Ok(ShimVerificationOutput::VerificationFailed);
+            return Ok(ShimVerificationOutput::VerificationFailed(status));
         }
 
         // If verification succeeded, return the validation output,
