@@ -186,8 +186,9 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         // Put the initrd through a quirk modifier to support Fedora.
         let initrd = quirk_initrd_remove_tuned(entry.initrd_path().unwrap_or_default());
 
-        // Combine the title with the version if a version is present.
-        let title_full = if !version.is_empty() {
+        // Combine the title with the version if a version is present, except if it already contains it.
+        // Sometimes BLS will have a version in the title already, and this makes it unique.
+        let title_full = if !version.is_empty() && !title_base.contains(&version) {
             format!("{} {}", title_base, version)
         } else {
             title_base.clone()
