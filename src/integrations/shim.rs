@@ -134,6 +134,13 @@ pub enum ShimVerificationOutput {
 #[unsafe_protocol(ShimSupport::SHIM_LOCK_GUID)]
 struct ShimLockProtocol {
     /// Verify the data in `buffer` with the size `buffer_size` to determine if it is valid.
+    /// NOTE: On x86_64, this function uses SYSV calling conventions. On aarch64 it uses the
+    /// efiapi calling convention. This is truly wild, but you can verify it yourself by
+    /// looking at: https://github.com/rhboot/shim/blob/15.8/shim.h#L207-L212
+    /// There is no calling convention declared like there should be.
+    #[cfg(target_arch = "x86_64")]
+    pub shim_verify: unsafe extern "sysv64" fn(buffer: *const c_void, buffer_size: u32) -> Status,
+    #[cfg(target_arch = "aarch64")]
     pub shim_verify: unsafe extern "efiapi" fn(buffer: *const c_void, buffer_size: u32) -> Status,
     /// Unused function that is defined by the shim.
     _generate_header: *mut c_void,
