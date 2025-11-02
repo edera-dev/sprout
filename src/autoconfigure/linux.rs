@@ -27,6 +27,18 @@ const KERNEL_PREFIXES: &[&str] = &["vmlinuz"];
 /// Prefixes of initramfs files to match to.
 const INITRAMFS_PREFIXES: &[&str] = &["initramfs", "initrd", "initrd.img"];
 
+/// This is really silly, but if what we are booting is the Canonical stubble stub,
+/// there is a chance it will assert that the load options are non-empty.
+/// Technically speaking, load options can be empty. However, it assumes load options
+/// have something in it. Canonical's stubble copied code from systemd that does this
+/// and then uses that code improperly by asserting that the pointer is non-null.
+/// To give a good user experience, we place a placeholder value here to ensure it's non-empty.
+/// For stubble, this code ensures the command line pointer becomes null:
+/// https://github.com/ubuntu/stubble/blob/e56643979addfb98982266018e08921c07424a0c/stub.c#L61-L64
+/// Then this code asserts on it, stopping the boot process:
+/// https://github.com/ubuntu/stubble/blob/e56643979addfb98982266018e08921c07424a0c/stub.c#L27
+const DEFAULT_LINUX_OPTIONS: &str = "placeholder";
+
 /// Pair of kernel and initramfs.
 /// This is what scanning a directory is meant to find.
 struct KernelPair {
@@ -212,9 +224,10 @@ pub fn scan(
 
     // Insert a default value for the linux-options if it doesn't exist.
     if !config.values.contains_key("linux-options") {
-        config
-            .values
-            .insert("linux-options".to_string(), "".to_string());
+        config.values.insert(
+            "linux-options".to_string(),
+            DEFAULT_LINUX_OPTIONS.to_string(),
+        );
     }
 
     // Generate a chainload configuration for the list generator.
