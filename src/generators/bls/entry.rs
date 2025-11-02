@@ -15,6 +15,12 @@ pub struct BlsEntry {
     pub initrd: Option<String>,
     /// The path to an EFI image.
     pub efi: Option<String>,
+    /// The sort key for the entry.
+    pub sort_key: Option<String>,
+    /// The version of the entry.
+    pub version: Option<String>,
+    /// The machine id of the entry.
+    pub machine_id: Option<String>,
 }
 
 /// Parser for a BLS entry.
@@ -30,6 +36,9 @@ impl FromStr for BlsEntry {
         let mut linux: Option<String> = None;
         let mut initrd: Option<String> = None;
         let mut efi: Option<String> = None;
+        let mut sort_key: Option<String> = None;
+        let mut version: Option<String> = None;
+        let mut machine_id: Option<String> = None;
 
         // Iterate over each line in the input and parse it.
         for line in input.lines() {
@@ -74,6 +83,18 @@ impl FromStr for BlsEntry {
                     efi = Some(value.trim().to_string());
                 }
 
+                "sort-key" => {
+                    sort_key = Some(value.trim().to_string());
+                }
+
+                "version" => {
+                    version = Some(value.trim().to_string());
+                }
+
+                "machine-id" => {
+                    machine_id = Some(value.trim().to_string());
+                }
+
                 // Ignore any other key.
                 _ => {
                     continue;
@@ -88,6 +109,9 @@ impl FromStr for BlsEntry {
             linux,
             initrd,
             efi,
+            sort_key,
+            version,
+            machine_id,
         })
     }
 }
@@ -124,5 +148,20 @@ impl BlsEntry {
     /// Fetches the title of the entry, if any.
     pub fn title(&self) -> Option<String> {
         self.title.clone()
+    }
+
+    /// Fetches the sort key of the entry, if any.
+    pub fn sort_key(&self) -> Option<String> {
+        self.sort_key.clone()
+    }
+
+    /// Fetches the version of the entry, if any.
+    pub fn version(&self) -> Option<String> {
+        self.version.clone()
+    }
+
+    /// Fetches the machine id of the entry, if any.
+    pub fn machine_id(&self) -> Option<String> {
+        self.machine_id.clone()
     }
 }

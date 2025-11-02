@@ -4,6 +4,7 @@ use crate::generators::bls::entry::BlsEntry;
 use crate::utils;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::rc::Rc;
 use std::str::FromStr;
 use uefi::cstr16;
@@ -38,6 +39,55 @@ fn default_bls_path() -> String {
 /// Fedora uses tuned which adds an initrd that shouldn't be used.
 fn quirk_initrd_remove_tuned(input: String) -> String {
     input.replace("$tuned_initrd", "").trim().to_string()
+}
+
+/// Sorts two entries according to the BLS sort system.
+/// Reference: https://uapi-group.org/specifications/specs/boot_loader_specification/#sorting
+fn sort_entries(a: &(BlsEntry, BootableEntry), b: &(BlsEntry, BootableEntry)) -> Ordering {
+    // Grab the components of both entries.
+    let (a_bls, a_boot) = a;
+    let (b_bls, b_boot) = b;
+
+    // Grab the sort keys from both entries.
+    let a_sort_key = a_bls.sort_key();
+    let b_sort_key = b_bls.sort_key();
+
+    // Compare the sort keys of both entries.
+    match a_sort_key.cmp(&b_sort_key) {
+        // If A and B sort keys are equal, sort by machine-id.
+        Ordering::Equal => {
+            // Grab the machine-id from both entries.
+            let a_machine_id = a_bls.machine_id();
+            let b_machine_id = b_bls.machine_id();
+
+            // Compare the machine-id of both entries.
+            match a_machine_id.cmp(&b_machine_id) {
+                // If both machine-id values are equal, sort by version.
+                Ordering::Equal => {
+                    // Grab the version from both entries.
+                    let a_version = a_bls.version();
+                    let b_version = b_bls.version();
+
+                    // Compare the version of both entries, sorting newer versions first.
+                    match b_version.cmp(&a_version) {
+                        // If both versions are equal, sort by file name in reverse order.
+                        Ordering::Equal => {
+                            // Grab the file name from both entries.
+                            let a_name = a_boot.name();
+                            let b_name = b_boot.name();
+
+                            // Compare the file names of both entries, sorting newer entries first.
+                            b_name.cmp(a_name)
+                        }
+                        other => other,
+                    }
+                }
+                other => other,
+            }
+        }
+
+        other => other,
+    }
 }
 
 /// Generates entries from the BLS entries directory using the specified `bls` configuration and
@@ -132,9 +182,11 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         context.set("chainload", chainload);
         context.set("options", options);
         context.set("initrd", initrd);
+        context.set("version", entry.version().unwrap_or_default());
+        context.set("machine-id", entry.machine_id().unwrap_or_default());
 
         // Produce a new bootable entry.
-        let mut entry = BootableEntry::new(
+        let mut boot = BootableEntry::new(
             name,
             bls.entry.title.clone(),
             context.freeze(),
@@ -144,11 +196,15 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         // Pin the entry name to prevent prefixing.
         // This is needed as the bootloader interface requires the name to be
         // the same as the entry file name, minus the .conf extension.
-        entry.mark_pin_name();
+        boot.mark_pin_name();
 
-        // Add the entry to the list with a frozen context.
-        entries.push(entry);
+        // Add the BLS entry to the list, along with the bootable entry.
+        entries.push((entry, boot));
     }
 
-    Ok(entries)
+    // Sort all the entries according to the BLS sort system.
+    entries.sort_by(sort_entries);
+
+    // Collect all the bootable entries and return them.
+    Ok(entries.into_iter().map(|(_, boot)| boot).collect())
 }
