@@ -6,6 +6,7 @@ use crate::utils::variables::{VariableClass, VariableController};
 use anyhow::{Context, Result, anyhow, bail};
 use log::warn;
 use std::ffi::c_void;
+use std::pin::Pin;
 use uefi::Handle;
 use uefi::boot::LoadImageSource;
 use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
@@ -23,13 +24,13 @@ pub struct ShimSupport;
 /// Input to the shim mechanisms.
 pub enum ShimInput<'a> {
     /// Data loaded into a buffer and ready to be verified, owned.
-    OwnedDataBuffer(Option<&'a ResolvedPath>, Vec<u8>),
+    OwnedDataBuffer(Option<&'a ResolvedPath>, Pin<Box<[u8]>>),
     /// Data loaded into a buffer and ready to be verified.
     DataBuffer(Option<&'a ResolvedPath>, &'a [u8]),
     /// Low-level data buffer provided by the security hook.
     SecurityHookBuffer(Option<*const FfiDevicePath>, &'a [u8]),
     /// Low-level owned data buffer provided by the security hook.
-    SecurityHookOwnedBuffer(Option<*const FfiDevicePath>, Vec<u8>),
+    SecurityHookOwnedBuffer(Option<*const FfiDevicePath>, Pin<Box<[u8]>>),
     /// Low-level path provided by the security hook.
     SecurityHookPath(*const FfiDevicePath),
     /// Data is provided as a resolved path. We will need to load the data to verify it.
@@ -72,9 +73,10 @@ impl<'a> ShimInput<'a> {
         match self {
             ShimInput::OwnedDataBuffer(root, data) => Ok(ShimInput::OwnedDataBuffer(root, data)),
 
-            ShimInput::DataBuffer(root, data) => {
-                Ok(ShimInput::OwnedDataBuffer(root, data.to_vec()))
-            }
+            ShimInput::DataBuffer(root, data) => Ok(ShimInput::OwnedDataBuffer(
+                root,
+                Box::into_pin(data.to_vec().into_boxed_slice()),
+            )),
 
             ShimInput::SecurityHookPath(ffi_path) => {
                 // Acquire the file path.
@@ -89,7 +91,10 @@ impl<'a> ShimInput<'a> {
                     .context("unable to resolve path")?;
                 // Read the file path.
                 let data = path.read_file()?;
-                Ok(ShimInput::SecurityHookOwnedBuffer(Some(ffi_path), data))
+                Ok(ShimInput::SecurityHookOwnedBuffer(
+                    Some(ffi_path),
+                    Box::into_pin(data.to_vec().into_boxed_slice()),
+                ))
             }
 
             ShimInput::SecurityHookBuffer(_, _) => {
@@ -97,7 +102,12 @@ impl<'a> ShimInput<'a> {
             }
 
             ShimInput::ResolvedPath(path) => {
-                Ok(ShimInput::OwnedDataBuffer(Some(path), path.read_file()?))
+                // Read the file path.
+                let data = path.read_file()?;
+                Ok(ShimInput::OwnedDataBuffer(
+                    Some(path),
+                    Box::into_pin(data.to_vec().into_boxed_slice()),
+                ))
             }
 
             ShimInput::SecurityHookOwnedBuffer(path, data) => {
