@@ -2,6 +2,7 @@ use crate::context::SproutContext;
 use crate::entries::{BootableEntry, EntryDeclaration};
 use crate::generators::bls::entry::BlsEntry;
 use crate::utils;
+use crate::utils::vercmp;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -69,7 +70,12 @@ fn sort_entries(a: &(BlsEntry, BootableEntry), b: &(BlsEntry, BootableEntry)) ->
                     let b_version = b_bls.version();
 
                     // Compare the version of both entries, sorting newer versions first.
-                    match b_version.cmp(&a_version) {
+                    match vercmp::compare_versions_optional(
+                        a_version.as_deref(),
+                        b_version.as_deref(),
+                    )
+                    .reverse()
+                    {
                         // If both versions are equal, sort by file name in reverse order.
                         Ordering::Equal => {
                             // Grab the file name from both entries.
@@ -77,7 +83,7 @@ fn sort_entries(a: &(BlsEntry, BootableEntry), b: &(BlsEntry, BootableEntry)) ->
                             let b_name = b_boot.name();
 
                             // Compare the file names of both entries, sorting newer entries first.
-                            b_name.cmp(a_name)
+                            vercmp::compare_versions(a_name, b_name).reverse()
                         }
                         other => other,
                     }

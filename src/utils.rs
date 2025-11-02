@@ -18,6 +18,9 @@ pub mod media_loader;
 /// Support code for EFI variables.
 pub mod variables;
 
+/// Implements a version comparison algorithm according to the BLS specification.
+pub mod vercmp;
+
 /// Parses the input `path` as a [DevicePath].
 /// Uses the [DevicePathFromText] protocol exclusively, and will fail if it cannot acquire the protocol.
 pub fn text_to_device_path(path: &str) -> Result<PoolDevicePath> {
