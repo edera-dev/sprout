@@ -23,9 +23,9 @@ pub fn compare_versions_optional(a: Option<&str>, b: Option<&str>) -> Ordering {
     match (a, b) {
         // If both have values, compare them.
         (Some(a), Some(b)) => compare_versions(a, b),
-        // If the second value is None, return that it is less than the first.
+        // If the second value is None, then `a` is less than `b`.
         (Some(_a), None) => Ordering::Less,
-        // If the first value is None, return that it is greater than the second.
+        // If the first value is None, the `a` is greater than `b`.
         (None, Some(_b)) => Ordering::Greater,
         // If both values are None, return that they are equal.
         (None, None) => Ordering::Equal,
