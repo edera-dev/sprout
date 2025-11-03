@@ -107,7 +107,6 @@ if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
 
 	cp "hack/dev/configs/${SPROUT_CONFIG_NAME}.sprout.toml" "${FINAL_DIR}/sprout.toml"
 	cp "hack/dev/configs/xen.cfg" "${FINAL_DIR}/xen.cfg"
-	cp "hack/dev/assets/edera-splash.png" "${FINAL_DIR}/edera-splash.png"
 	cp "hack/dev/configs/bls.conf" "${FINAL_DIR}/bls.conf"
 
 	mkdir -p "${FINAL_DIR}/efi/EFI/BOOT"
@@ -125,7 +124,6 @@ if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
 		cp "${FINAL_DIR}/xen.cfg" "${FINAL_DIR}/efi/EFI/BOOT/XEN.CFG"
 	fi
 	cp "${FINAL_DIR}/sprout.toml" "${FINAL_DIR}/efi/SPROUT.TOML"
-	cp "${FINAL_DIR}/edera-splash.png" "${FINAL_DIR}/efi/EDERA-SPLASH.PNG"
 	cp "${FINAL_DIR}/initramfs" "${FINAL_DIR}/efi/INITRAMFS"
 fi
 

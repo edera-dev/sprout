@@ -12,7 +12,6 @@ COPY shell.efi /work/SHELL.EFI
 COPY xen.efi /work/XEN.EFI
 COPY xen.cfg /work/XEN.CFG
 COPY initramfs /work/INITRAMFS
-COPY edera-splash.png /work/EDERA-SPLASH.PNG
 COPY bls.conf /work/BLS.CONF
 RUN truncate -s128MiB sprout.img && \
     parted --script sprout.img mklabel gpt > /dev/null 2>&1 && \
@@ -29,7 +28,6 @@ RUN truncate -s128MiB sprout.img && \
     mcopy -i sprout.img XEN.EFI ::/EFI/BOOT/ && \
     mcopy -i sprout.img XEN.CFG ::/EFI/BOOT/ && \
     mcopy -i sprout.img SPROUT.TOML ::/ && \
-    mcopy -i sprout.img EDERA-SPLASH.PNG ::/ && \
     mcopy -i sprout.img INITRAMFS ::/ && \
     mcopy -i sprout.img BLS.CONF ::/LOADER/ENTRIES/ && \
     mv sprout.img /sprout.img
