@@ -1,10 +1,12 @@
 name: codeql
 
 on:
-  push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
+    branches:
+    - main
+  push:
+    branches:
+    - main
   schedule:
   - cron: '33 16 * * 0'
 

@@ -1,19 +1,12 @@
 name: publish
 
 on:
-  push:
-    branches:
-    - main
-
   pull_request:
     branches:
     - main
-    paths:
-    - bin/**
-    - src/**
-    - Cargo.*
-    - rust-toolchain.toml
-    - .github/workflows/publish.yaml
+  push:
+    branches:
+    - main
 
 permissions:
   contents: read # Needed to checkout the repository.
