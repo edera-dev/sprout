@@ -1,4 +1,4 @@
-# Setup Sprout to boot Windows
+# Setup Sprout for Windows without Secure Boot
 
 ## Prerequisites
 

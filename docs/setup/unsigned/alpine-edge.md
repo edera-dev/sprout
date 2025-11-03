@@ -1,4 +1,4 @@
-# Setup Sprout on Alpine Edge
+# Setup Sprout for Alpine Edge without Secure Boot
 
 ## Prerequisites
 

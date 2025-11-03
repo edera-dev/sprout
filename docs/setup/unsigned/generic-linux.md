@@ -1,4 +1,4 @@
-# Setup Sprout to boot Linux
+# Setup Sprout for Linux without Secure Boot
 
 ## Prerequisites
 

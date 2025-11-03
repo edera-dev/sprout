@@ -18,6 +18,9 @@ existing UEFI bootloader or booted by the hardware directly.
 
 Sprout is licensed under Apache 2.0 and is open to modifications and contributions.
 
+**NOTE**: Sprout is still in beta. Some features may not work as expected.
+Please [report any bugs you find](https://github.com/edera-dev/sprout/issues/new/choose).
+
 ## Background
 
 At [Edera] we make compute isolation technology for a wide variety of environments, often ones we do not fully control.
@@ -37,11 +40,21 @@ simplify installation and usage.
 
 ## Documentation
 
-- [Ubuntu Secure Boot Setup Guide]
-- [Fedora Setup Guide]
-- [Generic Linux Setup Guide]
-- [Alpine Edge Setup Guide]
-- [Windows Setup Guide]
+### Setup Guides
+
+Some guides support Secure Boot and some do not.
+We recommend running Sprout without Secure Boot for development, and with Secure Boot for production.
+
+| Operating System | Secure Boot Enabled | Link                                                  |
+|------------------|---------------------|-------------------------------------------------------|
+| Ubuntu           | ✅                   | [Setup Guide](./docs/setup/signed/ubuntu.md)          |
+| Fedora           | ❌                   | [Setup Guide](./docs/setup/unsigned/fedora.md)        |
+| Alpine Edge      | ❌                   | [Setup Guide](./docs/setup/unsigned/alpine-edge.md)   |
+| Generic Linux    | ❌                   | [Setup Guide](./docs/setup/unsigned/generic-linux.md) |
+| Windows          | ❌                   | [Setup Guide](./docs/setup/unsigned/windows.md)       |
+
+### Project Documentation
+
 - [Development Guide]
 - [Contributing Guide]
 - [Sprout License]
@@ -49,8 +62,6 @@ simplify installation and usage.
 - [Security Policy]
 
 ## Features
-
-**NOTE**: Sprout is still in beta.
 
 ### Current
 
@@ -148,11 +159,6 @@ autoconfigure = true
 ```
 
 [Edera]: https://edera.dev
-[Ubuntu Secure Boot Setup Guide]: ./docs/ubuntu-secure-boot-setup.md
-[Fedora Setup Guide]: ./docs/fedora-setup.md
-[Generic Linux Setup Guide]: ./docs/generic-linux-setup.md
-[Alpine Edge Setup Guide]: ./docs/alpine-edge-setup.md
-[Windows Setup Guide]: ./docs/windows-setup.md
 [Development Guide]: ./DEVELOPMENT.md
 [Contributing Guide]: ./CONTRIBUTING.md
 [Sprout License]: ./LICENSE

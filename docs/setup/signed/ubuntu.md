@@ -1,6 +1,12 @@
-# Ubuntu Secure Boot Setup
+# Setup Sprout for Ubuntu with Secure Boot
 
-## Generate and Install Secure Boot Key
+## Prerequisites
+
+- Modern Ubuntu release: tested on Ubuntu 25.10 on ARM64
+- EFI System Partition mounted on `/boot/efi` (the default)
+- ext4 or FAT32/exFAT formatted `/boot` partition
+
+## Step 1: Generate and Install Secure Boot Key
 
 ```bash
 # Create a directory to store the Secure Boot MOK key and certificates.
@@ -28,7 +34,7 @@ $ mokutil --import mok.cer
 # Select "Reboot" to boot back into your Operating System.
 ```
 
-## Prepare Secure Boot Environment
+## Step 2: Prepare the Secure Boot Environment
 
 ```bash
 # Create a directory for Sprout EFI artifacts.
@@ -45,13 +51,13 @@ $ cp /usr/lib/shim/mmaa64.efi /boot/efi/EFI/sprout/mmaa64.efi
 $ cp /usr/lib/shim/fbaa64.efi /boot/efi/EFI/sprout/fbaa64.efi
 ```
 
-## Install Unsigned Sprout
+## Step 3: Install Unsigned Sprout
 
 Download the latest sprout.efi release from the [GitHub releases page](https://github.com/edera-dev/sprout/releases).
 For x86_64 systems, download the `sprout-x86_64.efi` file, and for ARM64 systems, download the `sprout-aarch64.efi` file.
 Copy the downloaded `sprout.efi` file to `/boot/efi/EFI/sprout/sprout.unsigned.efi` on your EFI System Partition.
 
-## Sign Sprout for Secure Boot
+## Step 4: Sign Sprout for Secure Boot
 
 ```bash
 # For x86_64, sign the unsigned Sprout artifact and name it grubaa64.efi which is what the shim will call.
@@ -69,7 +75,14 @@ $ sbsign \
     /boot/efi/EFI/sprout/sprout.unsigned.efi
 ```
 
-## Sign EFI Drivers
+## Step 5: Install and Sign EFI Drivers
+
+You will need a filesystem EFI driver if `/boot` is not FAT32 or ExFAT.
+If `/boot` is FAT32 or ExFAT, you can skip this step.
+
+Most Ubuntu systems use an ext4 filesystem for `/boot`.
+You can download an EFI filesystem driver from [EfiFs releases](https://github.com/pbatard/EfiFs/releases).
+For ext4, download the `ext2` file for your platform. It will work for ext4 filesystems too.
 
 If you have an EFI driver, copy the driver to `/boot/efi/EFI/sprout/DRIVER_NAME.unsigned.efi` for signing.
 
@@ -86,7 +99,7 @@ $ sbsign \
     /boot/efi/EFI/sprout/ext4.unsigned.efi
 ```
 
-## Create Sprout Configuration
+## Step 6: Create Sprout Configuration
 
 Write the following to the file `/boot/efi/sprout.toml`:
 
@@ -100,6 +113,8 @@ version = 1
 linux-options = "root=UUID=MY_ROOT_UUID"
 
 # load an ext4 EFI driver.
+# skip this if you do not have an filesystem driver.
+# if your filesystem driver is not named ext4, change accordingly.
 [drivers.ext4]
 path = "\\EFI\\sprout\\ext4.efi"
 
@@ -113,14 +128,17 @@ autoconfigure = true
 Ensure you add the signed driver paths to the configuration, not the unsigned ones.
 If you do not have any drivers, exclude the drivers section entirely.
 
-## Configure Sprout Boot Entry
+## Step 7: Configure Sprout Boot Entry
+
+In the following commands, replace /dev/ESP_PARTITION with the actual path to the ESP partition block device.
 
 ```bash
-# In the following commands, replace /dev/ESP_PARTITION with the actual path to the ESP partition block device.
-
 # For x86_64, run this command to add Sprout as the default boot entry.
 $ efibootmgr -d /dev/ESP_PARTITION -c -L 'Sprout' -l '\EFI\sprout\shimx64.efi'
 
 # For aarch64, run this command to add Sprout as the default boot entry.
 $ efibootmgr -d /dev/ESP_PARTITION -c -L 'Sprout' -l '\EFI\sprout\shimaa64.efi'
 ```
+
+Reboot your machine and it should boot into Sprout.
+If Sprout fails to boot, it should boot into the original bootloader.

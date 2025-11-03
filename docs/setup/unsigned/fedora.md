@@ -1,4 +1,4 @@
-# Setup Sprout on Fedora
+# Setup Sprout for Fedora without Secure Boot
 
 ## Prerequisites
 
