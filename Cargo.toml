@@ -4,9 +4,28 @@ members = [
 ]
 resolver = "3"
 
-[profile.dev]
-# We have to compile for opt-level = 2 due to optimization passes
+[workspace.package]
+license = "Apache-2.0"
+version = "0.0.17"
+homepage = "https://sprout.edera.dev"
+repository = "https://github.com/edera-dev/sprout"
+edition = "2024"
+
+[workspace.dependencies]
+anyhow = "1.0.100"
+bitflags = "2.10.0"
+hex = "0.4.3"
+log = "0.4.28"
+serde = "1.0.228"
+sha2 = "0.10.9"
+toml = "0.9.8"
+uefi = "0.36.0"
+uefi-raw = "0.12.0"
+
+# Common build profiles
+# NOTE: We have to compile everything for opt-level = 2 due to optimization passes
 # which don't handle the UEFI target properly.
+[profile.dev]
 opt-level = 2
 
 [profile.release]

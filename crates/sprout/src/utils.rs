@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, bail};
+use sha2::{Digest, Sha256};
 use std::ops::Deref;
 use uefi::boot::SearchType;
 use uefi::fs::{FileSystem, Path};
@@ -201,7 +202,7 @@ pub fn combine_options<T: AsRef<str>>(options: impl Iterator<Item = T>) -> Strin
 /// Produce a unique hash for the input.
 /// This uses SHA-256, which is unique enough but relatively short.
 pub fn unique_hash(input: &str) -> String {
-    sha256::digest(input.as_bytes())
+    hex::encode(Sha256::digest(input.as_bytes()))
 }
 
 /// Represents the type of partition GUID that can be retrieved.

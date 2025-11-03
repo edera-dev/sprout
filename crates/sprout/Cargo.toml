@@ -1,32 +1,30 @@
 [package]
 name = "edera-sprout"
 description = "Modern UEFI bootloader"
-license = "Apache-2.0"
-version = "0.0.17"
-homepage = "https://sprout.edera.dev"
-repository = "https://github.com/edera-dev/sprout"
-edition = "2024"
+license.workspace = true
+version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+edition.workspace = true
 
 [dependencies]
-anyhow = "1.0.100"
-bitflags = "2.10.0"
-toml = "0.9.8"
-log = "0.4.28"
+anyhow.workspace = true
+bitflags.workspace = true
+hex.workspace = true
+sha2.workspace = true
+toml.workspace = true
+log.workspace = true
 
 [dependencies.serde]
-version = "1.0.228"
+workspace = true
 features = ["derive"]
 
-[dependencies.sha256]
-version = "1.6.0"
-default-features = false
-
 [dependencies.uefi]
-version = "0.36.0"
+workspace = true
 features = ["alloc", "logger"]
 
 [dependencies.uefi-raw]
-version = "0.12.0"
+workspace = true
 
 [[bin]]
 name = "sprout"
