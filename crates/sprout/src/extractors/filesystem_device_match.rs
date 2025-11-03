@@ -1,10 +1,11 @@
 use crate::context::SproutContext;
 use crate::utils;
+use alloc::rc::Rc;
+use alloc::string::String;
 use anyhow::{Context, Result, anyhow, bail};
+use core::ops::Deref;
+use core::str::FromStr;
 use edera_sprout_config::extractors::filesystem_device_match::FilesystemDeviceMatchExtractor;
-use std::ops::Deref;
-use std::rc::Rc;
-use std::str::FromStr;
 use uefi::fs::{FileSystem, Path};
 use uefi::proto::device_path::DevicePath;
 use uefi::proto::media::file::{File, FileSystemVolumeLabel};

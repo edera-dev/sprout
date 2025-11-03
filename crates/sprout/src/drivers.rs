@@ -1,11 +1,13 @@
 use crate::context::SproutContext;
 use crate::integrations::shim::{ShimInput, ShimSupport};
 use crate::utils;
+use alloc::collections::BTreeMap;
+use alloc::format;
+use alloc::rc::Rc;
+use alloc::string::String;
 use anyhow::{Context, Result};
-pub(crate) use edera_sprout_config::drivers::DriverDeclaration;
+use edera_sprout_config::drivers::DriverDeclaration;
 use log::info;
-use std::collections::BTreeMap;
-use std::rc::Rc;
 use uefi::boot::SearchType;
 
 /// Loads the driver specified by the `driver` declaration.

@@ -1,6 +1,6 @@
 use crate::context::SproutContext;
+use alloc::rc::Rc;
 use anyhow::{Context, Result, bail};
-use std::rc::Rc;
 
 /// EFI chainloader action.
 pub mod chainload;

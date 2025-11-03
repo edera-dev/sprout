@@ -1,3 +1,5 @@
+use alloc::string::String;
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 /// The configuration of the edera action which boots the Edera hypervisor.

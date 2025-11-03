@@ -5,11 +5,7 @@ This guide is a work in progress.
 ## Development Setup
 
 You can use any Rust development environment to develop Sprout.
-
 Rustup is recommended as the Rust toolchain manager to manage Rust versions and targets.
-
-Sprout currently requires Rust nightly to support uefi_std. See [uefi_std](https://doc.rust-lang.org/beta/rustc/platform-support/unknown-uefi.html) for more details.
-
 We currently only support `x86_64-unknown-uefi` and `aarch64-unknown-uefi` targets.
 
 To test your changes in QEMU, please run `./hack/dev/boot.sh`, you can specify `x86_64` or `aarch64`

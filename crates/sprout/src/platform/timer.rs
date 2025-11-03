@@ -1,7 +1,7 @@
 // Referenced https://github.com/sheroz/tick_counter (MIT license) as a baseline.
 // Architecturally modified to support UEFI and remove x86 (32-bit) support.
 
-use std::time::Duration;
+use core::time::Duration;
 
 /// Support for aarch64 timers.
 #[cfg(target_arch = "aarch64")]

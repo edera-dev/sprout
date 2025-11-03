@@ -1,5 +1,6 @@
+use alloc::string::{String, ToString};
 use anyhow::{Error, Result};
-use std::str::FromStr;
+use core::str::FromStr;
 
 /// Represents a parsed BLS entry.
 /// Fields unrelated to Sprout are not included.

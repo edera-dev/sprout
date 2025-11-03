@@ -1,7 +1,8 @@
 use crate::context::SproutContext;
+use alloc::rc::Rc;
+use alloc::string::String;
 use anyhow::{Result, bail};
 use edera_sprout_config::extractors::ExtractorDeclaration;
-use std::rc::Rc;
 
 /// The filesystem device match extractor.
 pub mod filesystem_device_match;

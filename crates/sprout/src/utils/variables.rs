@@ -1,4 +1,7 @@
 use crate::utils;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use anyhow::{Context, Result};
 use log::warn;
 use uefi::{CString16, guid};

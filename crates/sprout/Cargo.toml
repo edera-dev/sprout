@@ -13,12 +13,14 @@ bitflags.workspace = true
 edera-sprout-config.path = "../config"
 hex.workspace = true
 sha2.workspace = true
+shlex.workspace = true
+spin.workspace = true
 toml.workspace = true
 log.workspace = true
 
 [dependencies.uefi]
 workspace = true
-features = ["alloc", "logger"]
+features = ["alloc", "global_allocator", "logger", "panic_handler"]
 
 [dependencies.uefi-raw]
 workspace = true

@@ -1,5 +1,9 @@
 use crate::utils;
 use crate::utils::vercmp;
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use alloc::{format, vec};
 use anyhow::{Context, Result};
 use edera_sprout_config::RootConfiguration;
 use edera_sprout_config::actions::ActionDeclaration;
@@ -7,7 +11,6 @@ use edera_sprout_config::actions::chainload::ChainloadConfiguration;
 use edera_sprout_config::entries::EntryDeclaration;
 use edera_sprout_config::generators::GeneratorDeclaration;
 use edera_sprout_config::generators::list::ListConfiguration;
-use std::collections::BTreeMap;
 use uefi::CString16;
 use uefi::fs::{FileSystem, Path, PathBuf};
 use uefi::proto::device_path::DevicePath;

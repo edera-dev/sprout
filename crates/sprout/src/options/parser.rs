@@ -1,6 +1,10 @@
+use crate::options::env;
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
 use anyhow::{Context, Result, bail};
+use core::ptr::null_mut;
 use log::info;
-use std::collections::BTreeMap;
+use uefi_raw::Status;
 
 /// The type of option. This disambiguates different behavior
 /// of how options are handled.
@@ -47,23 +51,7 @@ pub trait OptionsRepresentable {
 
         // Collect all the arguments to Sprout.
         // Skip the first argument, which is the path to our executable.
-        let mut args = std::env::args().skip(1).collect::<Vec<_>>();
-
-        // Correct firmware that may add invalid arguments at the start.
-        // Witnessed this on a Dell Precision 5690 when direct booting.
-        loop {
-            // Grab the first argument or break.
-            let Some(arg) = args.first() else {
-                break;
-            };
-
-            // If the argument starts with a tilde, remove it.
-            if arg.starts_with("`") {
-                args.remove(0);
-                continue;
-            }
-            break;
-        }
+        let args = env::args()?;
 
         // Represent options as key-value pairs.
         let mut options = BTreeMap::new();
@@ -77,7 +65,7 @@ pub trait OptionsRepresentable {
                 break;
             };
 
-            // If the doesn't start with --, that is invalid.
+            // If the option doesn't start with --, that is invalid.
             if !option.starts_with("--") {
                 bail!("invalid option: {option}");
             }
@@ -144,7 +132,9 @@ pub trait OptionsRepresentable {
                     );
                 }
                 // Exit because the help has been displayed.
-                std::process::exit(0);
+                unsafe {
+                    uefi::boot::exit(uefi::boot::image_handle(), Status::SUCCESS, 0, null_mut());
+                };
             }
 
             // Insert the option and the value into the map.

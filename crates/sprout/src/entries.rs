@@ -1,6 +1,7 @@
 use crate::context::SproutContext;
+use alloc::rc::Rc;
+use alloc::string::{String, ToString};
 use edera_sprout_config::entries::EntryDeclaration;
-use std::rc::Rc;
 
 /// Represents an entry that is stamped and ready to be booted.
 #[derive(Clone)]

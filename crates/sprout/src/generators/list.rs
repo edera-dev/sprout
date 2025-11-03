@@ -1,8 +1,10 @@
 use crate::context::SproutContext;
 use crate::entries::BootableEntry;
+use alloc::rc::Rc;
+use alloc::string::ToString;
+use alloc::vec::Vec;
 use anyhow::Result;
 use edera_sprout_config::generators::list::ListConfiguration;
-use std::rc::Rc;
 
 /// Generates a set of entries using the specified `list` configuration in the `context`.
 pub fn generate(

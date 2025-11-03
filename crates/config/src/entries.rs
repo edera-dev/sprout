@@ -1,5 +1,7 @@
+use alloc::collections::BTreeMap;
+use alloc::string::String;
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 /// Declares a boot entry to display in the boot menu.
 ///
