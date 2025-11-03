@@ -85,7 +85,9 @@ impl PlatformTpm {
         };
 
         // Check if the TPM supports `GetActivePcrBanks`, and if it doesn't return zero.
-        if handle.version().major < 1 || handle.version().major == 1 && handle.version().minor < 1 {
+        if (handle.version().major < 1)
+            || (handle.version().major == 1 && (handle.version().minor < 1))
+        {
             return Ok(0);
         }
 
