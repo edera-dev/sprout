@@ -1,9 +1,9 @@
-use crate::actions::ActionDeclaration;
-use crate::actions::chainload::ChainloadConfiguration;
-use crate::config::RootConfiguration;
-use crate::entries::EntryDeclaration;
 use crate::utils;
 use anyhow::{Context, Result};
+use edera_sprout_config::RootConfiguration;
+use edera_sprout_config::actions::ActionDeclaration;
+use edera_sprout_config::actions::chainload::ChainloadConfiguration;
+use edera_sprout_config::entries::EntryDeclaration;
 use uefi::CString16;
 use uefi::fs::{FileSystem, Path};
 use uefi::proto::device_path::DevicePath;

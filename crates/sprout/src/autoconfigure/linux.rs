@@ -1,12 +1,12 @@
-use crate::actions::ActionDeclaration;
-use crate::actions::chainload::ChainloadConfiguration;
-use crate::config::RootConfiguration;
-use crate::entries::EntryDeclaration;
-use crate::generators::GeneratorDeclaration;
-use crate::generators::list::ListConfiguration;
 use crate::utils;
 use crate::utils::vercmp;
 use anyhow::{Context, Result};
+use edera_sprout_config::RootConfiguration;
+use edera_sprout_config::actions::ActionDeclaration;
+use edera_sprout_config::actions::chainload::ChainloadConfiguration;
+use edera_sprout_config::entries::EntryDeclaration;
+use edera_sprout_config::generators::GeneratorDeclaration;
+use edera_sprout_config::generators::list::ListConfiguration;
 use std::collections::BTreeMap;
 use uefi::CString16;
 use uefi::fs::{FileSystem, Path, PathBuf};

@@ -70,13 +70,20 @@ version = "0.0.17"
 dependencies = [
  "anyhow",
  "bitflags",
+ "edera-sprout-config",
  "hex",
  "log",
- "serde",
  "sha2",
  "toml",
  "uefi",
  "uefi-raw",
+]
+
+[[package]]
+name = "edera-sprout-config"
+version = "0.0.17"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

@@ -1,22 +1,8 @@
 use crate::context::SproutContext;
-use crate::entries::{BootableEntry, EntryDeclaration};
+use crate::entries::BootableEntry;
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use edera_sprout_config::generators::list::ListConfiguration;
 use std::rc::Rc;
-
-/// List generator configuration.
-/// The list generator produces multiple entries based
-/// on a set of input maps.
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct ListConfiguration {
-    /// The template entry to use for each generated entry.
-    #[serde(default)]
-    pub entry: EntryDeclaration,
-    /// The values to use as the input for the matrix.
-    #[serde(default)]
-    pub values: Vec<BTreeMap<String, String>>,
-}
 
 /// Generates a set of entries using the specified `list` configuration in the `context`.
 pub fn generate(

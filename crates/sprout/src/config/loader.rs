@@ -1,8 +1,8 @@
-use crate::config::{RootConfiguration, latest_version};
 use crate::options::SproutOptions;
 use crate::platform::tpm::PlatformTpm;
 use crate::utils;
 use anyhow::{Context, Result, bail};
+use edera_sprout_config::{RootConfiguration, latest_version};
 use log::info;
 use std::ops::Deref;
 use toml::Value;

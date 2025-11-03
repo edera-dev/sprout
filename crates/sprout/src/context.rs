@@ -1,8 +1,8 @@
-use crate::actions::ActionDeclaration;
 use crate::options::SproutOptions;
 use crate::platform::timer::PlatformTimer;
 use anyhow::anyhow;
 use anyhow::{Result, bail};
+use edera_sprout_config::actions::ActionDeclaration;
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;

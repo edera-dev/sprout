@@ -2,22 +2,11 @@ use crate::context::SproutContext;
 use crate::integrations::shim::{ShimInput, ShimSupport};
 use crate::utils;
 use anyhow::{Context, Result};
+pub(crate) use edera_sprout_config::drivers::DriverDeclaration;
 use log::info;
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use uefi::boot::SearchType;
-
-/// Declares a driver configuration.
-/// Drivers allow extending the functionality of Sprout.
-/// Drivers are loaded at runtime and can provide extra functionality like filesystem support.
-/// Drivers are loaded by their name, which is used to reference them in other concepts.
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct DriverDeclaration {
-    /// The filesystem path to the driver.
-    /// This file should be an EFI executable that can be located and executed.
-    pub path: String,
-}
 
 /// Loads the driver specified by the `driver` declaration.
 fn load_driver(context: Rc<SproutContext>, driver: &DriverDeclaration) -> Result<()> {

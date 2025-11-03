@@ -4,7 +4,6 @@
 /// The delay to wait for when an error occurs in Sprout.
 const DELAY_ON_ERROR: Duration = Duration::from_secs(10);
 
-use crate::config::RootConfiguration;
 use crate::context::{RootContext, SproutContext};
 use crate::entries::BootableEntry;
 use crate::integrations::bootloader_interface::{BootloaderInterface, BootloaderInterfaceTimeout};
@@ -16,6 +15,7 @@ use crate::platform::tpm::PlatformTpm;
 use crate::secure::SecureBoot;
 use crate::utils::PartitionGuidForm;
 use anyhow::{Context, Result, bail};
+use edera_sprout_config::RootConfiguration;
 use log::{error, info, warn};
 use std::collections::BTreeMap;
 use std::ops::Deref;

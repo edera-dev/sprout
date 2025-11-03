@@ -1,5 +1,5 @@
-use crate::config::RootConfiguration;
 use anyhow::{Context, Result};
+use edera_sprout_config::RootConfiguration;
 use uefi::fs::FileSystem;
 use uefi::proto::device_path::DevicePath;
 use uefi::proto::media::fs::SimpleFileSystem;

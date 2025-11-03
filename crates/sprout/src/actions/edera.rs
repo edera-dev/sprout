@@ -1,12 +1,7 @@
 use std::rc::Rc;
 
-use anyhow::{Context, Result};
-use log::error;
-use serde::{Deserialize, Serialize};
-use uefi::Guid;
-
 use crate::{
-    actions::{self, chainload::ChainloadConfiguration},
+    actions,
     context::SproutContext,
     utils::{
         self,
@@ -18,26 +13,11 @@ use crate::{
         },
     },
 };
-
-/// The configuration of the edera action which boots the Edera hypervisor.
-/// Edera is based on Xen but modified significantly with a Rust stack.
-/// Sprout is a component of the Edera stack and provides the boot functionality of Xen.
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct EderaConfiguration {
-    /// The path to the Xen hypervisor EFI image.
-    pub xen: String,
-    /// The path to the kernel to boot for dom0.
-    pub kernel: String,
-    /// The path to the initrd to load for dom0.
-    #[serde(default)]
-    pub initrd: Option<String>,
-    /// The options to pass to the kernel.
-    #[serde(default, rename = "kernel-options")]
-    pub kernel_options: Vec<String>,
-    /// The options to pass to the Xen hypervisor.
-    #[serde(default, rename = "xen-options")]
-    pub xen_options: Vec<String>,
-}
+use anyhow::{Context, Result};
+use edera_sprout_config::actions::chainload::ChainloadConfiguration;
+use edera_sprout_config::actions::edera::EderaConfiguration;
+use log::error;
+use uefi::Guid;
 
 /// Builds a configuration string for the Xen EFI stub using the specified `configuration`.
 fn build_xen_config(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> String {

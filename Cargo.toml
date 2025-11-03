@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "crates/config",
   "crates/sprout",
 ]
 resolver = "3"

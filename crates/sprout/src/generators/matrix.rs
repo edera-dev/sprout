@@ -1,23 +1,11 @@
 use crate::context::SproutContext;
-use crate::entries::{BootableEntry, EntryDeclaration};
+use crate::entries::BootableEntry;
 use crate::generators::list;
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
+use edera_sprout_config::generators::list::ListConfiguration;
+use edera_sprout_config::generators::matrix::MatrixConfiguration;
 use std::collections::BTreeMap;
 use std::rc::Rc;
-
-/// Matrix generator configuration.
-/// The matrix generator produces multiple entries based
-/// on input values multiplicatively.
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct MatrixConfiguration {
-    /// The template entry to use for each generated entry.
-    #[serde(default)]
-    pub entry: EntryDeclaration,
-    /// The values to use as the input for the matrix.
-    #[serde(default)]
-    pub values: BTreeMap<String, Vec<String>>,
-}
 
 /// Builds out multiple generations of `input` based on a matrix style.
 /// For example, if input is: {"x": ["a", "b"], "y": ["c", "d"]}
@@ -61,7 +49,7 @@ pub fn generate(
     // Use the list generator to generate entries for each combination.
     list::generate(
         context,
-        &list::ListConfiguration {
+        &ListConfiguration {
             entry: matrix.entry.clone(),
             values: combinations,
         },
