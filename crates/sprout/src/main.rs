@@ -88,7 +88,7 @@ const DELAY_ON_ERROR: Duration = Duration::from_secs(10);
 fn run() -> Result<()> {
     // For safety reasons, we will note that Secure Boot is in beta on Sprout.
     if SecureBoot::enabled().context("unable to determine Secure Boot status")? {
-        warn!("Secure Boot is enabled. Sprout Secure Boot is in beta.");
+        warn!("Sprout Secure Boot is in beta. Some functionality may not work as expected.");
     }
 
     // Start the platform timer.
