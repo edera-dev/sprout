@@ -1,11 +1,15 @@
 use crate::options::SproutOptions;
 use crate::platform::timer::PlatformTimer;
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::format;
+use alloc::rc::Rc;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use anyhow::anyhow;
 use anyhow::{Result, bail};
+use core::cmp::Reverse;
 use edera_sprout_config::actions::ActionDeclaration;
-use std::cmp::Reverse;
-use std::collections::{BTreeMap, BTreeSet};
-use std::rc::Rc;
 use uefi::proto::device_path::DevicePath;
 
 /// The maximum number of iterations that can be performed in [SproutContext::finalize].

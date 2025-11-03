@@ -1,5 +1,5 @@
 use crate::platform::timer::TickFrequency;
-use std::arch::asm;
+use core::arch::asm;
 
 /// Reads the cntvct_el0 counter and returns the value.
 pub fn ticks() -> u64 {

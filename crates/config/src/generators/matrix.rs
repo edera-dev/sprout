@@ -1,6 +1,8 @@
 use crate::entries::EntryDeclaration;
+use alloc::collections::BTreeMap;
+use alloc::string::String;
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 /// Matrix generator configuration.
 /// The matrix generator produces multiple entries based

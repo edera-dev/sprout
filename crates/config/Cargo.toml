@@ -9,7 +9,7 @@ edition.workspace = true
 
 [dependencies.serde]
 workspace = true
-features = ["derive"]
+default-features = false
 
 [lib]
 name = "edera_sprout_config"

@@ -1,3 +1,5 @@
+use alloc::vec;
+use alloc::vec::Vec;
 use anyhow::{Context, Result};
 use uefi::proto::console::gop::{BltOp, BltPixel, BltRegion, GraphicsOutput};
 

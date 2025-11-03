@@ -1,5 +1,5 @@
-use std::cmp::Ordering;
-use std::iter::Peekable;
+use core::cmp::Ordering;
+use core::iter::Peekable;
 
 /// Handles single character advancement and comparison.
 macro_rules! handle_single_char {

@@ -1,11 +1,14 @@
 use crate::context::SproutContext;
 use crate::entries::BootableEntry;
 use crate::generators::list;
+use alloc::collections::BTreeMap;
+use alloc::rc::Rc;
+use alloc::string::String;
+use alloc::vec;
+use alloc::vec::Vec;
 use anyhow::Result;
 use edera_sprout_config::generators::list::ListConfiguration;
 use edera_sprout_config::generators::matrix::MatrixConfiguration;
-use std::collections::BTreeMap;
-use std::rc::Rc;
 
 /// Builds out multiple generations of `input` based on a matrix style.
 /// For example, if input is: {"x": ["a", "b"], "y": ["c", "d"]}

@@ -1,8 +1,9 @@
 use crate::integrations::shim::{ShimInput, ShimSupport, ShimVerificationOutput};
 use crate::utils;
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
+use core::slice;
 use log::warn;
-use std::sync::{LazyLock, Mutex};
+use spin::{Lazy, Mutex};
 use uefi::proto::device_path::FfiDevicePath;
 use uefi::proto::unsafe_protocol;
 use uefi::{Guid, guid};
@@ -45,8 +46,7 @@ struct SecurityHookState {
 
 /// Global state for the security hook.
 /// This is messy, but it is safe given the mutex.
-static GLOBAL_HOOK_STATE: LazyLock<Mutex<Option<SecurityHookState>>> =
-    LazyLock::new(|| Mutex::new(None));
+static GLOBAL_HOOK_STATE: Lazy<Mutex<Option<SecurityHookState>>> = Lazy::new(|| Mutex::new(None));
 
 /// Security hook helper.
 pub struct SecurityHook;
@@ -110,24 +110,13 @@ impl SecurityHook {
         // Verify the input, if it fails, call the original hook.
         if !Self::verify(input) {
             // Acquire the global hook state to grab the original hook.
-            let function = match GLOBAL_HOOK_STATE.lock() {
-                // We have acquired the lock, so we can find the original hook.
-                Ok(state) => match state.as_ref() {
-                    // The hook state is available, so we can acquire the original hook.
-                    Some(state) => state.original_hook.file_authentication_state,
+            let function = match GLOBAL_HOOK_STATE.lock().as_ref() {
+                // The hook state is available, so we can acquire the original hook.
+                Some(state) => state.original_hook.file_authentication_state,
 
-                    // The hook state is not available, so we can't call the original hook.
-                    None => {
-                        warn!("global hook state is not available, unable to call original hook");
-                        return Status::LOAD_ERROR;
-                    }
-                },
-
-                Err(error) => {
-                    warn!(
-                        "unable to acquire global hook state lock to call original hook: {}",
-                        error,
-                    );
+                // The hook state is not available, so we can't call the original hook.
+                None => {
+                    warn!("global hook state is not available, unable to call original hook");
                     return Status::LOAD_ERROR;
                 }
             };
@@ -161,7 +150,7 @@ impl SecurityHook {
         }
 
         // Construct a slice out of the file buffer and size.
-        let buffer = unsafe { std::slice::from_raw_parts(file_buffer, file_size) };
+        let buffer = unsafe { slice::from_raw_parts(file_buffer, file_size) };
 
         // Construct a shim input from the path.
         let input = ShimInput::SecurityHookBuffer(Some(path), buffer);
@@ -169,24 +158,13 @@ impl SecurityHook {
         // Verify the input, if it fails, call the original hook.
         if !Self::verify(input) {
             // Acquire the global hook state to grab the original hook.
-            let function = match GLOBAL_HOOK_STATE.lock() {
-                // We have acquired the lock, so we can find the original hook.
-                Ok(state) => match state.as_ref() {
-                    // The hook state is available, so we can acquire the original hook.
-                    Some(state) => state.original_hook2.file_authentication,
+            let function = match GLOBAL_HOOK_STATE.lock().as_ref() {
+                // The hook state is available, so we can acquire the original hook.
+                Some(state) => state.original_hook2.file_authentication,
 
-                    // The hook state is not available, so we can't call the original hook.
-                    None => {
-                        warn!("global hook state is not available, unable to call original hook");
-                        return Status::LOAD_ERROR;
-                    }
-                },
-
-                Err(error) => {
-                    warn!(
-                        "unable to acquire global hook state lock to call original hook: {}",
-                        error
-                    );
+                // The hook state is not available, so we can't call the original hook.
+                None => {
+                    warn!("global hook state is not available, unable to call original hook");
                     return Status::LOAD_ERROR;
                 }
             };
@@ -237,9 +215,7 @@ impl SecurityHook {
         };
 
         // Acquire the lock to the global state and replace it.
-        let Ok(mut global_state) = GLOBAL_HOOK_STATE.lock() else {
-            bail!("unable to acquire global hook state lock");
-        };
+        let mut global_state = GLOBAL_HOOK_STATE.lock();
         global_state.replace(state);
 
         // Install the hooks into the UEFI stack.
@@ -276,9 +252,7 @@ impl SecurityHook {
                 .context("unable to open security arch2 protocol")?;
 
         // Acquire the lock to the global state.
-        let Ok(mut global_state) = GLOBAL_HOOK_STATE.lock() else {
-            bail!("unable to acquire global hook state lock");
-        };
+        let mut global_state = GLOBAL_HOOK_STATE.lock();
 
         // Take the state and replace the original functions.
         let Some(state) = global_state.take() else {

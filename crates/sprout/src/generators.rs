@@ -1,9 +1,10 @@
 use crate::context::SproutContext;
 use crate::entries::BootableEntry;
+use alloc::rc::Rc;
+use alloc::vec::Vec;
 use anyhow::Result;
 use anyhow::bail;
 use edera_sprout_config::generators::GeneratorDeclaration;
-use std::rc::Rc;
 
 /// The BLS generator.
 pub mod bls;

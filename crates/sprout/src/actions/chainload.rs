@@ -4,10 +4,11 @@ use crate::integrations::shim::{ShimInput, ShimSupport};
 use crate::utils;
 use crate::utils::media_loader::MediaLoaderHandle;
 use crate::utils::media_loader::constants::linux::LINUX_EFI_INITRD_MEDIA_GUID;
+use alloc::boxed::Box;
+use alloc::rc::Rc;
 use anyhow::{Context, Result, bail};
 use edera_sprout_config::actions::chainload::ChainloadConfiguration;
 use log::error;
-use std::rc::Rc;
 use uefi::CString16;
 use uefi::proto::loaded_image::LoadedImage;
 

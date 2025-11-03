@@ -1,6 +1,6 @@
 use crate::platform::timer::TickFrequency;
 use core::arch::asm;
-use std::time::Duration;
+use core::time::Duration;
 
 /// We will measure the frequency of the timer based on 1000 microseconds.
 /// This will result in a call to BS->Stall(1000) in the end.

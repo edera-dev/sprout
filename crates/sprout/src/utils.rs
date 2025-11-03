@@ -1,6 +1,10 @@
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use anyhow::{Context, Result, bail};
+use core::ops::Deref;
 use sha2::{Digest, Sha256};
-use std::ops::Deref;
 use uefi::boot::SearchType;
 use uefi::fs::{FileSystem, Path};
 use uefi::proto::device_path::text::{AllowShortcuts, DevicePathFromText, DisplayOnly};

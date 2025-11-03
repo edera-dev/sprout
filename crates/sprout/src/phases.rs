@@ -1,8 +1,9 @@
 use crate::actions;
 use crate::context::SproutContext;
+use alloc::format;
+use alloc::rc::Rc;
 use anyhow::{Context, Result};
 use edera_sprout_config::phases::PhaseConfiguration;
-use std::rc::Rc;
 
 /// Executes the specified [phase] of the boot process.
 /// The value [phase] should be a reference of a specific phase in the [PhasesConfiguration].

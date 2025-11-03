@@ -1,8 +1,8 @@
 #![doc = include_str!("../README.md")]
-#![feature(uefi_std)]
+#![no_std]
+#![no_main]
 
-/// The delay to wait for when an error occurs in Sprout.
-const DELAY_ON_ERROR: Duration = Duration::from_secs(10);
+extern crate alloc;
 
 use crate::context::{RootContext, SproutContext};
 use crate::entries::BootableEntry;
@@ -14,13 +14,18 @@ use crate::platform::timer::PlatformTimer;
 use crate::platform::tpm::PlatformTpm;
 use crate::secure::SecureBoot;
 use crate::utils::PartitionGuidForm;
+use alloc::collections::BTreeMap;
+use alloc::format;
+use alloc::string::ToString;
+use alloc::vec::Vec;
 use anyhow::{Context, Result, bail};
+use core::ops::Deref;
+use core::time::Duration;
 use edera_sprout_config::RootConfiguration;
 use log::{error, info, warn};
-use std::collections::BTreeMap;
-use std::ops::Deref;
-use std::time::Duration;
+use uefi::entry;
 use uefi::proto::device_path::LoadedImageDevicePath;
+use uefi_raw::Status;
 
 /// actions: Code that can be configured and executed by Sprout.
 pub mod actions;
@@ -72,6 +77,9 @@ pub mod options;
 
 /// utils: Utility functions that are used by other parts of Sprout.
 pub mod utils;
+
+/// The delay to wait for when an error occurs in Sprout.
+const DELAY_ON_ERROR: Duration = Duration::from_secs(10);
 
 /// Run Sprout, returning an error if one occurs.
 fn run() -> Result<()> {
@@ -373,9 +381,14 @@ fn run() -> Result<()> {
 /// The main entrypoint of sprout.
 /// It is possible this function will not return if actions that are executed
 /// exit boot services or do not return control to sprout.
-fn main() -> Result<()> {
+#[entry]
+fn efi_main() -> Status {
     // Initialize the basic UEFI environment.
-    setup::init()?;
+    // If initialization fails, we will return ABORTED.
+    if let Err(error) = setup::init() {
+        error!("unable to initialize environment: {}", error);
+        return Status::ABORTED;
+    }
 
     // Run Sprout, then handle the error.
     let result = run();
@@ -387,9 +400,10 @@ fn main() -> Result<()> {
         }
         // Sleep to allow the user to read the error.
         uefi::boot::stall(DELAY_ON_ERROR);
+        return Status::ABORTED;
     }
 
     // Sprout doesn't necessarily guarantee anything was booted.
     // If we reach here, we will exit back to whoever called us.
-    Ok(())
+    Status::SUCCESS
 }

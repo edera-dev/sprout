@@ -1,4 +1,5 @@
 use crate::entries::EntryDeclaration;
+use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 
 /// The default path to the BLS directory.

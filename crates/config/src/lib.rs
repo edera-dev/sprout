@@ -1,5 +1,7 @@
 //! Sprout configuration descriptions.
 //! This crate provides all the configuration structures for Sprout.
+#![no_std]
+extern crate alloc;
 
 use crate::actions::ActionDeclaration;
 use crate::drivers::DriverDeclaration;
@@ -7,8 +9,9 @@ use crate::entries::EntryDeclaration;
 use crate::extractors::ExtractorDeclaration;
 use crate::generators::GeneratorDeclaration;
 use crate::phases::PhasesConfiguration;
+use alloc::collections::BTreeMap;
+use alloc::string::String;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 pub mod actions;
 pub mod drivers;

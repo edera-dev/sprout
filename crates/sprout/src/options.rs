@@ -1,6 +1,10 @@
 use crate::options::parser::{OptionDescription, OptionForm, OptionsRepresentable};
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
 use anyhow::{Context, Result, bail};
-use std::collections::BTreeMap;
+
+/// Acquire arguments from UEFI environment.
+pub mod env;
 
 /// The Sprout options parser.
 pub mod parser;

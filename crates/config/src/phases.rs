@@ -1,5 +1,7 @@
+use alloc::collections::BTreeMap;
+use alloc::string::String;
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 /// Configures the various phases of the boot process.
 /// This allows hooking various phases to run actions.

@@ -1,5 +1,8 @@
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use anyhow::{Context, Result, bail};
-use std::ffi::c_void;
+use core::ffi::c_void;
+use core::ptr;
 use uefi::proto::device_path::DevicePath;
 use uefi::proto::device_path::build::DevicePathBuilder;
 use uefi::proto::device_path::build::media::Vendor;
@@ -261,8 +264,7 @@ impl MediaLoaderHandle {
             let protocol = Box::from_raw(self.protocol);
 
             // Retrieve a box for the data we passed in.
-            let slice =
-                std::ptr::slice_from_raw_parts_mut(protocol.address as *mut u8, protocol.length);
+            let slice = ptr::slice_from_raw_parts_mut(protocol.address as *mut u8, protocol.length);
             let data = Box::from_raw(slice);
 
             // Drop all the allocations explicitly, as we don't want to leak them.
