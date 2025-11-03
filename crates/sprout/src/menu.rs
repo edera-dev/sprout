@@ -66,6 +66,7 @@ fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
 
     // Close the timer event that we acquired.
     // We don't need to close the key event because it is owned globally.
+    // This should always be called in practice as events are not modified by wait_for_event.
     if let Some(timer_event) = events.into_iter().next() {
         // Store the result of the close event so we can determine if we can safely assert it.
         let close_event_result =
