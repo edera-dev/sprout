@@ -145,6 +145,8 @@ impl VariableController {
         self.set(key, &value.to_le_bytes(), class)
     }
 
+    /// Remove the variable specified by `key`.
+    /// This can fail if the variable is not set.
     pub fn remove(&self, key: &str) -> Result<()> {
         let name = Self::name(key)?;
 
