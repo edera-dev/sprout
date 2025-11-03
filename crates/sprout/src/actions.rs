@@ -10,10 +10,6 @@ pub mod edera;
 /// EFI console print action.
 pub mod print;
 
-/// Splash screen action.
-#[cfg(feature = "splash")]
-pub mod splash;
-
 /// Declares an action that sprout can execute.
 /// Actions allow configuring sprout's internal runtime mechanisms with values
 /// that you can specify via other concepts.
@@ -29,10 +25,6 @@ pub struct ActionDeclaration {
     /// Print a string to the EFI console.
     #[serde(default)]
     pub print: Option<print::PrintConfiguration>,
-    /// Show an image as a fullscreen splash screen.
-    #[serde(default)]
-    #[cfg(feature = "splash")]
-    pub splash: Option<splash::SplashConfiguration>,
     /// Boot the Edera hypervisor and the root operating system.
     /// This action is an extension on top of the Xen EFI stub that
     /// is specific to Edera.
@@ -64,12 +56,6 @@ pub fn execute(context: Rc<SproutContext>, name: impl AsRef<str>) -> Result<()> 
         return Ok(());
     } else if let Some(edera) = &action.edera {
         edera::edera(context.clone(), edera)?;
-        return Ok(());
-    }
-
-    #[cfg(feature = "splash")]
-    if let Some(splash) = &action.splash {
-        splash::splash(context.clone(), splash)?;
         return Ok(());
     }
 
