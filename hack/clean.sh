@@ -27,4 +27,6 @@ if command -v docker >/dev/null 2>&1; then
 	delete_image sprout-kernel-build-aarch64 || true
 	delete_image sprout-boot-x86_64 || true
 	delete_image sprout-boot-aarch64 || true
+	delete_image sprout-xen-x86_64 || true
+	delete_image sprout-xen-aarch64 || true
 fi
