@@ -55,6 +55,13 @@ else
 	fi
 fi
 
+if [ "${NO_INPUT}" != "1" ]; then
+	set -- "${@}" \
+		-device qemu-xhci \
+		-device usb-kbd \
+		-device usb-mouse
+fi
+
 rm -f "${FINAL_DIR}/ovmf-boot.fd"
 cp "${FINAL_DIR}/ovmf.fd" "${FINAL_DIR}/ovmf-boot.fd"
 if [ "${TARGET_ARCH}" = "aarch64" ]; then
