@@ -51,17 +51,23 @@ pub mod extractors;
 /// generators: Runtime code that can generate entries with specific values.
 pub mod generators;
 
-/// platform: Integration or support code for specific hardware platforms.
-pub mod platform;
+/// integrations: Code that interacts with other systems.
+pub mod integrations;
+
+/// logger: Code for the logging mechanism of Sprout.
+pub mod logger;
 
 /// menu: Display a boot menu to select an entry to boot.
 pub mod menu;
 
-/// integrations: Code that interacts with other systems.
-pub mod integrations;
+/// options: Parse the options of the Sprout executable.
+pub mod options;
 
 /// phases: Hooks into specific parts of the boot process.
 pub mod phases;
+
+/// platform: Integration or support code for specific hardware platforms.
+pub mod platform;
 
 /// sbat: Secure Boot Attestation section.
 pub mod sbat;
@@ -71,9 +77,6 @@ pub mod secure;
 
 /// setup: Code that initializes the UEFI environment for Sprout.
 pub mod setup;
-
-/// options: Parse the options of the Sprout executable.
-pub mod options;
 
 /// utils: Utility functions that are used by other parts of Sprout.
 pub mod utils;
@@ -385,6 +388,9 @@ fn run() -> Result<()> {
 fn efi_main() -> Status {
     // Initialize the basic UEFI environment.
     // If initialization fails, we will return ABORTED.
+    // NOTE: This function will also initialize the logger.
+    // The logger will panic if it is unable to initialize.
+    // It is guaranteed that if this returns, the logger is initialized.
     if let Err(error) = setup::init() {
         error!("unable to initialize environment: {}", error);
         return Status::ABORTED;
@@ -394,7 +400,7 @@ fn efi_main() -> Status {
     let result = run();
     if let Err(ref error) = result {
         // Print an error trace.
-        error!("sprout encountered an error");
+        error!("sprout encountered an error:");
         for (index, stack) in error.chain().enumerate() {
             error!("[{}]: {}", index, stack);
         }

@@ -20,7 +20,7 @@ log.workspace = true
 
 [dependencies.uefi]
 workspace = true
-features = ["alloc", "global_allocator", "logger", "panic_handler"]
+features = ["alloc", "global_allocator", "panic_handler"]
 
 [dependencies.uefi-raw]
 workspace = true
