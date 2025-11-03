@@ -17,7 +17,7 @@ pub enum TickFrequency {
     /// The platform provides the tick frequency.
     Hardware(u64),
     /// The tick frequency is measured internally.
-    Measured(u64, Duration),
+    Measured(u64),
 }
 
 impl TickFrequency {
@@ -25,7 +25,7 @@ impl TickFrequency {
     fn ticks(&self) -> u64 {
         match self {
             TickFrequency::Hardware(frequency) => *frequency,
-            TickFrequency::Measured(frequency, _) => *frequency,
+            TickFrequency::Measured(frequency) => *frequency,
         }
     }
 
