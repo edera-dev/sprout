@@ -1,10 +1,11 @@
-# Setup Sprout for Ubuntu with Secure Boot
+# Setup Sprout for Debian with Secure Boot
 
 ## Prerequisites
 
-- Modern Ubuntu release: tested on Ubuntu 25.10 ARM64
+- Modern Debian release: tested on Debian 13 ARM64
 - EFI System Partition mounted on `/boot/efi` (the default)
 - ext4 or FAT32/exFAT formatted `/boot` partition
+- You will need the following packages installed: `openssl`, `shim-signed`, `mokutil`, `sbsigntool`
 
 ## Step 1: Generate and Install Secure Boot Key
 
@@ -42,13 +43,13 @@ $ mkdir -p /boot/efi/EFI/sprout
 
 # For x86_64, copy the following artifacts to the Sprout EFI directory.
 $ cp /usr/lib/shim/shimx64.efi.signed /boot/efi/EFI/sprout/shimx64.efi
-$ cp /usr/lib/shim/mmx64.efi /boot/efi/EFI/sprout/mmx64.efi
-$ cp /usr/lib/shim/fbx64.efi /boot/efi/EFI/sprout/fbx64.efi
+$ cp /usr/lib/shim/mmx64.efi.signed /boot/efi/EFI/sprout/mmx64.efi
+$ cp /usr/lib/shim/fbx64.efi.signed /boot/efi/EFI/sprout/fbx64.efi
 
 # For aarch64, copy the following artifacts to the Sprout EFI directory.
 $ cp /usr/lib/shim/shimaa64.efi.signed /boot/efi/EFI/sprout/shimaa64.efi
-$ cp /usr/lib/shim/mmaa64.efi /boot/efi/EFI/sprout/mmaa64.efi
-$ cp /usr/lib/shim/fbaa64.efi /boot/efi/EFI/sprout/fbaa64.efi
+$ cp /usr/lib/shim/mmaa64.efi.signed /boot/efi/EFI/sprout/mmaa64.efi
+$ cp /usr/lib/shim/fbaa64.efi.signed /boot/efi/EFI/sprout/fbaa64.efi
 ```
 
 ## Step 3: Install Unsigned Sprout
@@ -80,9 +81,9 @@ $ sbsign \
 You will need a filesystem EFI driver if `/boot` is not FAT32 or ExFAT.
 If `/boot` is FAT32 or ExFAT, you can skip this step.
 
-Most Ubuntu systems use an ext4 filesystem for `/boot`.
+Most Debian systems use an ext4 filesystem for `/boot`.
 You can download an EFI filesystem driver from [EfiFs releases](https://github.com/pbatard/EfiFs/releases).
-For ext4, download the `ext2` file for your platform. It will work for ext4 filesystems too.
+For ext4, download the `ext2` file for your platform. It should work for ext4 filesystems too.
 
 If you have an EFI driver, copy the driver to `/boot/efi/EFI/sprout/DRIVER_NAME.unsigned.efi` for signing.
 
