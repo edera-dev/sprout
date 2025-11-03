@@ -4,7 +4,6 @@
 
 - Modern Ubuntu release: tested on Ubuntu 25.10 ARM64
 - EFI System Partition mounted on `/boot/efi` (the default)
-- ext4 or FAT32/exFAT formatted `/boot` partition
 
 ## Step 1: Generate and Install Secure Boot Key
 
@@ -15,9 +14,9 @@ $ mkdir -p /etc/sprout/secure-boot
 $ cd /etc/sprout/secure-boot
 # Generate a MOK key and certificate.
 $ openssl req \
-  -newkey rsa:4096 -nodes -keyout mok.key \
-  -new -x509 -sha256 -days 3650 -subj '/CN=Sprout Secure Boot/' \
-  -out mok.crt
+    -newkey rsa:4096 -nodes -keyout mok.key \
+    -new -x509 -sha256 -days 3650 -subj '/CN=Sprout Secure Boot/' \
+    -out mok.crt
 # Generate a DER encoded certificate for enrollment.
 $ openssl x509 -outform DER -in mok.crt -out mok.cer
 # Import the certificate into the Secure Boot environment.

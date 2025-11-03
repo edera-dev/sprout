@@ -1,10 +1,14 @@
-# Setup Sprout for Debian with Secure Boot
+# Setup Sprout for openSUSE with Secure Boot
+
+**NOTE:** This guide may not function as written if the system validates hashes.
+If your system validates hashes in the shim, you will need to use MokManager to enroll the hashes
+of every EFI file involved, such as Sprout and any EFI drivers.
 
 ## Prerequisites
 
-- Modern Debian release: tested on Debian 13 ARM64
+- Modern openSUSE release: tested on openSUSE Tumbleweed ARM64
 - EFI System Partition mounted on `/boot/efi` (the default)
-- You will need the following packages installed: `openssl`, `shim-signed`, `mokutil`, `sbsigntool`
+- You will need the following packages installed: `openssl`, `shim`, `mokutil`, `sbsigntools`
 
 ## Step 1: Generate and Install Secure Boot Key
 
@@ -41,37 +45,31 @@ $ mokutil --import mok.cer
 $ mkdir -p /boot/efi/EFI/sprout
 
 # For x86_64, copy the following artifacts to the Sprout EFI directory.
-$ cp /usr/lib/shim/shimx64.efi.signed /boot/efi/EFI/sprout/shimx64.efi
-$ cp /usr/lib/shim/mmx64.efi.signed /boot/efi/EFI/sprout/mmx64.efi
-$ cp /usr/lib/shim/fbx64.efi.signed /boot/efi/EFI/sprout/fbx64.efi
+$ cp /usr/share/efi/x86_64/shim.efi /boot/efi/EFI/sprout/shim.efi
+$ cp /usr/share/efi/x86_64/MokManager.efi /boot/efi/EFI/sprout/MokManager.efi
+$ cp /usr/share/efi/x86_64/fallback.efi /boot/efi/EFI/sprout/fallback.efi
 
 # For aarch64, copy the following artifacts to the Sprout EFI directory.
-$ cp /usr/lib/shim/shimaa64.efi.signed /boot/efi/EFI/sprout/shimaa64.efi
-$ cp /usr/lib/shim/mmaa64.efi.signed /boot/efi/EFI/sprout/mmaa64.efi
-$ cp /usr/lib/shim/fbaa64.efi.signed /boot/efi/EFI/sprout/fbaa64.efi
+$ cp /usr/share/efi/aarch64/shim.efi /boot/efi/EFI/sprout/shim.efi
+$ cp /usr/share/efi/aarch64/MokManager.efi /boot/efi/EFI/sprout/MokManager.efi
+$ cp /usr/share/efi/aarch64/fallback.efi /boot/efi/EFI/sprout/fallback.efi
 ```
 
 ## Step 3: Install Unsigned Sprout
 
 Download the latest sprout.efi release from the [GitHub releases page](https://github.com/edera-dev/sprout/releases).
-For x86_64 systems, download the `sprout-x86_64.efi` file, and for ARM64 systems, download the `sprout-aarch64.efi` file.
+For x86_64 systems, download the `sprout-x86_64.efi` file, and for ARM64 systems, download the `sprout-aarch64.efi`
+file.
 Copy the downloaded `sprout.efi` file to `/boot/efi/EFI/sprout/sprout.unsigned.efi` on your EFI System Partition.
 
 ## Step 4: Sign Sprout for Secure Boot
 
 ```bash
-# For x86_64, sign the unsigned Sprout artifact and name it grubaa64.efi which is what the shim will call.
+# Sign the unsigned Sprout artifact and name it grub.efi which is what the shim will call.
 $ sbsign \
     --key /etc/sprout/secure-boot/mok.key \
     --cert /etc/sprout/secure-boot/mok.crt \
-    --output /boot/efi/EFI/sprout/grubx64.efi \
-    /boot/efi/EFI/sprout/sprout.unsigned.efi
-
-# For aarch64, sign the unsigned Sprout artifact and name it grubaa64.efi which is what the shim will call.
-$ sbsign \
-    --key /etc/sprout/secure-boot/mok.key \
-    --cert /etc/sprout/secure-boot/mok.crt \
-    --output /boot/efi/EFI/sprout/grubaa64.efi \
+    --output /boot/efi/EFI/sprout/grub.efi \
     /boot/efi/EFI/sprout/sprout.unsigned.efi
 ```
 
@@ -120,8 +118,8 @@ path = "\\EFI\\sprout\\ext4.efi"
 
 # global options.
 [options]
-# enable autoconfiguration by detecting bls enabled
-# filesystems and generating boot entries for them.
+# enable autoconfiguration by detecting bls enabled filesystems
+# or linux kernels and generating boot entries for them.
 autoconfigure = true
 ```
 
@@ -133,11 +131,8 @@ If you do not have any drivers, exclude the drivers section entirely.
 In the following commands, replace /dev/ESP_PARTITION with the actual path to the ESP partition block device.
 
 ```bash
-# For x86_64, run this command to add Sprout as the default boot entry.
-$ efibootmgr -d /dev/ESP_PARTITION -c -L 'Sprout' -l '\EFI\sprout\shimx64.efi'
-
-# For aarch64, run this command to add Sprout as the default boot entry.
-$ efibootmgr -d /dev/ESP_PARTITION -c -L 'Sprout' -l '\EFI\sprout\shimaa64.efi'
+# Run this command to add Sprout as the default boot entry.
+$ efibootmgr -d /dev/ESP_PARTITION -c -L 'Sprout' -l '\EFI\sprout\shim.efi'
 ```
 
 Reboot your machine and it should boot into Sprout.
