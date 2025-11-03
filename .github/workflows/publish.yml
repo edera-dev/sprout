@@ -27,6 +27,8 @@ jobs:
     name: artifacts
     permissions:
       contents: write # Needed to upload artifacts.
+      id-token: write # Needed for attestation.
+      attestations: write # Needed for attestations.
     runs-on: ubuntu-latest
     steps:
     - name: harden runner
@@ -46,14 +48,28 @@ jobs:
     - name: 'assemble artifacts'
       run: ./hack/assemble.sh
 
-    - name: 'upload sprout-x86_64.efi artifact'
+    - name: 'upload sprout-x86_64.efi.zip artifact'
+      id: upload-sprout-x86_64-efi
       uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
-        name: sprout-x86_64.efi
+        name: sprout-x86_64.efi.zip
         path: target/assemble/sprout-x86_64.efi
 
-    - name: 'upload sprout-aarch64.efi artifact'
+    - name: 'upload sprout-aarch64.efi.zip artifact'
+      id: upload-sprout-aarch64-efi
       uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
-        name: sprout-aarch64.efi
+        name: sprout-aarch64.efi.zip
         path: target/assemble/sprout-aarch64.efi
+
+    - name: 'attest sprout-x86_64.efi.zip artifact'
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+      with:
+        subject-name: sprout-x86_64.efi.zip
+        subject-digest: "sha256:${{ steps.upload-sprout-x86_64-efi.outputs.artifact-digest }}"
+
+    - name: 'attest sprout-aarch64.efi.zip artifact'
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+      with:
+        subject-name: sprout-aarch64.efi.zip
+        subject-digest: "sha256:${{ steps.upload-sprout-aarch64-efi.outputs.artifact-digest }}"
