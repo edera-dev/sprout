@@ -38,18 +38,13 @@ jobs:
       run: |
         cargo version
 
-    - name: 'assemble artifacts'
+    - name: 'assemble release artifacts'
       run: ./hack/assemble.sh
 
-    - name: 'attest sprout-x86_64.efi artifact'
+    - name: 'attest release artifacts'
       uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
       with:
-        subject-path: target/assemble/sprout-x86_64.efi
-
-    - name: 'attest sprout-aarch64.efi artifact'
-      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
-      with:
-        subject-path: target/assemble/sprout-aarch64.efi
+        subject-path: target/assemble/*
 
     - name: 'generate cultivator token'
       uses: actions/create-github-app-token@bf559f85448f9380bcfa2899dbdc01eb5b37be3a # v3.0.0-beta.2
