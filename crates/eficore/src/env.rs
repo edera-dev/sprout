@@ -45,25 +45,17 @@ pub fn args() -> Result<Vec<String>> {
 
     // Correct firmware that may add invalid arguments at the start.
     // Witnessed this on a Dell Precision 5690 when direct booting.
-    loop {
-        // Grab the first argument or break.
-        let Some(arg) = args.first() else {
-            break;
-        };
-
-        // Check if the argument is a valid character.
-        // If it is not, remove it and continue.
-        let Some(first_character) = arg.chars().next() else {
-            break;
-        };
-
-        // If the character is not a printable character or a backtick, remove it and continue.
-        if first_character < 0x1f as char || first_character == '`' {
-            args.remove(0);
-            continue;
-        }
-        break;
-    }
+    args = args
+        .into_iter()
+        .skip_while(|arg| {
+            arg.chars()
+                .next()
+                // Filter out unprintable characters and backticks.
+                // Both of which have been observed in the wild.
+                .map(|c| c < 0x1f as char || c == '`')
+                .unwrap_or(false)
+        })
+        .collect();
 
     // If there is a first argument, check if it is not an option.
     // If it is not, we will assume it is the path to the executable and remove it.
