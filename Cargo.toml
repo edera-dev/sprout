@@ -1,9 +1,9 @@
 [workspace]
 members = [
+  "crates/boot",
   "crates/build",
   "crates/config",
   "crates/eficore",
-  "crates/sprout",
 ]
 resolver = "3"
 

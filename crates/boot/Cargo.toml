@@ -1,6 +1,6 @@
 [package]
-name = "edera-sprout"
-description = "Modern UEFI bootloader"
+name = "edera-sprout-boot"
+description = "Sprout: Modern UEFI Bootloader"
 license.workspace = true
 version.workspace = true
 homepage.workspace = true
