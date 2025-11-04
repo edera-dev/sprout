@@ -161,14 +161,31 @@ impl MediaLoaderHandle {
 
         // Install a protocol interface for the device path.
         // This ensures it can be located by other EFI programs.
-        let primary_handle = unsafe {
+        let primary_handle = match unsafe {
             uefi::boot::install_protocol_interface(
                 None,
                 &DevicePathProtocol::GUID,
                 path.as_ffi_ptr() as *mut c_void,
             )
         }
-        .context("unable to install media loader device path handle")?;
+        .context("unable to install media loader device path handle")
+        {
+            // Acquiring the primary handle succeeded, so we can return the handle.
+            Ok(handle) => handle,
+            // If acquiring the primary handle failed, we free the device path and return the error.
+            Err(error) => {
+                // SAFETY: We know that the device path is leaked,
+                // so we can safely take a reference to it again.
+                // The UEFI stack failed to install the protocol interface
+                // if we reach here, so the path is no longer in use.
+                let path = unsafe { Box::from_raw(path) };
+                // Explicitly drop the path to clarify the lifetime.
+                drop(path);
+
+                // Return the original error.
+                return Err(error);
+            }
+        };
 
         // Leak the data we need to pass to the UEFI stack.
         let data = Box::leak(data);
