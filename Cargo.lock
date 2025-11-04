@@ -69,7 +69,7 @@ name = "edera-sprout"
 version = "0.0.22"
 dependencies = [
  "anyhow",
- "bitflags",
+ "edera-sprout-build",
  "edera-sprout-config",
  "edera-sprout-eficore",
  "hex",
@@ -80,6 +80,10 @@ dependencies = [
  "uefi",
  "uefi-raw",
 ]
+
+[[package]]
+name = "edera-sprout-build"
+version = "0.0.22"
 
 [[package]]
 name = "edera-sprout-config"

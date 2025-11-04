@@ -1,0 +1,12 @@
+[package]
+name = "edera-sprout-build"
+description = "Sprout Build Tools"
+license.workspace = true
+version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+edition.workspace = true
+
+[lib]
+name = "edera_sprout_build"
+path = "src/lib.rs"

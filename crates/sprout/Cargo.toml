@@ -9,7 +9,6 @@ edition.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-bitflags.workspace = true
 edera-sprout-config.path = "../config"
 edera-sprout-eficore.path = "../eficore"
 hex.workspace = true
@@ -19,6 +18,9 @@ toml.workspace = true
 log.workspace = true
 uefi.workspace = true
 uefi-raw.workspace = true
+
+[build-dependencies]
+edera-sprout-build.path = "../build"
 
 [[bin]]
 name = "sprout"
