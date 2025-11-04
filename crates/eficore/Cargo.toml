@@ -11,6 +11,7 @@ edition.workspace = true
 anyhow.workspace = true
 bitflags.workspace = true
 log.workspace = true
+shlex.workspace = true
 spin.workspace = true
 uefi.workspace = true
 uefi-raw.workspace = true

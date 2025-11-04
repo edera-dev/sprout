@@ -3,9 +3,6 @@ use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use anyhow::{Context, Result, bail};
 
-/// Acquire arguments from UEFI environment.
-pub mod env;
-
 /// The Sprout options parser.
 pub mod parser;
 

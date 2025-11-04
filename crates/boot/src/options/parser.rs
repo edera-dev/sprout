@@ -1,8 +1,8 @@
-use crate::options::env;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use anyhow::{Context, Result, bail};
 use core::ptr::null_mut;
+use eficore::env;
 use log::info;
 use uefi_raw::Status;
 
@@ -18,7 +18,7 @@ pub enum OptionForm {
     Help,
 }
 
-/// The description of an option, used in the options parser
+/// The description of an option, used in the option parser
 /// to make decisions about how to progress.
 #[derive(Debug, Clone)]
 pub struct OptionDescription<'a> {
@@ -35,8 +35,8 @@ pub trait OptionsRepresentable {
     type Output;
 
     /// The configured options for this type. This should describe all the options
-    /// that are valid to produce the type. The left hand side is the name of the option,
-    /// and the right hand side is the description.
+    /// that are valid to produce the type. The left-hand side is the name of the option,
+    /// and the right-hand side is the description.
     fn options() -> &'static [(&'static str, OptionDescription<'static>)];
 
     /// Produces the type by taking the `options` and processing it into the output.
@@ -44,7 +44,7 @@ pub trait OptionsRepresentable {
 
     /// For minimalism, we don't want a full argument parser. Instead, we use
     /// a simple --xyz = xyz: None and --abc 123 = abc: Some("123") format.
-    /// We also support --abc=123 = abc: Some("123") format.
+    /// We also support the format: --abc=123
     fn parse_raw() -> Result<BTreeMap<String, Option<String>>> {
         // Access the configured options for this type.
         let configured: BTreeMap<_, _> = BTreeMap::from_iter(Self::options().to_vec());

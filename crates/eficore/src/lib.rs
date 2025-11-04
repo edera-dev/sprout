@@ -29,6 +29,8 @@ pub mod strings;
 
 /// Implements support for the bootloader interface specification.
 pub mod bootloader_interface;
+/// Acquire arguments from UEFI environment.
+pub mod env;
 /// Support code for the EFI framebuffer.
 pub mod framebuffer;
 /// Support code for the media loader protocol.
