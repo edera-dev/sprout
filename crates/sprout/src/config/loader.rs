@@ -1,10 +1,9 @@
 use crate::options::SproutOptions;
-use crate::platform::tpm::PlatformTpm;
-use crate::utils;
 use alloc::vec::Vec;
 use anyhow::{Context, Result, bail};
 use core::ops::Deref;
 use edera_sprout_config::{RootConfiguration, latest_version};
+use eficore::platform::tpm::PlatformTpm;
 use log::info;
 use toml::Value;
 use uefi::proto::device_path::LoadedImageDevicePath;
@@ -21,7 +20,7 @@ fn load_raw_config(options: &SproutOptions) -> Result<Vec<u8>> {
     info!("configuration file: {}", options.config);
 
     // Read the contents of the sprout config file.
-    let content = utils::read_file_contents(Some(&path), &options.config)
+    let content = eficore::path::read_file_contents(Some(&path), &options.config)
         .context("unable to read sprout config file")?;
 
     // Measure the sprout.toml into the TPM, if needed and possible.

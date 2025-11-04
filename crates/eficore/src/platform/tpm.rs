@@ -1,4 +1,3 @@
-use crate::utils;
 use anyhow::{Context, Result};
 use uefi::ResultExt;
 use uefi::boot::ScopedProtocol;
@@ -43,8 +42,8 @@ impl PlatformTpm {
     /// Returns None if TPM is not available.
     fn protocol() -> Result<Option<TpmProtocolHandle>> {
         // Attempt to acquire the TCG2 protocol handle. If it's not available, return None.
-        let Some(handle) =
-            utils::find_handle(&Tcg2Protocol::GUID).context("unable to determine tpm presence")?
+        let Some(handle) = crate::handle::find_handle(&Tcg2Protocol::GUID)
+            .context("unable to determine tpm presence")?
         else {
             return Ok(None);
         };

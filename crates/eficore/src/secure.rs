@@ -1,4 +1,4 @@
-use crate::utils::variables::VariableController;
+use crate::variables::VariableController;
 use anyhow::Result;
 
 /// Secure boot services.

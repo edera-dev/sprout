@@ -1,13 +1,13 @@
 use crate::context::SproutContext;
-use crate::integrations::bootloader_interface::BootloaderInterface;
-use crate::integrations::shim::{ShimInput, ShimSupport};
 use crate::utils;
-use crate::utils::media_loader::MediaLoaderHandle;
-use crate::utils::media_loader::constants::linux::LINUX_EFI_INITRD_MEDIA_GUID;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use anyhow::{Context, Result, bail};
 use edera_sprout_config::actions::chainload::ChainloadConfiguration;
+use eficore::bootloader_interface::BootloaderInterface;
+use eficore::media_loader::MediaLoaderHandle;
+use eficore::media_loader::constants::linux::LINUX_EFI_INITRD_MEDIA_GUID;
+use eficore::shim::{ShimInput, ShimSupport};
 use log::error;
 use uefi::CString16;
 use uefi::proto::loaded_image::LoadedImage;
@@ -18,7 +18,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     let sprout_image = uefi::boot::image_handle();
 
     // Resolve the path to the image to chainload.
-    let resolved = utils::resolve_path(
+    let resolved = eficore::path::resolve_path(
         Some(context.root().loaded_image_path()?),
         &context.stamp(&configuration.path),
     )
@@ -68,9 +68,11 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     // If an initrd is provided, register it with the EFI stack.
     let mut initrd_handle = None;
     if let Some(linux_initrd) = initrd {
-        let content =
-            utils::read_file_contents(Some(context.root().loaded_image_path()?), &linux_initrd)
-                .context("unable to read linux initrd")?;
+        let content = eficore::path::read_file_contents(
+            Some(context.root().loaded_image_path()?),
+            &linux_initrd,
+        )
+        .context("unable to read linux initrd")?;
         let handle =
             MediaLoaderHandle::register(LINUX_EFI_INITRD_MEDIA_GUID, content.into_boxed_slice())
                 .context("unable to register linux initrd")?;

@@ -1,9 +1,9 @@
 use crate::entries::BootableEntry;
-use crate::integrations::bootloader_interface::BootloaderInterface;
-use crate::platform::timer::PlatformTimer;
 use alloc::vec;
 use anyhow::{Context, Result, bail};
 use core::time::Duration;
+use eficore::bootloader_interface::BootloaderInterface;
+use eficore::platform::timer::PlatformTimer;
 use log::{info, warn};
 use uefi::ResultExt;
 use uefi::boot::TimerTrigger;

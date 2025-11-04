@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "crates/config",
+  "crates/eficore",
   "crates/sprout",
 ]
 resolver = "3"
@@ -16,7 +17,6 @@ edition = "2024"
 bitflags = "2.10.0"
 log = "0.4.28"
 spin = "0.10.0"
-uefi = "0.36.0"
 uefi-raw = "0.12.0"
 
 [workspace.dependencies.anyhow]
@@ -45,6 +45,11 @@ default-features = false
 version = "0.9.8"
 default-features = false
 features = ["serde", "parse"]
+
+[workspace.dependencies.uefi]
+version = "0.36.0"
+default-features = false
+features = ["alloc", "global_allocator", "panic_handler"]
 
 # Common build profiles
 # NOTE: We have to compile everything for opt-level = 2 due to optimization passes

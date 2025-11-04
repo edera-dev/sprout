@@ -1,15 +1,7 @@
 use crate::{
     actions,
     context::SproutContext,
-    utils::{
-        self,
-        media_loader::{
-            MediaLoaderHandle,
-            constants::xen::{
-                XEN_EFI_CONFIG_MEDIA_GUID, XEN_EFI_KERNEL_MEDIA_GUID, XEN_EFI_RAMDISK_MEDIA_GUID,
-            },
-        },
-    },
+    utils::{self},
 };
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
@@ -17,6 +9,12 @@ use alloc::{format, vec};
 use anyhow::{Context, Result};
 use edera_sprout_config::actions::chainload::ChainloadConfiguration;
 use edera_sprout_config::actions::edera::EderaConfiguration;
+use eficore::media_loader::{
+    MediaLoaderHandle,
+    constants::xen::{
+        XEN_EFI_CONFIG_MEDIA_GUID, XEN_EFI_KERNEL_MEDIA_GUID, XEN_EFI_RAMDISK_MEDIA_GUID,
+    },
+};
 use log::error;
 use uefi::Guid;
 
@@ -79,8 +77,9 @@ fn register_media_loader_file(
     // Stamp the path to the file.
     let path = context.stamp(path);
     // Read the file contents.
-    let content = utils::read_file_contents(Some(context.root().loaded_image_path()?), &path)
-        .context(format!("unable to read {} file", what))?;
+    let content =
+        eficore::path::read_file_contents(Some(context.root().loaded_image_path()?), &path)
+            .context(format!("unable to read {} file", what))?;
     // Register the media loader.
     let handle = MediaLoaderHandle::register(guid, content.into_boxed_slice())
         .context(format!("unable to register {} media loader", what))?;

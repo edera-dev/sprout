@@ -13,3 +13,4 @@ default-features = false
 
 [lib]
 name = "edera_sprout_config"
+path = "src/lib.rs"

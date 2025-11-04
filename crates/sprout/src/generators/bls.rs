@@ -1,7 +1,6 @@
 use crate::context::SproutContext;
 use crate::entries::BootableEntry;
 use crate::generators::bls::entry::BlsEntry;
-use crate::utils;
 use crate::utils::vercmp;
 use alloc::format;
 use alloc::rc::Rc;
@@ -89,8 +88,9 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
     let path = context.stamp(&bls.path);
 
     // Resolve the path to the BLS directory.
-    let bls_resolved = utils::resolve_path(Some(context.root().loaded_image_path()?), &path)
-        .context("unable to resolve bls path")?;
+    let bls_resolved =
+        eficore::path::resolve_path(Some(context.root().loaded_image_path()?), &path)
+            .context("unable to resolve bls path")?;
 
     // Construct a filesystem path to the BLS entries directory.
     let mut entries_path = PathBuf::from(

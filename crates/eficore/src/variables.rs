@@ -1,4 +1,4 @@
-use crate::utils;
+use crate::strings;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -59,7 +59,7 @@ impl VariableController {
         match uefi::runtime::get_variable_boxed(&name, &self.vendor) {
             Ok((data, _)) => {
                 // Try to decode UTF-16 bytes to a CString16.
-                match utils::utf16_bytes_to_cstring16(&data) {
+                match strings::utf16_bytes_to_cstring16(&data) {
                     Ok(value) => {
                         // We have a value, so return the UTF-8 value.
                         Ok(Some(value.to_string()))

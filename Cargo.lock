@@ -71,11 +71,11 @@ dependencies = [
  "anyhow",
  "bitflags",
  "edera-sprout-config",
+ "edera-sprout-eficore",
  "hex",
  "log",
  "sha2",
  "shlex",
- "spin",
  "toml",
  "uefi",
  "uefi-raw",
@@ -86,6 +86,18 @@ name = "edera-sprout-config"
 version = "0.0.22"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "edera-sprout-eficore"
+version = "0.0.22"
+dependencies = [
+ "anyhow",
+ "bitflags",
+ "log",
+ "spin",
+ "uefi",
+ "uefi-raw",
 ]
 
 [[package]]

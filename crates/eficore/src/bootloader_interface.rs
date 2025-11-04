@@ -1,7 +1,6 @@
-use crate::integrations::bootloader_interface::bitflags::LoaderFeatures;
+use crate::bootloader_interface::bitflags::LoaderFeatures;
 use crate::platform::timer::PlatformTimer;
-use crate::utils::device_path_subpath;
-use crate::utils::variables::{VariableClass, VariableController};
+use crate::variables::{VariableClass, VariableController};
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -103,7 +102,8 @@ impl BootloaderInterface {
 
     /// Tell the system the relative path to the partition root of the current bootloader.
     pub fn set_loader_path(path: &DevicePath) -> Result<()> {
-        let subpath = device_path_subpath(path).context("unable to get loader path subpath")?;
+        let subpath =
+            crate::path::device_path_subpath(path).context("unable to get loader path subpath")?;
         Self::VENDOR.set_cstr16(
             "LoaderImageIdentifier",
             &subpath,

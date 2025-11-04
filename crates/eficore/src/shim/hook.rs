@@ -1,5 +1,4 @@
-use crate::integrations::shim::{ShimInput, ShimSupport, ShimVerificationOutput};
-use crate::utils;
+use crate::shim::{ShimInput, ShimSupport, ShimVerificationOutput};
 use anyhow::{Context, Result};
 use core::slice;
 use log::warn;
@@ -181,14 +180,14 @@ impl SecurityHook {
     /// Install the security hook if needed.
     pub fn install() -> Result<bool> {
         // Find the security arch protocol. If we can't find it, we will return false.
-        let Some(hook_arch) = utils::find_handle(&SECURITY_ARCH_GUID)
+        let Some(hook_arch) = crate::handle::find_handle(&SECURITY_ARCH_GUID)
             .context("unable to check security arch existence")?
         else {
             return Ok(false);
         };
 
         // Find the security arch2 protocol. If we can't find it, we will return false.
-        let Some(hook_arch2) = utils::find_handle(&SECURITY_ARCH2_GUID)
+        let Some(hook_arch2) = crate::handle::find_handle(&SECURITY_ARCH2_GUID)
             .context("unable to check security arch2 existence")?
         else {
             return Ok(false);
@@ -228,14 +227,14 @@ impl SecurityHook {
     /// Uninstalls the global security hook, if installed.
     pub fn uninstall() -> Result<()> {
         // Find the security arch protocol. If we can't find it, we will do nothing.
-        let Some(hook_arch) = utils::find_handle(&SECURITY_ARCH_GUID)
+        let Some(hook_arch) = crate::handle::find_handle(&SECURITY_ARCH_GUID)
             .context("unable to check security arch existence")?
         else {
             return Ok(());
         };
 
         // Find the security arch2 protocol. If we can't find it, we will do nothing.
-        let Some(hook_arch2) = utils::find_handle(&SECURITY_ARCH2_GUID)
+        let Some(hook_arch2) = crate::handle::find_handle(&SECURITY_ARCH2_GUID)
             .context("unable to check security arch2 existence")?
         else {
             return Ok(());

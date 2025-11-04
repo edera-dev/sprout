@@ -1,19 +1,13 @@
 #![doc = include_str!("../README.md")]
 #![no_std]
 #![no_main]
-
 extern crate alloc;
 
 use crate::context::{RootContext, SproutContext};
 use crate::entries::BootableEntry;
-use crate::integrations::bootloader_interface::{BootloaderInterface, BootloaderInterfaceTimeout};
 use crate::options::SproutOptions;
 use crate::options::parser::OptionsRepresentable;
 use crate::phases::phase;
-use crate::platform::timer::PlatformTimer;
-use crate::platform::tpm::PlatformTpm;
-use crate::secure::SecureBoot;
-use crate::utils::PartitionGuidForm;
 use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::string::ToString;
@@ -22,6 +16,12 @@ use anyhow::{Context, Result, bail};
 use core::ops::Deref;
 use core::time::Duration;
 use edera_sprout_config::RootConfiguration;
+use eficore::bootloader_interface::{BootloaderInterface, BootloaderInterfaceTimeout};
+use eficore::partition::PartitionGuidForm;
+use eficore::platform::timer::PlatformTimer;
+use eficore::platform::tpm::PlatformTpm;
+use eficore::secure::SecureBoot;
+use eficore::setup;
 use log::{error, info, warn};
 use uefi::entry;
 use uefi::proto::device_path::LoadedImageDevicePath;
@@ -51,12 +51,6 @@ pub mod extractors;
 /// generators: Runtime code that can generate entries with specific values.
 pub mod generators;
 
-/// integrations: Code that interacts with other systems.
-pub mod integrations;
-
-/// logger: Code for the logging mechanism of Sprout.
-pub mod logger;
-
 /// menu: Display a boot menu to select an entry to boot.
 pub mod menu;
 
@@ -66,17 +60,8 @@ pub mod options;
 /// phases: Hooks into specific parts of the boot process.
 pub mod phases;
 
-/// platform: Integration or support code for specific hardware platforms.
-pub mod platform;
-
 /// sbat: Secure Boot Attestation section.
 pub mod sbat;
-
-/// secure: Secure Boot support.
-pub mod secure;
-
-/// setup: Code that initializes the UEFI environment for Sprout.
-pub mod setup;
 
 /// utils: Utility functions that are used by other parts of Sprout.
 pub mod utils;
@@ -139,7 +124,7 @@ fn run() -> Result<()> {
 
     // Grab the partition GUID of the ESP that sprout was loaded from.
     let loaded_image_partition_guid =
-        utils::partition_guid(&loaded_image_path, PartitionGuidForm::Partition)
+        eficore::partition::partition_guid(&loaded_image_path, PartitionGuidForm::Partition)
             .context("unable to retrieve loaded image partition guid")?;
 
     // Set the partition GUID of the ESP that sprout was loaded from in the bootloader interface.

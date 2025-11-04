@@ -1,8 +1,7 @@
-use crate::integrations::shim::hook::SecurityHook;
+use crate::path::ResolvedPath;
 use crate::secure::SecureBoot;
-use crate::utils;
-use crate::utils::ResolvedPath;
-use crate::utils::variables::{VariableClass, VariableController};
+use crate::shim::hook::SecurityHook;
+use crate::variables::{VariableClass, VariableController};
 use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
@@ -90,7 +89,7 @@ impl<'a> ShimInput<'a> {
                 let path = path
                     .to_string(DisplayOnly(false), AllowShortcuts(false))
                     .context("unable to convert device path to string")?;
-                let path = utils::resolve_path(None, &path.to_string())
+                let path = crate::path::resolve_path(None, &path.to_string())
                     .context("unable to resolve path")?;
                 // Read the file path.
                 let data = path.read_file()?;
@@ -163,14 +162,14 @@ impl ShimSupport {
 
     /// Determines whether the shim is loaded.
     pub fn loaded() -> Result<bool> {
-        Ok(utils::find_handle(&Self::SHIM_LOCK_GUID)
+        Ok(crate::handle::find_handle(&Self::SHIM_LOCK_GUID)
             .context("unable to find shim lock protocol")?
             .is_some())
     }
 
     /// Determines whether the shim loader is available.
     pub fn loader_available() -> Result<bool> {
-        Ok(utils::find_handle(&Self::SHIM_IMAGE_LOADER_GUID)
+        Ok(crate::handle::find_handle(&Self::SHIM_IMAGE_LOADER_GUID)
             .context("unable to find shim image loader protocol")?
             .is_some())
     }
@@ -178,7 +177,7 @@ impl ShimSupport {
     /// Use the shim to validate the `input`, returning [ShimVerificationOutput] when complete.
     pub fn verify(input: ShimInput) -> Result<ShimVerificationOutput> {
         // Acquire the handle to the shim lock protocol.
-        let handle = utils::find_handle(&Self::SHIM_LOCK_GUID)
+        let handle = crate::handle::find_handle(&Self::SHIM_LOCK_GUID)
             .context("unable to find shim lock protocol")?
             .ok_or_else(|| anyhow!("unable to find shim lock protocol"))?;
         // Acquire the protocol exclusively to the shim lock.

@@ -1,12 +1,11 @@
 use crate::context::SproutContext;
-use crate::integrations::shim::{ShimInput, ShimSupport};
-use crate::utils;
 use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::String;
 use anyhow::{Context, Result};
 use edera_sprout_config::drivers::DriverDeclaration;
+use eficore::shim::{ShimInput, ShimSupport};
 use log::info;
 use uefi::boot::SearchType;
 
@@ -16,7 +15,7 @@ fn load_driver(context: Rc<SproutContext>, driver: &DriverDeclaration) -> Result
     let sprout_image = uefi::boot::image_handle();
 
     // Resolve the path to the driver image.
-    let resolved = utils::resolve_path(
+    let resolved = eficore::path::resolve_path(
         Some(context.root().loaded_image_path()?),
         &context.stamp(&driver.path),
     )

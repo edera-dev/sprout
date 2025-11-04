@@ -1,11 +1,11 @@
 use crate::context::SproutContext;
-use crate::utils;
 use alloc::rc::Rc;
 use alloc::string::String;
 use anyhow::{Context, Result, anyhow, bail};
 use core::ops::Deref;
 use core::str::FromStr;
 use edera_sprout_config::extractors::filesystem_device_match::FilesystemDeviceMatchExtractor;
+use eficore::partition::PartitionGuidForm;
 use uefi::fs::{FileSystem, Path};
 use uefi::proto::device_path::DevicePath;
 use uefi::proto::media::file::{File, FileSystemVolumeLabel};
@@ -48,8 +48,9 @@ pub fn extract(
                 .to_boxed();
 
             // Fetch the partition uuid for this filesystem.
-            let partition_uuid = utils::partition_guid(&root, utils::PartitionGuidForm::Partition)
-                .context("unable to fetch the partition uuid of the filesystem")?;
+            let partition_uuid =
+                eficore::partition::partition_guid(&root, PartitionGuidForm::Partition)
+                    .context("unable to fetch the partition uuid of the filesystem")?;
 
             // Compare the partition uuid to the parsed uuid.
             // If it does not match, continue to the next filesystem.
@@ -73,7 +74,7 @@ pub fn extract(
 
             // Fetch the partition type uuid for this filesystem.
             let partition_type_uuid =
-                utils::partition_guid(&root, utils::PartitionGuidForm::PartitionType)
+                eficore::partition::partition_guid(&root, PartitionGuidForm::PartitionType)
                     .context("unable to fetch the partition uuid of the filesystem")?;
             // Compare the partition type uuid to the parsed uuid.
             // If it does not match, continue to the next filesystem.
@@ -133,7 +134,7 @@ pub fn extract(
             .context("unable to open filesystem device path")?;
         let path = path.deref();
         // Acquire the device path root as a string.
-        return utils::device_path_root(path).context("unable to get device path root");
+        return eficore::path::device_path_root(path).context("unable to get device path root");
     }
 
     // If there is a fallback value, use it at this point.

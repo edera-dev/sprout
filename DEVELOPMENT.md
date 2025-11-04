@@ -11,6 +11,16 @@ We currently only support `x86_64-unknown-uefi` and `aarch64-unknown-uefi` targe
 To test your changes in QEMU, please run `./hack/dev/boot.sh`, you can specify `x86_64` or `aarch64`
 as an argument to boot.sh to boot the specified architecture.
 
+## Crate Structure
+
+Sprout is split into multiple crates:
+
+- `edera-sprout-config` at `crates/config`: Serialization structures for the Sprout configuration file.
+- `edera-sprout-eficore` at `crates/eficore`: Core library for Sprout EFI code.
+- `edera-sprout` as `crates/sprout`: Sprout's main crate that contains bootloader logic.
+
+It is intended that overtime Sprout will be split into even more crates.
+
 ## Hack Scripts
 
 You can use the `./hack` scripts to run common development tasks:
