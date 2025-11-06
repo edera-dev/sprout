@@ -5,9 +5,10 @@ use alloc::rc::Rc;
 use anyhow::{Context, Result, bail};
 use edera_sprout_config::actions::chainload::ChainloadConfiguration;
 use eficore::bootloader_interface::BootloaderInterface;
+use eficore::loader::source::ImageSource;
+use eficore::loader::{ImageLoadRequest, ImageLoader};
 use eficore::media_loader::MediaLoaderHandle;
 use eficore::media_loader::constants::linux::LINUX_EFI_INITRD_MEDIA_GUID;
-use eficore::shim::{ShimInput, ShimSupport};
 use log::error;
 use uefi::CString16;
 use uefi::proto::loaded_image::LoadedImage;
@@ -24,13 +25,17 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     )
     .context("unable to resolve chainload path")?;
 
-    // Load the image to chainload using the shim support integration.
+    // Create a new image load request with the current image and the resolved path.
+    let request = ImageLoadRequest::new(sprout_image, ImageSource::ResolvedPath(&resolved));
+
+    // Load the image to chainload using the image loader support module.
     // It will determine if the image needs to be loaded via the shim or can be loaded directly.
-    let image = ShimSupport::load(sprout_image, ShimInput::ResolvedPath(&resolved))?;
+    let image = ImageLoader::load(request)?;
 
     // Open the LoadedImage protocol of the image to chainload.
-    let mut loaded_image_protocol = uefi::boot::open_protocol_exclusive::<LoadedImage>(image)
-        .context("unable to open loaded image protocol")?;
+    let mut loaded_image_protocol =
+        uefi::boot::open_protocol_exclusive::<LoadedImage>(*image.handle())
+            .context("unable to open loaded image protocol")?;
 
     // Stamp and combine the options to pass to the image.
     let options =
@@ -87,7 +92,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     // This call might return, or it may pass full control to another image that will never return.
     // Capture the result to ensure we can return an error if the image fails to start, but only
     // after the optional initrd has been unregistered.
-    let result = uefi::boot::start_image(image);
+    let result = uefi::boot::start_image(*image.handle());
 
     // Unregister the initrd if it was registered.
     if let Some(initrd_handle) = initrd_handle

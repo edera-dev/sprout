@@ -1,6 +1,4 @@
 use crate::path::ResolvedPath;
-use crate::secure::SecureBoot;
-use crate::shim::hook::SecurityHook;
 use crate::variables::{VariableClass, VariableController};
 use alloc::boxed::Box;
 use alloc::string::ToString;
@@ -8,9 +6,6 @@ use alloc::vec::Vec;
 use anyhow::{Context, Result, anyhow, bail};
 use core::ffi::c_void;
 use core::pin::Pin;
-use log::warn;
-use uefi::Handle;
-use uefi::boot::LoadImageSource;
 use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
 use uefi::proto::device_path::{DevicePath, FfiDevicePath};
 use uefi::proto::unsafe_protocol;
@@ -18,7 +13,7 @@ use uefi_raw::table::runtime::VariableVendor;
 use uefi_raw::{Guid, Status, guid};
 
 /// Security hook support.
-mod hook;
+pub mod hook;
 
 /// Support for the shim loader application for Secure Boot.
 pub struct ShimSupport;
@@ -235,72 +230,6 @@ impl ShimSupport {
         Ok(maybe_loaded_data
             .map(ShimVerificationOutput::VerifiedDataBuffer)
             .unwrap_or(ShimVerificationOutput::VerifiedDataNotLoaded))
-    }
-
-    /// Load the image specified by the `input` and returns an image handle.
-    pub fn load(current_image: Handle, input: ShimInput) -> Result<Handle> {
-        // Determine whether Secure Boot is enabled.
-        let secure_boot =
-            SecureBoot::enabled().context("unable to determine if secure boot is enabled")?;
-
-        // Determine whether the shim is loaded.
-        let shim_loaded = Self::loaded().context("unable to determine if shim is loaded")?;
-
-        // Determine whether the shim loader is available.
-        let shim_loader_available =
-            Self::loader_available().context("unable to determine if shim loader is available")?;
-
-        // Determines whether LoadImage in Boot Services must be patched.
-        // Version 16 of the shim doesn't require extra effort to load Secure Boot binaries.
-        // If the image loader is installed, we can skip over the security hook.
-        let requires_security_hook = secure_boot && shim_loaded && !shim_loader_available;
-
-        // If the security hook is required, we will bail for now.
-        if requires_security_hook {
-            // Install the security hook, if possible. If it's not, this is necessary to continue,
-            // so we should bail.
-            let installed = SecurityHook::install().context("unable to install security hook")?;
-            if !installed {
-                bail!("unable to install security hook required for this platform");
-            }
-        }
-
-        // If the shim is loaded, we will need to retain the shim protocol to allow
-        // loading multiple images.
-        if shim_loaded {
-            // Retain the shim protocol after loading the image.
-            Self::retain()?;
-        }
-
-        // Converts the shim input to an owned data buffer.
-        let input = input
-            .into_owned_data_buffer()
-            .context("unable to convert input to loaded data buffer")?;
-
-        // Constructs a LoadImageSource from the input.
-        let source = LoadImageSource::FromBuffer {
-            buffer: input.buffer().context("unable to get buffer from input")?,
-            file_path: input.file_path(),
-        };
-
-        // Loads the image using Boot Services LoadImage function.
-        let result = uefi::boot::load_image(current_image, source).context("unable to load image");
-
-        // If the security override is required, we will uninstall the security hook.
-        if requires_security_hook {
-            let uninstall_result = SecurityHook::uninstall();
-            // Ensure we don't mask load image errors if uninstalling fails.
-            if result.is_err()
-                && let Err(uninstall_error) = &uninstall_result
-            {
-                // Warn on the error since the load image error is more important.
-                warn!("unable to uninstall security hook: {}", uninstall_error);
-            } else {
-                // Otherwise, ensure we handle the original uninstallation result.
-                uninstall_result?;
-            }
-        }
-        result
     }
 
     /// Set the ShimRetainProtocol variable to indicate that shim should retain the protocols

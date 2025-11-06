@@ -5,7 +5,8 @@ use alloc::rc::Rc;
 use alloc::string::String;
 use anyhow::{Context, Result};
 use edera_sprout_config::drivers::DriverDeclaration;
-use eficore::shim::{ShimInput, ShimSupport};
+use eficore::loader::source::ImageSource;
+use eficore::loader::{ImageLoadRequest, ImageLoader};
 use log::info;
 use uefi::boot::SearchType;
 
@@ -21,14 +22,17 @@ fn load_driver(context: Rc<SproutContext>, driver: &DriverDeclaration) -> Result
     )
     .context("unable to resolve path to driver")?;
 
-    // Load the driver image using the shim support integration.
+    // Create an image load request with the current image and the resolved path.
+    let request = ImageLoadRequest::new(sprout_image, ImageSource::ResolvedPath(&resolved));
+
+    // Load the driver image using the image loader support module.
     // It will determine if the image needs to be loaded via the shim or can be loaded directly.
-    let image = ShimSupport::load(sprout_image, ShimInput::ResolvedPath(&resolved))?;
+    let image = ImageLoader::load(request)?;
 
     // Start the driver image, this is expected to return control to sprout.
     // There is no guarantee that the driver will actually return control as it is
     // just a standard EFI image.
-    uefi::boot::start_image(image).context("unable to start driver image")?;
+    uefi::boot::start_image(*image.handle()).context("unable to start driver image")?;
 
     Ok(())
 }

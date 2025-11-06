@@ -6,6 +6,9 @@ extern crate alloc;
 /// EFI handle helpers.
 pub mod handle;
 
+/// Load and start EFI images.
+pub mod loader;
+
 /// Logging support for EFI applications.
 pub mod logger;
 
