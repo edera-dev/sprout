@@ -385,7 +385,7 @@ fn efi_main() -> Status {
     let result = run();
     if let Err(ref error) = result {
         // Print an error trace.
-        error!("sprout encountered an error:");
+        error!("sprout encountered an error: {}", error);
         for (index, stack) in error.chain().enumerate() {
             error!("[{}]: {}", index, stack);
         }
