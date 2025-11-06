@@ -66,7 +66,7 @@ dependencies = [
 
 [[package]]
 name = "edera-sprout-boot"
-version = "0.0.23"
+version = "0.0.24"
 dependencies = [
  "anyhow",
  "edera-sprout-build",
@@ -82,18 +82,18 @@ dependencies = [
 
 [[package]]
 name = "edera-sprout-build"
-version = "0.0.23"
+version = "0.0.24"
 
 [[package]]
 name = "edera-sprout-config"
-version = "0.0.23"
+version = "0.0.24"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "edera-sprout-eficore"
-version = "0.0.23"
+version = "0.0.24"
 dependencies = [
  "anyhow",
  "bitflags",
