@@ -47,8 +47,9 @@ We recommend running Sprout without Secure Boot for development, and with Secure
 
 | Operating System | Secure Boot Enabled | Link                                                  |
 |------------------|---------------------|-------------------------------------------------------|
-| Ubuntu           | ✅                   | [Setup Guide](./docs/setup/signed/ubuntu.md)          |
+| Fedora           | ✅                   | [Setup Guide](./docs/setup/signed/fedora.md)          |
 | Debian           | ✅                   | [Setup Guide](./docs/setup/signed/debian.md)          |
+| Ubuntu           | ✅                   | [Setup Guide](./docs/setup/signed/ubuntu.md)          |
 | openSUSE         | ✅                   | [Setup Guide](./docs/setup/signed/opensuse.md)        |
 | Fedora           | ❌                   | [Setup Guide](./docs/setup/unsigned/fedora.md)        |
 | Alpine Edge      | ❌                   | [Setup Guide](./docs/setup/unsigned/alpine-edge.md)   |

@@ -1,10 +1,12 @@
-# Setup Sprout for Debian with Secure Boot
+# Setup Sprout for Fedora with Secure Boot
 
 ## Prerequisites
 
-- Modern Debian release: tested on Debian 13 ARM64
+- Modern Fedora release: tested on Fedora 43 x86_64.
 - EFI System Partition mounted on `/boot/efi` (the default)
-- You will need the following packages installed: `openssl`, `shim-signed`, `mokutil`, `sbsigntool`
+- You will need the following packages installed: `openssl`, `mokutil`, `sbsigntools`, `efibootmgr`
+
+**NOTE**: Fedora on ARM64 itself does not support Secure Boot consistently.
 
 ## Step 1: Generate and Install Secure Boot Key
 
@@ -41,14 +43,12 @@ $ mokutil --import mok.cer
 $ mkdir -p /boot/efi/EFI/sprout
 
 # For x86_64, copy the following artifacts to the Sprout EFI directory.
-$ cp /usr/lib/shim/shimx64.efi.signed /boot/efi/EFI/sprout/shimx64.efi
-$ cp /usr/lib/shim/mmx64.efi.signed /boot/efi/EFI/sprout/mmx64.efi
-$ cp /usr/lib/shim/fbx64.efi.signed /boot/efi/EFI/sprout/fbx64.efi
+$ cp /boot/efi/EFI/fedora/shimx64.efi /boot/efi/EFI/sprout/shimx64.efi
+$ cp /boot/efi/EFI/fedora/mmx64.efi /boot/efi/EFI/sprout/mmx64.efi
 
 # For aarch64, copy the following artifacts to the Sprout EFI directory.
-$ cp /usr/lib/shim/shimaa64.efi.signed /boot/efi/EFI/sprout/shimaa64.efi
-$ cp /usr/lib/shim/mmaa64.efi.signed /boot/efi/EFI/sprout/mmaa64.efi
-$ cp /usr/lib/shim/fbaa64.efi.signed /boot/efi/EFI/sprout/fbaa64.efi
+$ cp /boot/efi/EFI/fedora/shimaa64.efi /boot/efi/EFI/sprout/shimaa64.efi
+$ cp /boot/efi/EFI/fedora/mmaa64.efi /boot/efi/EFI/sprout/mmaa64.efi
 ```
 
 ## Step 3: Install Unsigned Sprout
@@ -78,17 +78,27 @@ $ sbsign \
 ## Step 5: Install and Sign EFI Drivers
 
 You will need a filesystem EFI driver if `/boot` is not FAT32 or ExFAT.
-If `/boot` is FAT32 or ExFAT, you can skip this step.
 
-Most Debian systems use an ext4 filesystem for `/boot`.
-You can download an EFI filesystem driver from [EfiFs releases](https://github.com/pbatard/EfiFs/releases).
-For ext4, download the `ext2` file for your platform. It should work for ext4 filesystems too.
+### ext4
 
-If you have an EFI driver, copy the driver to `/boot/efi/EFI/sprout/DRIVER_NAME.unsigned.efi` for signing.
+Most Fedora systems use an ext4 filesystem for `/boot`, if that is the case, use the ext4 instructions here:
 
-For example, the `ext4` driver, copy the `ext4.efi` file to `/boot/efi/EFI/sprout/ext4.unsigned.efi`.
+Install the necessary `edk2-ext4` package:
 
-Then sign the driver with the Sprout Secure Boot key:
+```bash
+# Install the ext4 driver from the package manager.
+$ dnf install edk2-ext4
+```
+
+Copy the ext4 driver to `/boot/efi/EFI/sprout/ext4.unsigned.efi`:
+
+```bash
+# For x86_64, copy the ext4x64.efi driver to the Sprout EFI directory.
+$ cp /usr/share/edk2/drivers/ext4x64.efi /boot/efi/EFI/sprout/ext4.unsigned.efi
+
+# For aarch64, copy the ext4aa64.efi driver to the Sprout EFI directory.
+$ cp /usr/share/edk2/drivers/ext4aa64.efi /boot/efi/EFI/sprout/ext4.unsigned.efi
+```
 
 ```bash
 # Sign the ext4 driver at ext4.unsigned.efi, placing it at ext4.efi, which will be used in the configuration.
@@ -99,6 +109,27 @@ $ sbsign \
     /boot/efi/EFI/sprout/ext4.unsigned.efi
 ```
 
+### Other Filesystems
+
+If you need another driver, you can download EFI filesystem drivers from [EfiFs releases](https://github.com/pbatard/EfiFs/releases).
+Copy the driver to `/boot/efi/EFI/sprout/DRIVER_NAME.unsigned.efi` for signing, then sign it like this:
+
+```bash
+# Sign your driver, placing it at DRIVER_NAME.efi, which will be used in the configuration.
+$ sbsign \
+    --key /etc/sprout/secure-boot/mok.key \
+    --cert /etc/sprout/secure-boot/mok.crt \
+    --output /boot/efi/EFI/sprout/DRIVER_NAME.efi \
+    /boot/efi/EFI/sprout/DRIVER_NAME.unsigned.efi
+```
+
+You will add the driver in your Sprout configuration below, like this:
+
+```toml
+[drivers.DRIVER_NAME]
+path = "\\EFI\\sprout\\DRIVER_NAME.efi"
+```
+
 ## Step 6: Create Sprout Configuration
 
 Write the following to the file `/boot/efi/sprout.toml`:
@@ -106,11 +137,6 @@ Write the following to the file `/boot/efi/sprout.toml`:
 ```toml
 # sprout configuration: version 1
 version = 1
-
-# global values.
-[values]
-# your linux kernel command line.
-linux-options = "root=UUID=MY_ROOT_UUID"
 
 # load an ext4 EFI driver.
 # skip this if you do not have a filesystem driver.
@@ -120,8 +146,8 @@ path = "\\EFI\\sprout\\ext4.efi"
 
 # global options.
 [options]
-# enable autoconfiguration by detecting installed kernels
-# generating boot entries for them.
+# enable autoconfiguration by detecting bls enabled
+# filesystems and generating boot entries for them.
 autoconfigure = true
 ```
 

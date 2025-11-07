@@ -119,8 +119,8 @@ path = "\\EFI\\sprout\\ext4.efi"
 
 # global options.
 [options]
-# enable autoconfiguration by detecting bls enabled
-# filesystems and generating boot entries for them.
+# enable autoconfiguration by detecting installed kernels
+# generating boot entries for them.
 autoconfigure = true
 ```
 
@@ -129,14 +129,18 @@ If you do not have any drivers, exclude the drivers section entirely.
 
 ## Step 7: Configure Sprout Boot Entry
 
-In the following commands, replace /dev/ESP_PARTITION with the actual path to the ESP partition block device.
+## Step 7: Configure Sprout Boot Entry
+
+In the following commands, replace /dev/BLOCK_DEVICE with the device that houses your GPT partition table,
+and PARTITION_NUMBER with the partition number of the EFI System Partition. For example, if your EFI System Partition is
+`/dev/sda1`, the BLOCK_DEVICE would be `/dev/sda` and the PARTITION_NUMBER would be `1`
 
 ```bash
 # For x86_64, run this command to add Sprout as the default boot entry.
-$ efibootmgr -d /dev/ESP_PARTITION -c -L 'Sprout' -l '\EFI\sprout\shimx64.efi'
+$ efibootmgr -d /dev/BLOCK_DEVICE -p PARTITION_NUMBER -c -L 'Sprout' -l '\EFI\sprout\shimx64.efi'
 
 # For aarch64, run this command to add Sprout as the default boot entry.
-$ efibootmgr -d /dev/ESP_PARTITION -c -L 'Sprout' -l '\EFI\sprout\shimaa64.efi'
+$ efibootmgr -d /dev/BLOCK_DEVICE -p PARTITION_NUMBER -c -L 'Sprout' -l '\EFI\sprout\shimaa64.efi'
 ```
 
 Reboot your machine and it should boot into Sprout.
