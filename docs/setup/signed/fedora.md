@@ -60,7 +60,7 @@ Copy the downloaded `sprout.efi` file to `/boot/efi/EFI/sprout/sprout.unsigned.e
 ## Step 4: Sign Sprout for Secure Boot
 
 ```bash
-# For x86_64, sign the unsigned Sprout artifact and name it grubaa64.efi which is what the shim will call.
+# For x86_64, sign the unsigned Sprout artifact and name it grubx64.efi which is what the shim will call.
 $ sbsign \
     --key /etc/sprout/secure-boot/mok.key \
     --cert /etc/sprout/secure-boot/mok.crt \
