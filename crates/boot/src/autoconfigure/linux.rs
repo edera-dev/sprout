@@ -25,7 +25,7 @@ const LINUX_CHAINLOAD_ACTION_PREFIX: &str = "linux-chainload-";
 const SCAN_LOCATIONS: &[&str] = &["\\boot", "\\"];
 
 /// Prefixes of kernel files to scan for.
-const KERNEL_PREFIXES: &[&str] = &["vmlinuz"];
+const KERNEL_PREFIXES: &[&str] = &["vmlinuz", "Image"];
 
 /// Prefixes of initramfs files to match to.
 const INITRAMFS_PREFIXES: &[&str] = &["initramfs", "initrd", "initrd.img"];
