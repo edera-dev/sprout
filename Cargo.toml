@@ -29,6 +29,11 @@ version = "0.4.3"
 default-features = false
 features = ["alloc"]
 
+[workspace.dependencies.jaarg]
+version = "0.2.1"
+default-features = false
+features = ["alloc"]
+
 [workspace.dependencies.serde]
 version = "1.0.228"
 default-features = false

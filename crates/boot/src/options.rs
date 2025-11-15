@@ -1,10 +1,13 @@
-use crate::options::parser::{OptionDescription, OptionForm, OptionsRepresentable};
-use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use anyhow::{Context, Result, bail};
-
-/// The Sprout options parser.
-pub mod parser;
+use core::ptr::null_mut;
+use jaarg::alloc::ParseMapResult;
+use jaarg::{
+    ErrorUsageWriter, ErrorUsageWriterContext, HelpWriter, HelpWriterContext, Opt, Opts,
+    StandardErrorUsageWriter, StandardFullHelpWriter,
+};
+use log::{error, info};
+use uefi_raw::Status;
 
 /// Default configuration file path.
 const DEFAULT_CONFIG_PATH: &str = "\\sprout.toml";
@@ -38,65 +41,61 @@ impl Default for SproutOptions {
 }
 
 /// The options parser mechanism for Sprout.
-impl OptionsRepresentable for SproutOptions {
-    /// Produce the [SproutOptions] structure.
-    type Output = Self;
+impl SproutOptions {
+    /// Produces [SproutOptions] from the arguments provided by the UEFI core.
+    /// Internally we utilize the `jaarg` argument parser which has excellent no_std support.
+    pub fn parse() -> Result<Self> {
+        // All the options for the Sprout executable.
+        const OPTIONS: Opts<&str> = Opts::new(&[
+            Opt::help_flag("help", &["--help"]).help_text("Display Sprout Help"),
+            Opt::flag("autoconfigure", &["--autoconfigure"])
+                .help_text("Enable Sprout autoconfiguration"),
+            Opt::value("config", &["--config"], "PATH")
+                .help_text("Path to Sprout configuration file"),
+            Opt::value("boot", &["--boot"], "ENTRY").help_text("Entry to boot, bypassing the menu"),
+            Opt::flag("force-menu", &["--force-menu"]).help_text("Force showing the boot menu"),
+            Opt::value("menu-timeout", &["--menu-timeout"], "TIMEOUT")
+                .help_text("Boot menu timeout, in seconds"),
+        ]);
 
-    /// All the Sprout options that are defined.
-    fn options() -> &'static [(&'static str, OptionDescription<'static>)] {
-        &[
-            (
-                "autoconfigure",
-                OptionDescription {
-                    description: "Enable Sprout Autoconfiguration",
-                    form: OptionForm::Flag,
-                },
-            ),
-            (
-                "config",
-                OptionDescription {
-                    description: "Path to Sprout configuration file",
-                    form: OptionForm::Value,
-                },
-            ),
-            (
-                "boot",
-                OptionDescription {
-                    description: "Entry to boot, bypassing the menu",
-                    form: OptionForm::Value,
-                },
-            ),
-            (
-                "force-menu",
-                OptionDescription {
-                    description: "Force showing of the boot menu",
-                    form: OptionForm::Flag,
-                },
-            ),
-            (
-                "menu-timeout",
-                OptionDescription {
-                    description: "Boot menu timeout, in seconds",
-                    form: OptionForm::Value,
-                },
-            ),
-            (
-                "help",
-                OptionDescription {
-                    description: "Display Sprout Help",
-                    form: OptionForm::Help,
-                },
-            ),
-        ]
-    }
+        // Acquire the arguments as determined by the UEFI core.
+        let args = eficore::env::args()?;
 
-    /// Produces [SproutOptions] from the parsed raw `options` map.
-    fn produce(options: BTreeMap<String, Option<String>>) -> Result<Self> {
+        // Parse the OPTIONS into a map using jaarg.
+        let parsed = match OPTIONS.parse_map(
+            "sprout",
+            args.iter(),
+            |program_name| {
+                let ctx = HelpWriterContext {
+                    options: &OPTIONS,
+                    program_name,
+                };
+                info!("{}", StandardFullHelpWriter::new(ctx));
+            },
+            |program_name, error| {
+                let ctx = ErrorUsageWriterContext {
+                    options: &OPTIONS,
+                    program_name,
+                    error,
+                };
+                error!("{}", StandardErrorUsageWriter::new(ctx));
+            },
+        ) {
+            ParseMapResult::Map(map) => map,
+            ParseMapResult::ExitSuccess => unsafe {
+                uefi::boot::exit(uefi::boot::image_handle(), Status::SUCCESS, 0, null_mut());
+            },
+
+            ParseMapResult::ExitFailure => unsafe {
+                uefi::boot::exit(uefi::boot::image_handle(), Status::ABORTED, 0, null_mut());
+            },
+        };
+
         // Use the default value of sprout options and have the raw options be parsed into it.
         let mut result = Self::default();
 
-        for (key, value) in options {
-            match key.as_str() {
+        for (key, value) in parsed {
+            match key {
                 "autoconfigure" => {
                     // Enable autoconfiguration.
                     result.autoconfigure = true;
@@ -104,12 +103,12 @@ impl OptionsRepresentable for SproutOptions {
 
                 "config" => {
                     // The configuration file to load.
-                    result.config = value.context("--config option requires a value")?;
+                    result.config = value;
                 }
 
                 "boot" => {
                     // The entry to boot.
-                    result.boot = Some(value.context("--boot option requires a value")?);
+                    result.boot = Some(value);
                 }
 
                 "force-menu" => {
@@ -119,7 +118,6 @@ impl OptionsRepresentable for SproutOptions {
 
                 "menu-timeout" => {
                     // The timeout for the boot menu in seconds.
-                    let value = value.context("--menu-timeout option requires a value")?;
                     let value = value
                         .parse::<u64>()
                         .context("menu-timeout must be a number")?;

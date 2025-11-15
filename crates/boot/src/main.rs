@@ -6,7 +6,6 @@ extern crate alloc;
 use crate::context::{RootContext, SproutContext};
 use crate::entries::BootableEntry;
 use crate::options::SproutOptions;
-use crate::options::parser::OptionsRepresentable;
 use crate::phases::phase;
 use alloc::collections::BTreeMap;
 use alloc::format;
