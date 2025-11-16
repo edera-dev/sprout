@@ -30,9 +30,9 @@ if [ "${QEMU_GDB_WAIT}" = "1" ]; then
 	set -- "${@}" "-S"
 fi
 
-set -- "${@}" -smp 2 -m 4096
+set -- "${@}" -nodefaults -smp 2 -m 4096
 
-if [ "${NO_GRAPHICAL_BOOT}" = "1" ]; then
+if [ "${NO_GRAPHICAL}" = "1" ]; then
 	set -- "${@}" -nographic
 else
 	if [ "${GRAPHICAL_ONLY}" != "1" ]; then
@@ -41,7 +41,7 @@ else
 		else
 			set -- "${@}" \
 				-device virtio-serial-pci,id=vs0 \
-				-chardev stdio,id=stdio0 \
+				-chardev stdio,id=stdio0,signal=off \
 				-device virtconsole,chardev=stdio0,id=console0
 		fi
 	fi
@@ -60,6 +60,12 @@ if [ "${NO_INPUT}" != "1" ]; then
 		-device qemu-xhci \
 		-device usb-kbd \
 		-device usb-mouse
+fi
+
+if [ "${NO_NETWORK}" != "1" ]; then
+	set -- "${@}" \
+		-netdev user,id=network0 \
+		-device virtio-net-pci,netdev=network0
 fi
 
 rm -f "${FINAL_DIR}/ovmf-boot.fd"

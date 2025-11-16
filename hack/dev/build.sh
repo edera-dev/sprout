@@ -48,7 +48,7 @@ copy_from_image_polyfill() {
 	SOURCE="${2}"
 	TARGET="${3}"
 
-	docker build -t "${IMAGE}-copy-polyfill:${DOCKER_TAG}" --build-arg "TARGET_IMAGE=${IMAGE}:${DOCKER_TAG}" \
+	docker build --platform="${DOCKER_TARGET}" -t "${IMAGE}-copy-polyfill:${DOCKER_TAG}" --build-arg "TARGET_IMAGE=${IMAGE}:${DOCKER_TAG}" \
 		-f hack/dev/utils/Dockerfile.copy-polyfill hack
 	# note: the -w '//' is a workaround for Git Bash where / is magically rewritten.
 	docker run --rm -i -w '//' "${IMAGE}-copy-polyfill:${DOCKER_TAG}" cat "image/${SOURCE}" >"${TARGET}"
@@ -81,7 +81,7 @@ if [ "${SKIP_VM_BUILD}" != "1" ]; then
 	copy_from_image "${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}" "ovmf.fd" "${FINAL_DIR}/ovmf.fd"
 	copy_from_image "${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}" "shell.efi" "${FINAL_DIR}/shell.efi"
 	docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-initramfs-${TARGET_ARCH}:${DOCKER_TAG}" \
-		-f hack/dev/vm/Dockerfile.initramfs "${FINAL_DIR}"
+		-f hack/dev/vm/Dockerfile.initramfs "hack/dev/vm"
 	copy_from_image "${DOCKER_PREFIX}/sprout-initramfs-${TARGET_ARCH}" "initramfs" "${FINAL_DIR}/initramfs"
 
 	if [ -n "${SPROUT_XEN_EFI_OVERRIDE}" ]; then

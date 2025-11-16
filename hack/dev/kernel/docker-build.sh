@@ -36,9 +36,14 @@ if [ "${TARGET_KARCH}" = "x86_64" ]; then
 fi
 make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" mod2yesconfig
 
+./scripts/config -e UEVENT_HELPER
+./scripts/config --set-str UEVENT_HELPER_PATH "/sbin/hotplug"
+
 ./scripts/config -e DRM_VIRTIO_GPU
 ./scripts/config -e FRAMEBUFFER_CONSOLE
 ./scripts/config -e FRAMEBUFFER_CONSOLE_DETECT_PRIMARY
+./scripts/config -e LOGO
+
 ./scripts/config -e XEN_DOM0
 
 make "-j$(nproc)" CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}"

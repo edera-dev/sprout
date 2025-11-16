@@ -8,7 +8,7 @@ has-item = "\\vmlinuz"
 
 [actions.chainload-kernel]
 chainload.path = "$boot\\vmlinuz"
-chainload.options = ["console=hvc0"]
+chainload.options = ["console=hvc0", "overlaytmpfs=yes"]
 chainload.linux-initrd = "$boot\\initramfs"
 
 [entries.kernel]
