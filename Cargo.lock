@@ -73,6 +73,7 @@ dependencies = [
  "edera-sprout-config",
  "edera-sprout-eficore",
  "hex",
+ "jaarg",
  "log",
  "sha2",
  "toml",
@@ -119,6 +120,12 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "jaarg"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b216e5405f7e759ee0d16007f9d5c3346f9803a2e86cf01fc8df8baac43d0fa"
 
 [[package]]
 name = "libc"
