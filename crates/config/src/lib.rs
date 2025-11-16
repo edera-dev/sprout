@@ -78,8 +78,7 @@ pub struct RootConfiguration {
 /// Options configuration for Sprout, used when the corresponding options are not specified.
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct OptionsConfiguration {
-    /// The entry to boot without showing the boot menu.
-    /// If not specified, a boot menu is shown.
+    /// The entry to mark as the default entry, instead of the first entry.
     #[serde(rename = "default-entry", default)]
     pub default_entry: Option<String>,
     /// The timeout of the boot menu.
