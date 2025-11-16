@@ -93,7 +93,17 @@ impl BootableEntry {
     }
 
     /// Determine if this entry matches `needle` by comparing to the name or title of the entry.
+    /// If `needle` ends with *, we will match a partial match.
     pub fn is_match(&self, needle: &str) -> bool {
+        // If the needle ends with '*', we will accept a partial match.
+        if needle.ends_with("*") {
+            // Strip off any '*' at the end.
+            let partial = needle.trim_end_matches("*");
+            // Check if the name or title start with the partial match.
+            return self.name.starts_with(partial) || self.title.starts_with(partial);
+        }
+
+        // Standard quality matching rules.
         self.name == needle || self.title == needle
     }
 
