@@ -1,10 +1,9 @@
 use alloc::string::{String, ToString};
-use anyhow::{Context, Result, bail};
+use anyhow::Result;
 use core::ptr::null_mut;
-use jaarg::alloc::ParseMapResult;
 use jaarg::{
     ErrorUsageWriter, ErrorUsageWriterContext, HelpWriter, HelpWriterContext, Opt, Opts,
-    StandardErrorUsageWriter, StandardFullHelpWriter,
+    ParseControl, ParseResult, StandardErrorUsageWriter, StandardFullHelpWriter,
 };
 use log::{error, info};
 use uefi_raw::Status;
@@ -45,32 +44,71 @@ impl SproutOptions {
     /// Produces [SproutOptions] from the arguments provided by the UEFI core.
     /// Internally we utilize the `jaarg` argument parser which has excellent no_std support.
     pub fn parse() -> Result<Self> {
+        enum ArgID {
+            Help,
+            AutoConfigure,
+            Config,
+            Boot,
+            ForceMenu,
+            MenuTimeout,
+        }
+
         // All the options for the Sprout executable.
-        const OPTIONS: Opts<&str> = Opts::new(&[
-            Opt::help_flag("help", &["--help"]).help_text("Display Sprout Help"),
-            Opt::flag("autoconfigure", &["--autoconfigure"])
+        const OPTIONS: Opts<ArgID> = Opts::new(&[
+            Opt::help_flag(ArgID::Help, &["--help"]).help_text("Display Sprout Help"),
+            Opt::flag(ArgID::AutoConfigure, &["--autoconfigure"])
                 .help_text("Enable Sprout autoconfiguration"),
-            Opt::value("config", &["--config"], "PATH")
+            Opt::value(ArgID::Config, &["--config"], "PATH")
                 .help_text("Path to Sprout configuration file"),
-            Opt::value("boot", &["--boot"], "ENTRY").help_text("Entry to boot, bypassing the menu"),
-            Opt::flag("force-menu", &["--force-menu"]).help_text("Force showing the boot menu"),
-            Opt::value("menu-timeout", &["--menu-timeout"], "TIMEOUT")
+            Opt::value(ArgID::Boot, &["--boot"], "ENTRY")
+                .help_text("Entry to boot, bypassing the menu"),
+            Opt::flag(ArgID::ForceMenu, &["--force-menu"]).help_text("Force showing the boot menu"),
+            Opt::value(ArgID::MenuTimeout, &["--menu-timeout"], "TIMEOUT")
                 .help_text("Boot menu timeout, in seconds"),
         ]);
 
         // Acquire the arguments as determined by the UEFI core.
         let args = eficore::env::args()?;
 
+        // Use the default value of sprout options and have the raw options be parsed into it.
+        let mut result = Self::default();
+
         // Parse the OPTIONS into a map using jaarg.
-        let parsed = match OPTIONS.parse_map(
+        match OPTIONS.parse(
             "sprout",
             args.iter(),
-            |program_name| {
-                let ctx = HelpWriterContext {
-                    options: &OPTIONS,
-                    program_name,
-                };
-                info!("{}", StandardFullHelpWriter::new(ctx));
+            |program_name, id, _opt, _name, value| {
+                match id {
+                    ArgID::AutoConfigure => {
+                        // Enable autoconfiguration.
+                        result.autoconfigure = true;
+                    }
+                    ArgID::Config => {
+                        // The configuration file to load.
+                        result.config = value.into();
+                    }
+                    ArgID::Boot => {
+                        // The entry to boot.
+                        result.boot = Some(value.into());
+                    }
+                    ArgID::ForceMenu => {
+                        // Force showing of the boot menu.
+                        result.force_menu = true;
+                    }
+                    ArgID::MenuTimeout => {
+                        // The timeout for the boot menu in seconds.
+                        result.menu_timeout = Some(value.parse::<u64>()?);
+                    }
+                    ArgID::Help => {
+                        let ctx = HelpWriterContext {
+                            options: &OPTIONS,
+                            program_name,
+                        };
+                        info!("{}", StandardFullHelpWriter::new(ctx));
+                        return Ok(ParseControl::Quit);
+                    }
+                }
+                Ok(ParseControl::Continue)
             },
             |program_name, error| {
                 let ctx = ErrorUsageWriterContext {
@@ -81,52 +119,14 @@ impl SproutOptions {
                 error!("{}", StandardErrorUsageWriter::new(ctx));
             },
         ) {
-            ParseMapResult::Map(map) => map,
-            ParseMapResult::ExitSuccess => unsafe {
+            ParseResult::ContinueSuccess => Ok(result),
+            ParseResult::ExitSuccess => unsafe {
                 uefi::boot::exit(uefi::boot::image_handle(), Status::SUCCESS, 0, null_mut());
             },
 
-            ParseMapResult::ExitFailure => unsafe {
+            ParseResult::ExitError => unsafe {
                 uefi::boot::exit(uefi::boot::image_handle(), Status::ABORTED, 0, null_mut());
             },
-        };
-
-        // Use the default value of sprout options and have the raw options be parsed into it.
-        let mut result = Self::default();
-
-        for (key, value) in parsed {
-            match key {
-                "autoconfigure" => {
-                    // Enable autoconfiguration.
-                    result.autoconfigure = true;
-                }
-
-                "config" => {
-                    // The configuration file to load.
-                    result.config = value;
-                }
-
-                "boot" => {
-                    // The entry to boot.
-                    result.boot = Some(value);
-                }
-
-                "force-menu" => {
-                    // Force showing of the boot menu.
-                    result.force_menu = true;
-                }
-
-                "menu-timeout" => {
-                    // The timeout for the boot menu in seconds.
-                    let value = value
-                        .parse::<u64>()
-                        .context("menu-timeout must be a number")?;
-                    result.menu_timeout = Some(value);
-                }
-
-                _ => bail!("unknown option: --{key}"),
-            }
         }
-        Ok(result)
     }
 }
