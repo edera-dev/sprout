@@ -53,3 +53,4 @@ jobs:
       with:
         subject-name: artifacts.zip
         subject-digest: "sha256:${{ steps.upload.outputs.artifact-digest }}"
+      if: github.event_name != 'pull_request'
