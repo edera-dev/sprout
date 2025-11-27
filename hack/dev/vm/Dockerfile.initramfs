@@ -1,5 +1,5 @@
 FROM alpine:3.22@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412 AS rootfs
-RUN apk --no-cache add alpine-base tzdata ifupdown-ng agetty
+RUN apk --no-cache add alpine-base tzdata wireless-regdb ifupdown-ng agetty
 RUN rc-update add devfs sysinit && \
     rc-update add dmesg sysinit && \
     rc-update add mdev sysinit && \
@@ -18,6 +18,7 @@ RUN rc-update add devfs sysinit && \
     rm /etc/motd && \
     ln -s /usr/share/zoneinfo/UTC /etc/localtime && \
     echo 'hvc0::respawn:/sbin/agetty --autologin root -L hvc0 115200 vt100' >> /etc/inittab
+ADD kernel.modules.tgz /
 COPY files/interfaces /etc/network/interfaces
 
 FROM alpine:3.22@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412 AS build

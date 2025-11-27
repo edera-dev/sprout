@@ -40,9 +40,9 @@ else
 			set -- "${@}" -serial stdio
 		else
 			set -- "${@}" \
-				-device virtio-serial-pci,id=vs0 \
-				-chardev stdio,id=stdio0,signal=off \
-				-device virtconsole,chardev=stdio0,id=console0
+				-device 'virtio-serial-pci,id=vs0' \
+				-chardev 'stdio,id=stdio0,signal=off' \
+				-device 'virtconsole,chardev=stdio0,id=console0,name=alpine'
 		fi
 	fi
 
@@ -64,8 +64,8 @@ fi
 
 if [ "${NO_NETWORK}" != "1" ]; then
 	set -- "${@}" \
-		-netdev user,id=network0 \
-		-device virtio-net-pci,netdev=network0
+		-netdev 'user,id=network0' \
+		-device 'virtio-net-pci,netdev=network0'
 fi
 
 rm -f "${FINAL_DIR}/ovmf-boot.fd"
@@ -76,7 +76,7 @@ fi
 # shellcheck disable=SC2086
 set -- "${@}" \
 	-drive "if=pflash,file=${FINAL_DIR}/ovmf-boot.fd,format=raw,readonly=on" \
-	-device nvme,drive=disk1,serial=cafebabe
+	-device 'nvme,drive=disk1,serial=cafebabe'
 
 set -- "${@}" \
 	-drive "if=none,file=${FINAL_DIR}/sprout.img,format=raw,id=disk1,readonly=on"
