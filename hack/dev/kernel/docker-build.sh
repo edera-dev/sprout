@@ -28,13 +28,17 @@ else
 	exit 1
 fi
 
+echo "CROSS_COMPILE=${MAYBE_CROSS_COMPILE}" > kernel.buildenv
+echo "TARGET_KARCH=${TARGET_KARCH}" >> kernel.buildenv
+
 make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" defconfig
 if [ "${TARGET_KARCH}" = "x86_64" ]; then
 	make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" xen.config
 	./scripts/config -e XEN_PV
 	./scripts/config -e XEN_PV_DOM0
 fi
-make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" mod2yesconfig
+
+./scripts/config -e BPF_SYSCALL
 
 ./scripts/config -e UEVENT_HELPER
 ./scripts/config --set-str UEVENT_HELPER_PATH "/sbin/hotplug"
@@ -46,8 +50,11 @@ make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" mod2yesconfig
 
 ./scripts/config -e XEN_DOM0
 
+make CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}" mod2noconfig
+
 make "-j$(nproc)" CROSS_COMPILE="${MAYBE_CROSS_COMPILE}" ARCH="${TARGET_KARCH}"
 
 [ -f "arch/x86/boot/bzImage" ] && cp "arch/x86/boot/bzImage" kernel.image
 [ -f "arch/arm64/boot/Image.gz" ] && gzip -d <"arch/arm64/boot/Image.gz" >kernel.image
+
 exit 0

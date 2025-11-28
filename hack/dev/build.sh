@@ -72,6 +72,7 @@ if [ "${SKIP_KERNEL_BUILD}" != "1" ]; then
 	fi
 
 	copy_from_image "${DOCKER_PREFIX}/sprout-kernel-${TARGET_ARCH}" "kernel.efi" "${FINAL_DIR}/kernel.efi"
+	copy_from_image "${DOCKER_PREFIX}/sprout-kernel-${TARGET_ARCH}" "kernel.modules.tgz" "${FINAL_DIR}/kernel.modules.tgz"
 fi
 
 if [ "${SKIP_VM_BUILD}" != "1" ]; then
@@ -80,8 +81,12 @@ if [ "${SKIP_VM_BUILD}" != "1" ]; then
 		-f hack/dev/vm/Dockerfile.ovmf "${FINAL_DIR}"
 	copy_from_image "${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}" "ovmf.fd" "${FINAL_DIR}/ovmf.fd"
 	copy_from_image "${DOCKER_PREFIX}/sprout-ovmf-${TARGET_ARCH}" "shell.efi" "${FINAL_DIR}/shell.efi"
+	rm -rf "${FINAL_DIR}/initramfs.build"
+	mkdir -p "${FINAL_DIR}/initramfs.build"
+	cp -r "hack/dev/vm/files" "${FINAL_DIR}/initramfs.build/files"
+	cp "${FINAL_DIR}/kernel.modules.tgz" "${FINAL_DIR}/initramfs.build/kernel.modules.tgz"
 	docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-initramfs-${TARGET_ARCH}:${DOCKER_TAG}" \
-		-f hack/dev/vm/Dockerfile.initramfs "hack/dev/vm"
+		-f hack/dev/vm/Dockerfile.initramfs "${FINAL_DIR}/initramfs.build"
 	copy_from_image "${DOCKER_PREFIX}/sprout-initramfs-${TARGET_ARCH}" "initramfs" "${FINAL_DIR}/initramfs"
 
 	if [ -n "${SPROUT_XEN_EFI_OVERRIDE}" ]; then

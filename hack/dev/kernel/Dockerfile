@@ -32,6 +32,9 @@ ENV BUILDPLATFORM=${BUILDPLATFORM}
 ENV TARGETPLATFORM=${TARGETPLATFORM}
 WORKDIR /build/src
 RUN /build/docker-build.sh
+COPY --chown=build:build docker-install.sh /build/docker-install.sh
+RUN /build/docker-install.sh
 
 FROM scratch AS final
 COPY --from=build /build/src/kernel.image /kernel.efi
+COPY --from=build /build/src/kernel.modules.tgz /kernel.modules.tgz
