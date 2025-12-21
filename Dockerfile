@@ -2,7 +2,7 @@
 ARG RUST_PROFILE=release
 ARG RUST_TARGET_SUBDIR=release
 
-FROM --platform=$BUILDPLATFORM rust:1.91.1-alpine@sha256:8efbfb788786eeb127adc581394349c5fb567712156e0f8c2e499acadbc23756 AS build
+FROM --platform=$BUILDPLATFORM rust:1.92.0-alpine@sha256:f6c22e0a256c05d44fca23bf530120b5d4a6249a393734884281ca80782329bc AS build
 RUN apk --no-cache add musl-dev busybox-static
 ARG RUST_PROFILE
 RUN adduser -S -s /bin/sh build

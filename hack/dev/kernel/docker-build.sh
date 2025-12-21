@@ -38,10 +38,16 @@ if [ "${TARGET_KARCH}" = "x86_64" ]; then
 	./scripts/config -e XEN_PV_DOM0
 fi
 
+./scripts/config -e IPV6
+
 ./scripts/config -e BPF_SYSCALL
 
 ./scripts/config -e UEVENT_HELPER
 ./scripts/config --set-str UEVENT_HELPER_PATH "/sbin/hotplug"
+
+./scripts/config -e SYN_COOKIES
+
+./scripts/config -d DEBUG_STACK_USAGE
 
 ./scripts/config -e DRM_VIRTIO_GPU
 ./scripts/config -e FRAMEBUFFER_CONSOLE
