@@ -13,7 +13,7 @@ pub struct ChainloadConfiguration {
     #[serde(default)]
     pub options: Vec<String>,
     /// An optional path to a Linux initrd.
-    /// This uses the [LINUX_EFI_INITRD_MEDIA_GUID] mechanism to load the initrd into the EFI stack.
+    /// This uses the `LINUX_EFI_INITRD_MEDIA_GUID` mechanism to load the initrd into the EFI stack.
     /// For Linux, you can also use initrd=\path\to\initrd as an option, but this option is
     /// generally better and safer as it can support additional load options in the future.
     #[serde(default, rename = "linux-initrd")]

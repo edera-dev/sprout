@@ -37,9 +37,9 @@ const INITRAMFS_PREFIXES: &[&str] = &["initramfs", "initrd", "initrd.img"];
 /// and then uses that code improperly by asserting that the pointer is non-null.
 /// To give a good user experience, we place a placeholder value here to ensure it's non-empty.
 /// For stubble, this code ensures the command line pointer becomes null:
-/// https://github.com/ubuntu/stubble/blob/e56643979addfb98982266018e08921c07424a0c/stub.c#L61-L64
+/// <https://github.com/ubuntu/stubble/blob/e56643979addfb98982266018e08921c07424a0c/stub.c#L61-L64>
 /// Then this code asserts on it, stopping the boot process:
-/// https://github.com/ubuntu/stubble/blob/e56643979addfb98982266018e08921c07424a0c/stub.c#L27
+/// <https://github.com/ubuntu/stubble/blob/e56643979addfb98982266018e08921c07424a0c/stub.c#L27>
 const DEFAULT_LINUX_OPTIONS: &str = "placeholder";
 
 /// Pair of kernel and initramfs.

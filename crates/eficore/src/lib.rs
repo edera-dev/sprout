@@ -1,5 +1,8 @@
-//! Sprout EFI Core.
-//! This crate provides tools for working with the EFI environment.
+//! Sprout EFI core.
+//! This crate provides core EFI functionality for Sprout.
+
+// For some reason this triggers, and I can't figure out why.
+#![allow(rustdoc::bare_urls)]
 #![no_std]
 extern crate alloc;
 

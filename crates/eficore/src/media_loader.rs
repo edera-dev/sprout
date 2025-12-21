@@ -34,8 +34,7 @@ struct MediaLoaderProtocol {
 }
 
 /// Represents a media loader which has been registered in the UEFI stack.
-/// You MUST call [MediaLoaderHandle::unregister] when ready to unregister.
-/// [Drop] is not implemented for this type.
+/// Calling `drop` on this handle will unregister the media loader.
 pub struct MediaLoaderHandle {
     /// The handle of the media loader in the UEFI stack.
     handle: Handle,
