@@ -7,6 +7,7 @@ use crate::context::{RootContext, SproutContext};
 use crate::entries::BootableEntry;
 use crate::options::SproutOptions;
 use crate::phases::phase;
+use crate::utils::vercmp::compare_versions;
 use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::string::ToString;
@@ -256,6 +257,10 @@ fn run() -> Result<()> {
             }
         }
     }
+
+    // Sort the entries by their sort key, finalizing the order to show entries. This happens
+    // in reverse order so that entries that would come last show up first in the menu.
+    entries.sort_by(|a, b| compare_versions(a.sort_key(), b.sort_key()).reverse());
 
     // Tell the bootloader interface what entries are available.
     BootloaderInterface::set_entries(entries.iter().map(|entry| entry.name()))

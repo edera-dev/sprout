@@ -1,5 +1,4 @@
 use crate::utils;
-use crate::utils::vercmp;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -186,17 +185,15 @@ pub fn scan(
         return Ok(false);
     }
 
-    // Sort the kernel pairs by kernel version, if it has one, newer kernels first.
-    pairs.sort_by(|a, b| vercmp::compare_versions(&a.kernel, &b.kernel).reverse());
-
     // Generate a unique name for the linux chainload action.
-    let chainload_action_name = format!("{}{}", LINUX_CHAINLOAD_ACTION_PREFIX, root_unique_hash,);
+    let chainload_action_name = format!("{}{}", LINUX_CHAINLOAD_ACTION_PREFIX, root_unique_hash);
 
     // Kernel pairs are detected, generate a list configuration for it.
     let generator = ListConfiguration {
         entry: EntryDeclaration {
             title: "Boot Linux $name".to_string(),
             actions: vec![chainload_action_name.clone()],
+            sort_key: Some("$kernel".to_string()),
             ..Default::default()
         },
         values: pairs

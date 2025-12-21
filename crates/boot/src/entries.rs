@@ -12,6 +12,7 @@ pub struct BootableEntry {
     declaration: EntryDeclaration,
     default: bool,
     pin_name: bool,
+    sort_key: Option<String>,
 }
 
 impl BootableEntry {
@@ -29,6 +30,7 @@ impl BootableEntry {
             declaration,
             default: false,
             pin_name: false,
+            sort_key: None,
         }
     }
 
@@ -105,6 +107,22 @@ impl BootableEntry {
 
         // Standard quality matching rules.
         self.name == needle || self.title == needle
+    }
+
+    /// Set the sort key of the entry. This is used to sort entries via version comparison.
+    pub fn set_sort_key(&mut self, sort_key: String) {
+        self.sort_key = Some(sort_key);
+    }
+
+    /// Retrieve a reference to the sort key of the entry. If one is not specified, we will use the
+    /// name of the entry.
+    pub fn sort_key(&self) -> &str {
+        // Use the sort key specified in the bootable entry, or use the declaration sort key,
+        // or use the name of the entry.
+        self.sort_key
+            .as_deref()
+            .or(self.declaration.sort_key.as_deref())
+            .unwrap_or(&self.name)
     }
 
     /// Find an entry by `needle` inside the entry iterator `haystack`.
