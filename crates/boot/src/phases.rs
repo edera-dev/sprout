@@ -24,3 +24,13 @@ pub fn phase(context: Rc<SproutContext>, phase: &[PhaseConfiguration]) -> Result
     }
     Ok(())
 }
+
+/// Manual hook called by code in the bootloader that hands off to another image.
+/// This is used to perform actions like clearing the screen.
+pub fn before_handoff(context: &SproutContext) -> Result<()> {
+    // If we have not been asked to retain the boot console, then we should clear the screen.
+    if !context.root().options().retain_boot_console {
+        uefi::system::with_stdout(|stdout| stdout.reset(true)).context("unable to clear screen")?;
+    }
+    Ok(())
+}

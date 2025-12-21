@@ -24,6 +24,8 @@ pub struct SproutOptions {
     pub force_menu: bool,
     /// The timeout for the boot menu in seconds.
     pub menu_timeout: Option<u64>,
+    /// Retains the boot console before boot.
+    pub retain_boot_console: bool,
 }
 
 /// The default Sprout options.
@@ -35,6 +37,7 @@ impl Default for SproutOptions {
             boot: None,
             force_menu: false,
             menu_timeout: None,
+            retain_boot_console: false,
         }
     }
 }
@@ -42,7 +45,7 @@ impl Default for SproutOptions {
 /// The options parser mechanism for Sprout.
 impl SproutOptions {
     /// Produces [SproutOptions] from the arguments provided by the UEFI core.
-    /// Internally we utilize the `jaarg` argument parser which has excellent no_std support.
+    /// Internally, we use the `jaarg` argument parser which has excellent no_std support.
     pub fn parse() -> Result<Self> {
         enum ArgID {
             Help,
@@ -51,6 +54,7 @@ impl SproutOptions {
             Boot,
             ForceMenu,
             MenuTimeout,
+            RetainBootConsole,
         }
 
         // All the options for the Sprout executable.
@@ -65,6 +69,8 @@ impl SproutOptions {
             Opt::flag(ArgID::ForceMenu, &["--force-menu"]).help_text("Force showing the boot menu"),
             Opt::value(ArgID::MenuTimeout, &["--menu-timeout"], "TIMEOUT")
                 .help_text("Boot menu timeout, in seconds"),
+            Opt::flag(ArgID::RetainBootConsole, &["--retain-boot-console"])
+                .help_text("Retain boot console before boot"),
         ]);
 
         // Acquire the arguments as determined by the UEFI core.
@@ -98,6 +104,10 @@ impl SproutOptions {
                     ArgID::MenuTimeout => {
                         // The timeout for the boot menu in seconds.
                         result.menu_timeout = Some(value.parse::<u64>()?);
+                    }
+                    ArgID::RetainBootConsole => {
+                        // Retain the boot console before booting.
+                        result.retain_boot_console = true;
                     }
                     ArgID::Help => {
                         let ctx = HelpWriterContext {
