@@ -1,4 +1,5 @@
 use crate::context::SproutContext;
+use crate::phases::before_handoff;
 use crate::utils;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
@@ -87,6 +88,10 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     // Mark execution of an entry in the bootloader interface.
     BootloaderInterface::mark_exec(context.root().timer())
         .context("unable to mark execution of boot entry in bootloader interface")?;
+
+    // Since we are about to hand off control to another image, we need to execute the handoff hook.
+    // This will perform operations like clearing the screen.
+    before_handoff(&context).context("unable to execute before handoff hook")?;
 
     // Start the loaded image.
     // This call might return, or it may pass full control to another image that will never return.
