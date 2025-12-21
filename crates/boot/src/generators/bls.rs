@@ -26,7 +26,7 @@ fn quirk_initrd_remove_tuned(input: String) -> String {
 }
 
 /// Sorts two entries according to the BLS sort system.
-/// Reference: https://uapi-group.org/specifications/specs/boot_loader_specification/#sorting
+/// Reference: <https://uapi-group.org/specifications/specs/boot_loader_specification/#sorting>
 fn sort_entries(a: &(BlsEntry, BootableEntry), b: &(BlsEntry, BootableEntry)) -> Ordering {
     // Grab the components of both entries.
     let (a_bls, a_boot) = a;

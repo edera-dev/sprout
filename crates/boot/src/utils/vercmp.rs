@@ -33,7 +33,7 @@ pub fn compare_versions_optional(a: Option<&str>, b: Option<&str>) -> Ordering {
 }
 
 /// Compares two strings using the BLS version comparison specification.
-/// See: https://uapi-group.org/specifications/specs/version_format_specification/
+/// See: <https://uapi-group.org/specifications/specs/version_format_specification/>
 pub fn compare_versions(a: &str, b: &str) -> Ordering {
     // Acquire a peekable iterator for each string.
     let mut a_chars = a.chars().peekable();
