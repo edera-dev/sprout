@@ -18,4 +18,7 @@ pub struct EntryDeclaration {
     /// The values to insert into the context when the entry is selected.
     #[serde(default)]
     pub values: BTreeMap<String, String>,
+    /// The key to sort entries, via version comparison.
+    #[serde(default, rename = "sort-key")]
+    pub sort_key: Option<String>,
 }

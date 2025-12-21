@@ -51,13 +51,14 @@ pub fn scan(
     let chainload_action_name = format!("{}{}", WINDOWS_CHAINLOAD_ACTION_PREFIX, root_unique_hash,);
 
     // Generate an entry name for Windows.
-    let entry_name = format!("auto-windows-{}", root_unique_hash,);
+    let entry_name = format!("auto-windows-{}", root_unique_hash);
 
     // Create an entry for Windows and insert it into the configuration.
     let entry = EntryDeclaration {
         title: "Boot Windows".to_string(),
         actions: vec![chainload_action_name.clone()],
         values: Default::default(),
+        sort_key: None, // Use the default sort key.
     };
     config.entries.insert(entry_name, entry);
 

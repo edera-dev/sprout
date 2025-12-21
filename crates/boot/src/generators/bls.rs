@@ -206,6 +206,16 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
     // Sort all the entries according to the BLS sort system.
     entries.sort_by(sort_entries);
 
+    // Grab the number of entries that we have, so we can calculate a reverse index.
+    let entry_count = entries.len();
+
+    // Set the sort keys of all the bootable entries to a semi-unique prefix + the BLS sort order.
+    // The final comparison happens using version comparison, so this will sort
+    // things properly.
+    for (idx, (_bls, boot)) in entries.iter_mut().enumerate() {
+        boot.set_sort_key(format!("bls-{}-{}", path, entry_count - idx - 1));
+    }
+
     // Collect all the bootable entries and return them.
     Ok(entries.into_iter().map(|(_, boot)| boot).collect())
 }
