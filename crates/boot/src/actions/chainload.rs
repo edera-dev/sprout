@@ -9,7 +9,6 @@ use eficore::loader::source::ImageSource;
 use eficore::loader::{ImageLoadRequest, ImageLoader};
 use eficore::media_loader::MediaLoaderHandle;
 use eficore::media_loader::constants::linux::LINUX_EFI_INITRD_MEDIA_GUID;
-use log::error;
 use uefi::CString16;
 use uefi::proto::loaded_image::LoadedImage;
 
@@ -94,18 +93,14 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     // after the optional initrd has been unregistered.
     let result = uefi::boot::start_image(*image.handle());
 
-    // Unregister the initrd if it was registered.
-    if let Some(initrd_handle) = initrd_handle
-        && let Err(error) = initrd_handle.unregister()
-    {
-        error!("unable to unregister linux initrd: {}", error);
-    }
-
     // Assert there was no error starting the image.
     result.context("unable to start image")?;
 
     // Explicitly drop the options to clarify the lifetime.
     drop(options);
+
+    // Explicitly drop the initrd handle to clarify when it should be unregistered.
+    drop(initrd_handle);
 
     // Return control to sprout.
     Ok(())
