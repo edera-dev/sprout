@@ -30,7 +30,12 @@ pub fn phase(context: Rc<SproutContext>, phase: &[PhaseConfiguration]) -> Result
 pub fn before_handoff(context: &SproutContext) -> Result<()> {
     // If we have not been asked to retain the boot console, then we should clear the screen.
     if !context.root().options().retain_boot_console {
-        uefi::system::with_stdout(|stdout| stdout.reset(true)).context("unable to clear screen")?;
+        // Clear the screen. We use clear here instead of reset because some firmware,
+        // particularly Dell firmware, does not clear the screen on reset.
+        // We clear both stdout and stderr because it's not guaranteed that they are the same
+        // text output.
+        uefi::system::with_stdout(|stdout| stdout.clear()).context("unable to clear screen")?;
+        uefi::system::with_stderr(|stderr| stderr.clear()).context("unable to clear screen")?;
     }
     Ok(())
 }
