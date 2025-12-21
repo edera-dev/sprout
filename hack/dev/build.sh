@@ -113,23 +113,6 @@ if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
 	cp "hack/dev/configs/${SPROUT_CONFIG_NAME}.sprout.toml" "${FINAL_DIR}/sprout.toml"
 	cp "hack/dev/configs/xen.cfg" "${FINAL_DIR}/xen.cfg"
 	cp "hack/dev/configs/bls.conf" "${FINAL_DIR}/bls.conf"
-
-	mkdir -p "${FINAL_DIR}/efi/EFI/BOOT"
-	cp "${FINAL_DIR}/sprout.efi" "${FINAL_DIR}/efi/EFI/BOOT/${EFI_NAME}.EFI"
-	if [ -f "${FINAL_DIR}/kernel.efi" ]; then
-		cp "${FINAL_DIR}/kernel.efi" "${FINAL_DIR}/efi/EFI/BOOT/KERNEL.EFI"
-	fi
-	if [ -f "${FINAL_DIR}/shell.efi" ]; then
-		cp "${FINAL_DIR}/shell.efi" "${FINAL_DIR}/efi/EFI/BOOT/SHELL.EFI"
-	fi
-	if [ -f "${FINAL_DIR}/xen.efi" ]; then
-		cp "${FINAL_DIR}/xen.efi" "${FINAL_DIR}/efi/EFI/BOOT/XEN.EFI"
-	fi
-	if [ -f "${FINAL_DIR}/xen.cfg" ]; then
-		cp "${FINAL_DIR}/xen.cfg" "${FINAL_DIR}/efi/EFI/BOOT/XEN.CFG"
-	fi
-	cp "${FINAL_DIR}/sprout.toml" "${FINAL_DIR}/efi/SPROUT.TOML"
-	cp "${FINAL_DIR}/initramfs" "${FINAL_DIR}/efi/INITRAMFS"
 fi
 
 if [ "${SKIP_BOOT_BUILD}" != "1" ]; then
