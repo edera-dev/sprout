@@ -15,7 +15,6 @@ use eficore::media_loader::{
         XEN_EFI_CONFIG_MEDIA_GUID, XEN_EFI_KERNEL_MEDIA_GUID, XEN_EFI_RAMDISK_MEDIA_GUID,
     },
 };
-use log::error;
 use uefi::Guid;
 
 /// Builds a configuration string for the Xen EFI stub using the specified `configuration`.
@@ -105,7 +104,7 @@ pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> 
     )
     .context("unable to register kernel media loader")?;
 
-    // Create a vector of media loaders to unregister on error.
+    // Create a vector of media loaders to drop them only after this function completes.
     let mut media_loaders = vec![config, kernel];
 
     // Register the initrd if it is provided.
@@ -127,12 +126,8 @@ pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> 
     )
     .context("unable to chainload to xen");
 
-    // Unregister the media loaders when an error happens.
-    for media_loader in media_loaders {
-        if let Err(error) = media_loader.unregister() {
-            error!("unable to unregister media loader: {}", error);
-        }
-    }
+    // Explicitly drop the media loaders to clarify when they should be unregistered.
+    drop(media_loaders);
 
     result
 }

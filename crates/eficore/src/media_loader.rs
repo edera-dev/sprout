@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 use anyhow::{Context, Result, bail};
 use core::ffi::c_void;
 use core::ptr;
+use log::error;
 use uefi::proto::device_path::DevicePath;
 use uefi::proto::device_path::build::DevicePathBuilder;
 use uefi::proto::device_path::build::media::Vendor;
@@ -255,7 +256,7 @@ impl MediaLoaderHandle {
 
     /// Unregisters a media loader from the UEFI stack.
     /// This will free the memory allocated by the passed data.
-    pub fn unregister(self) -> Result<()> {
+    fn unregister(&self) -> Result<()> {
         // SAFETY: We know that the media loader is registered if the handle is valid,
         // so we can safely uninstall it.
         // We should have allocated the pointers involved, so we can safely free them.
@@ -291,5 +292,16 @@ impl MediaLoaderHandle {
         }
 
         Ok(())
+    }
+}
+
+/// Implement drop for the handle to automatically unregister the media loader.
+impl Drop for MediaLoaderHandle {
+    fn drop(&mut self) {
+        // If unregister fails, print an error to the log.
+        // This may leak stuff, but the only other option is to panic.
+        if let Err(error) = self.unregister() {
+            error!("unable to unregister media loader: {}", error);
+        }
     }
 }
