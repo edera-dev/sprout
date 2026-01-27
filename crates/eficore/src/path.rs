@@ -48,8 +48,8 @@ fn cstring16_contains_char(string: &CString16, c: char) -> bool {
 
 /// Parses the input `path` as a [DevicePath].
 /// Uses the [DevicePathFromText] protocol exclusively, and will fail if it cannot acquire the protocol.
-pub fn text_to_device_path(path: &str) -> Result<PoolDevicePath> {
-    let path = CString16::try_from(path).context("unable to convert path to CString16")?;
+pub fn text_to_device_path(path: impl AsRef<str>) -> Result<PoolDevicePath> {
+    let path = CString16::try_from(path.as_ref()).context("unable to convert path to CString16")?;
     let device_path_from_text = uefi::boot::open_protocol_exclusive::<DevicePathFromText>(
         uefi::boot::get_handle_for_protocol::<DevicePathFromText>()
             .context("no device path from text protocol")?,
@@ -113,8 +113,13 @@ pub fn device_path_subpath(path: &DevicePath) -> Result<String> {
 /// Resolve a path specified by `input` to its various components.
 /// Uses `default_root_path` as the base root if one is not specified in the path.
 /// Returns [ResolvedPath] which contains the resolved components.
-pub fn resolve_path(default_root_path: Option<&DevicePath>, input: &str) -> Result<ResolvedPath> {
-    let mut path = text_to_device_path(input).context("unable to convert text to path")?;
+pub fn resolve_path(
+    default_root_path: Option<&DevicePath>,
+    input: impl ToString,
+) -> Result<ResolvedPath> {
+    let mut input = input.to_string();
+
+    let mut path = text_to_device_path(&input).context("unable to convert text to path")?;
     let path_has_device = path
         .node_iter()
         .next()
@@ -125,7 +130,6 @@ pub fn resolve_path(default_root_path: Option<&DevicePath>, input: &str) -> Resu
         .map(|it| it.to_string().contains('('))
         .unwrap_or(false);
     if !path_has_device {
-        let mut input = input.to_string();
         if !input.starts_with('\\') {
             input.insert(0, '\\');
         }

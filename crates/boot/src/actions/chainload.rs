@@ -21,7 +21,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     // Resolve the path to the image to chainload.
     let resolved = eficore::path::resolve_path(
         Some(context.root().loaded_image_path()?),
-        &context.stamp(&configuration.path),
+        context.stamp(&configuration.path),
     )
     .context("unable to resolve chainload path")?;
 
@@ -38,8 +38,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
             .context("unable to open loaded image protocol")?;
 
     // Stamp and combine the options to pass to the image.
-    let options =
-        utils::combine_options(configuration.options.iter().map(|item| context.stamp(item)));
+    let options = utils::combine_options(context.stamp_iter(configuration.options.iter()));
 
     // Pass the load options to the image.
     // If no options are provided, the resulting string will be empty.
@@ -50,6 +49,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
             .context("unable to convert chainloader options to CString16")?,
     );
 
+    // Ensure the chainloader options limit is not exceeded.
     if options.num_bytes() > u32::MAX as usize {
         bail!("chainloader options too large");
     }

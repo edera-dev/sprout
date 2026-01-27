@@ -22,11 +22,10 @@ pub fn generate(
 
         // Stamp the entry title and actions from the template.
         let mut entry = list.entry.clone();
-        entry.actions = entry
-            .actions
-            .into_iter()
-            .map(|action| context.stamp(action))
-            .collect();
+
+        // Stamp all the actions this entry references.
+        entry.actions = context.stamp_iter(entry.actions.into_iter()).collect();
+
         // Push the entry into the list with the new context.
         entries.push(BootableEntry::new(
             index.to_string(),

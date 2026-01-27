@@ -18,7 +18,7 @@ fn load_driver(context: Rc<SproutContext>, driver: &DriverDeclaration) -> Result
     // Resolve the path to the driver image.
     let resolved = eficore::path::resolve_path(
         Some(context.root().loaded_image_path()?),
-        &context.stamp(&driver.path),
+        context.stamp(&driver.path),
     )
     .context("unable to resolve path to driver")?;
 
