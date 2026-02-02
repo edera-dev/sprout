@@ -269,6 +269,15 @@ impl SproutContext {
         Self::stamp_values(&self.all_values(), text.as_ref()).1
     }
 
+    /// Stamps all the items from the iterator `input` with all the values in this [SproutContext]
+    /// and it's parents. This calls [self.stamp] on each item.
+    pub fn stamp_iter(
+        &self,
+        input: impl Iterator<Item = impl AsRef<str>>,
+    ) -> impl Iterator<Item = String> {
+        input.map(|item| self.stamp(item))
+    }
+
     /// Unloads a [SproutContext] back into an owned context. This
     /// may not succeed if something else is holding onto the value.
     pub fn unload(self: Rc<SproutContext>) -> Option<SproutContext> {

@@ -20,20 +20,11 @@ use uefi::Guid;
 /// Builds a configuration string for the Xen EFI stub using the specified `configuration`.
 fn build_xen_config(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> String {
     // Stamp xen options and combine them.
-    let xen_options = utils::combine_options(
-        configuration
-            .xen_options
-            .iter()
-            .map(|item| context.stamp(item)),
-    );
+    let xen_options = utils::combine_options(context.stamp_iter(configuration.xen_options.iter()));
 
     // Stamp kernel options and combine them.
-    let kernel_options = utils::combine_options(
-        configuration
-            .kernel_options
-            .iter()
-            .map(|item| context.stamp(item)),
-    );
+    let kernel_options =
+        utils::combine_options(context.stamp_iter(configuration.kernel_options.iter()));
 
     // xen config file format is ini-like
     [
