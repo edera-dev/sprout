@@ -9,7 +9,7 @@ resolver = "3"
 
 [workspace.package]
 license = "Apache-2.0"
-version = "0.0.27"
+version = "0.0.28"
 homepage = "https://sprout.edera.dev"
 repository = "https://github.com/edera-dev/sprout"
 edition = "2024"
