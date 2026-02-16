@@ -25,7 +25,7 @@ jobs:
       actions: read # Needed to analyze action metadata.
     steps:
     - name: harden runner
-      uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+      uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
       with:
         egress-policy: audit
 
@@ -35,7 +35,7 @@ jobs:
         persist-credentials: false
 
     - name: setup uv
-      uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
+      uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
 
     - name: zizmor
       run: uvx zizmor --pedantic --format sarif . > results.sarif
