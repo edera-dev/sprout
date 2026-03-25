@@ -347,7 +347,6 @@ mod tests {
         assert!(config.ends_with('\n'));
     }
 
-
     #[test]
     fn kernel_prefix_exact_match() {
         assert_eq!(
@@ -380,7 +379,6 @@ mod tests {
         // "vmlinuz6.1" has no dash separator — should not match.
         assert!(match_kernel_prefix("vmlinuz6.1", LINUX_KERNEL_PREFIXES).is_none());
     }
-
 
     #[test]
     fn initramfs_candidates_with_suffix() {

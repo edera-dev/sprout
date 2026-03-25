@@ -26,7 +26,6 @@ const LINUX_CHAINLOAD_ACTION_PREFIX: &str = "linux-chainload-";
 /// The empty string represents the root of the filesystem.
 const SCAN_LOCATIONS: &[&str] = &["\\boot", "\\"];
 
-
 /// This is really silly, but if what we are booting is the Canonical stubble stub,
 /// there is a chance it will assert that the load options are non-empty.
 /// Technically speaking, load options can be empty. However, it assumes load options
