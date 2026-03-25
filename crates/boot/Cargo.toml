@@ -27,3 +27,4 @@ edera-sprout-build.path = "../build"
 [[bin]]
 name = "sprout"
 path = "src/main.rs"
+test = false
