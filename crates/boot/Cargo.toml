@@ -11,6 +11,7 @@ edition.workspace = true
 anyhow.workspace = true
 edera-sprout-config.path = "../config"
 edera-sprout-eficore.path = "../eficore"
+edera-sprout-bls.path = "../bls"
 hex.workspace = true
 jaarg.workspace = true
 sha2.workspace = true

@@ -2,9 +2,6 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use sha2::{Digest, Sha256};
 
-/// Implements a version comparison algorithm according to the BLS specification.
-pub mod vercmp;
-
 /// Combine a sequence of strings into a single string, separated by spaces, ignoring empty strings.
 pub fn combine_options<T: AsRef<str>>(options: impl Iterator<Item = T>) -> String {
     options

@@ -3,28 +3,26 @@
 #![no_main]
 extern crate alloc;
 
-use crate::context::{RootContext, SproutContext};
-use crate::entries::BootableEntry;
-use crate::options::SproutOptions;
-use crate::phases::phase;
-use crate::utils::vercmp::compare_versions;
-use alloc::collections::BTreeMap;
-use alloc::format;
-use alloc::string::ToString;
-use alloc::vec::Vec;
+use crate::{
+    context::{RootContext, SproutContext},
+    entries::BootableEntry,
+    options::SproutOptions,
+    phases::phase,
+};
+use alloc::{collections::BTreeMap, format, string::ToString, vec::Vec};
 use anyhow::{Context, Result, bail};
-use core::ops::Deref;
-use core::time::Duration;
+use core::{ops::Deref, time::Duration};
+use edera_sprout_bls::compare_versions;
 use edera_sprout_config::RootConfiguration;
-use eficore::bootloader_interface::{BootloaderInterface, BootloaderInterfaceTimeout};
-use eficore::partition::PartitionGuidForm;
-use eficore::platform::timer::PlatformTimer;
-use eficore::platform::tpm::PlatformTpm;
-use eficore::secure::SecureBoot;
-use eficore::setup;
+use eficore::{
+    bootloader_interface::{BootloaderInterface, BootloaderInterfaceTimeout},
+    partition::PartitionGuidForm,
+    platform::{timer::PlatformTimer, tpm::PlatformTpm},
+    secure::SecureBoot,
+    setup,
+};
 use log::{error, info, warn};
-use uefi::entry;
-use uefi::proto::device_path::LoadedImageDevicePath;
+use uefi::{entry, proto::device_path::LoadedImageDevicePath};
 use uefi_raw::Status;
 
 /// actions: Code that can be configured and executed by Sprout.

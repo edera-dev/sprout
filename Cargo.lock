@@ -65,10 +65,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "edera-sprout-bls"
+version = "0.0.28"
+dependencies = [
+ "anyhow",
+]
+
+[[package]]
 name = "edera-sprout-boot"
 version = "0.0.28"
 dependencies = [
  "anyhow",
+ "edera-sprout-bls",
  "edera-sprout-build",
  "edera-sprout-config",
  "edera-sprout-eficore",
