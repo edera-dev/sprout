@@ -1,13 +1,13 @@
 use crate::options::SproutOptions;
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use anyhow::anyhow;
 use anyhow::{Result, bail};
 use edera_sprout_config::actions::ActionDeclaration;
+use edera_sprout_parsing::stamp_values;
 use eficore::platform::timer::PlatformTimer;
 use uefi::proto::device_path::DevicePath;
 
@@ -241,45 +241,4 @@ impl SproutContext {
     pub fn unload(self: Rc<SproutContext>) -> Option<SproutContext> {
         Rc::into_inner(self)
     }
-}
-
-/// Stamps the `text` value with the specified `values` map. The returned value indicates
-/// whether the `text` has been changed and the value that was stamped and changed.
-///
-/// Stamping works like this:
-/// - Start with the input text.
-/// - Sort all the keys in reverse length order (longest keys first)
-/// - For each key, if the key is not empty, replace $KEY in the text.
-/// - Each follow-up iteration acts upon the last iterations result.
-/// - We keep track if the text changes during the replacement.
-/// - We return both whether the text changed during any iteration and the final result.
-fn stamp_values(values: &BTreeMap<String, String>, text: impl AsRef<str>) -> (bool, String) {
-    let mut result = text.as_ref().to_string();
-    let mut did_change = false;
-
-    // Sort the keys by length. This is to ensure that we stamp the longest keys first.
-    // If we did not do this, "$abc" could be stamped by "$a" into an invalid result.
-    let mut keys = values.keys().collect::<Vec<_>>();
-
-    // Sort by key length, reversed. This results in the longest keys appearing first.
-    keys.sort_by_key(|key| core::cmp::Reverse(key.len()));
-
-    for key in keys {
-        // Empty keys are not supported.
-        if key.is_empty() {
-            continue;
-        }
-
-        // We can fetch the value from the map. It is verifiable that the key exists.
-        let Some(value) = values.get(key) else {
-            unreachable!("keys iterated over is collected on a map that cannot be modified");
-        };
-
-        let next_result = result.replace(&format!("${key}"), value);
-        if result != next_result {
-            did_change = true;
-        }
-        result = next_result;
-    }
-    (did_change, result)
 }

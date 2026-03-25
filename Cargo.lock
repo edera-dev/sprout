@@ -80,6 +80,7 @@ dependencies = [
  "edera-sprout-build",
  "edera-sprout-config",
  "edera-sprout-eficore",
+ "edera-sprout-parsing",
  "hex",
  "jaarg",
  "log",
@@ -111,6 +112,14 @@ dependencies = [
  "spin",
  "uefi",
  "uefi-raw",
+]
+
+[[package]]
+name = "edera-sprout-parsing"
+version = "0.0.28"
+dependencies = [
+ "hex",
+ "sha2",
 ]
 
 [[package]]

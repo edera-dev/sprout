@@ -213,11 +213,6 @@ pub fn sort_bls(a_bls: &BlsEntry, a_name: &str, b_bls: &BlsEntry, b_name: &str) 
     }
 }
 
-// ---------------------------------------------------------------------------
-// BLS version comparison
-// Reference: https://uapi-group.org/specifications/specs/version_format_specification/
-// ---------------------------------------------------------------------------
-
 /// Handles single character advancement and comparison.
 macro_rules! handle_single_char {
     ($ca: expr, $cb:expr, $a_chars:expr, $b_chars:expr, $c:expr) => {

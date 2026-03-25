@@ -2,8 +2,8 @@
 # so that the contents can be unit-testable on non-UEFI target hosts.
 # Do not add uefi or uefi-raw as dependencies.
 [package]
-name = "edera-sprout-bls"
-description = "Sprout BLS Utilities (UEFI-free)"
+name = "edera-sprout-parsing"
+description = "Sprout Parsing Utilities (UEFI-free)"
 license.workspace = true
 version.workspace = true
 homepage.workspace = true
@@ -11,8 +11,9 @@ repository.workspace = true
 edition.workspace = true
 
 [dependencies]
-anyhow.workspace = true
+hex.workspace = true
+sha2.workspace = true
 
 [lib]
-name = "edera_sprout_bls"
+name = "edera_sprout_parsing"
 path = "src/lib.rs"

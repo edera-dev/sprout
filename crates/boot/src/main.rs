@@ -61,9 +61,6 @@ pub mod phases;
 /// sbat: Secure Boot Attestation section.
 pub mod sbat;
 
-/// utils: Utility functions that are used by other parts of Sprout.
-pub mod utils;
-
 /// The delay to wait for when an error occurs in Sprout.
 const DELAY_ON_ERROR: Duration = Duration::from_secs(10);
 

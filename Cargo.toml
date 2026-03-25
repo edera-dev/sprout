@@ -5,6 +5,7 @@ members = [
   "crates/config",
   "crates/eficore",
   "crates/bls",
+  "crates/parsing",
 ]
 resolver = "3"
 
