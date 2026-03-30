@@ -1,14 +1,11 @@
-use crate::{
-    actions,
-    context::SproutContext,
-    utils::{self},
-};
+use crate::{actions, context::SproutContext};
 use alloc::rc::Rc;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::{format, vec};
 use anyhow::{Context, Result};
 use edera_sprout_config::actions::chainload::ChainloadConfiguration;
 use edera_sprout_config::actions::edera::EderaConfiguration;
+use edera_sprout_parsing::{build_xen_config, combine_options, empty_is_none};
 use eficore::media_loader::{
     MediaLoaderHandle,
     constants::xen::{
@@ -18,31 +15,10 @@ use eficore::media_loader::{
 use uefi::Guid;
 
 /// Builds a configuration string for the Xen EFI stub using the specified `configuration`.
-fn build_xen_config(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> String {
-    // Stamp xen options and combine them.
-    let xen_options = utils::combine_options(context.stamp_iter(configuration.xen_options.iter()));
-
-    // Stamp kernel options and combine them.
-    let kernel_options =
-        utils::combine_options(context.stamp_iter(configuration.kernel_options.iter()));
-
-    // xen config file format is ini-like
-    [
-        // global section
-        "[global]".to_string(),
-        // default configuration section
-        "default=sprout".to_string(),
-        // configuration section for sprout
-        "[sprout]".to_string(),
-        // xen options
-        format!("options={}", xen_options),
-        // kernel options, stub replaces the kernel path
-        // the kernel is provided via media loader
-        format!("kernel=stub {}", kernel_options),
-        // required or else the last line will be ignored
-        "".to_string(),
-    ]
-    .join("\n")
+fn make_xen_config(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> String {
+    let xen_options = combine_options(context.stamp_iter(configuration.xen_options.iter()));
+    let kernel_options = combine_options(context.stamp_iter(configuration.kernel_options.iter()));
+    build_xen_config(&xen_options, &kernel_options)
 }
 
 /// Register a media loader for some `text` with the vendor `guid`.
@@ -80,7 +56,7 @@ fn register_media_loader_file(
 /// `configuration` and `context`. This action uses Edera-specific Xen EFI stub functionality.
 pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> Result<()> {
     // Build the Xen config file content for this configuration.
-    let config = build_xen_config(context.clone(), configuration);
+    let config = make_xen_config(context.clone(), configuration);
 
     // Register the media loader for the config.
     let config = register_media_loader_text(XEN_EFI_CONFIG_MEDIA_GUID, "config", config)
@@ -99,7 +75,7 @@ pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> 
     let mut media_loaders = vec![config, kernel];
 
     // Register the initrd if it is provided.
-    if let Some(initrd) = utils::empty_is_none(configuration.initrd.as_ref()) {
+    if let Some(initrd) = empty_is_none(configuration.initrd.as_ref()) {
         let initrd =
             register_media_loader_file(&context, XEN_EFI_RAMDISK_MEDIA_GUID, "initrd", initrd)
                 .context("unable to register initrd media loader")?;

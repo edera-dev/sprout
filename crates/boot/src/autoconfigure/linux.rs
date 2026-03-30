@@ -1,4 +1,3 @@
-use crate::utils;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -10,6 +9,10 @@ use edera_sprout_config::actions::chainload::ChainloadConfiguration;
 use edera_sprout_config::entries::EntryDeclaration;
 use edera_sprout_config::generators::GeneratorDeclaration;
 use edera_sprout_config::generators::list::ListConfiguration;
+use edera_sprout_parsing::{
+    LINUX_INITRAMFS_PREFIXES, LINUX_KERNEL_PREFIXES, initramfs_candidates, match_kernel_prefix,
+    unique_hash,
+};
 use uefi::CString16;
 use uefi::fs::{FileSystem, Path, PathBuf};
 use uefi::proto::device_path::DevicePath;
@@ -22,12 +25,6 @@ const LINUX_CHAINLOAD_ACTION_PREFIX: &str = "linux-chainload-";
 /// We will check for symlinks and if this directory is a symlink, we will skip it.
 /// The empty string represents the root of the filesystem.
 const SCAN_LOCATIONS: &[&str] = &["\\boot", "\\"];
-
-/// Prefixes of kernel files to scan for.
-const KERNEL_PREFIXES: &[&str] = &["vmlinuz", "Image"];
-
-/// Prefixes of initramfs files to match to.
-const INITRAMFS_PREFIXES: &[&str] = &["initramfs", "initrd", "initrd.img"];
 
 /// This is really silly, but if what we are booting is the Canonical stubble stub,
 /// there is a chance it will assert that the load options are non-empty.
@@ -108,9 +105,7 @@ fn scan_directory(filesystem: &mut FileSystem, path: &str) -> Result<Vec<KernelP
 
         // Find a kernel prefix that matches, if any.
         // This is case-insensitive to ensure we pick up all possibilities.
-        let Some(prefix) = KERNEL_PREFIXES.iter().find(|prefix| {
-            name_for_match == **prefix || name_for_match.starts_with(&format!("{}-", prefix))
-        }) else {
+        let Some(prefix) = match_kernel_prefix(&name_for_match, LINUX_KERNEL_PREFIXES) else {
             // Skip over anything that doesn't match a kernel prefix.
             continue;
         };
@@ -118,15 +113,14 @@ fn scan_directory(filesystem: &mut FileSystem, path: &str) -> Result<Vec<KernelP
         // Acquire the suffix of the name, this will be used to match an initramfs.
         let suffix = &name[prefix.len()..];
 
-        // Find a matching initramfs, if any.
-        let mut initramfs_prefix_iter = INITRAMFS_PREFIXES.iter();
+        // Find a matching initramfs by trying each candidate name, if any.
+        let mut candidates = initramfs_candidates(suffix, LINUX_INITRAMFS_PREFIXES);
         let matched_initramfs_path = loop {
-            let Some(prefix) = initramfs_prefix_iter.next() else {
+            let Some(candidate) = candidates.next() else {
                 break None;
             };
             // Construct an initramfs path.
-            let initramfs = format!("{}{}", prefix, suffix);
-            let initramfs = CString16::try_from(initramfs.as_str())
+            let initramfs = CString16::try_from(candidate.as_str())
                 .context("unable to convert initramfs name to CString16")?;
             let mut initramfs_path = path_for_join.clone();
             initramfs_path.push(Path::new(&initramfs));
@@ -171,7 +165,7 @@ pub fn scan(
     root.push('/');
 
     // Generate a unique hash of the root path.
-    let root_unique_hash = utils::unique_hash(&root);
+    let root_unique_hash = unique_hash(&root);
 
     // Scan all locations for kernel pairs, adding them to the list.
     for location in SCAN_LOCATIONS {

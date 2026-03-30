@@ -19,3 +19,4 @@ uefi-raw.workspace = true
 [lib]
 name = "eficore"
 path = "src/lib.rs"
+test = false

@@ -1,22 +1,21 @@
 use crate::context::SproutContext;
 use crate::entries::BootableEntry;
-use crate::generators::bls::entry::BlsEntry;
-use crate::utils::vercmp;
-use alloc::format;
-use alloc::rc::Rc;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
+use alloc::{
+    format,
+    rc::Rc,
+    string::{String, ToString},
+    vec::Vec,
+};
 use anyhow::{Context, Result};
-use core::cmp::Ordering;
-use core::str::FromStr;
+use core::{cmp::Ordering, str::FromStr};
+use edera_sprout_bls::{BlsEntry, sort_bls};
 use edera_sprout_config::generators::bls::BlsConfiguration;
-use uefi::cstr16;
-use uefi::fs::{FileSystem, PathBuf};
-use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
-use uefi::proto::media::fs::SimpleFileSystem;
-
-/// BLS entry parser.
-mod entry;
+use uefi::{
+    cstr16,
+    fs::{FileSystem, PathBuf},
+    proto::device_path::text::{AllowShortcuts, DisplayOnly},
+    proto::media::fs::SimpleFileSystem,
+};
 
 // TODO(azenla): remove this once variable substitution is implemented.
 /// This function is used to remove the `tuned_initrd` variable from entry values.
@@ -28,55 +27,9 @@ fn quirk_initrd_remove_tuned(input: String) -> String {
 /// Sorts two entries according to the BLS sort system.
 /// Reference: <https://uapi-group.org/specifications/specs/boot_loader_specification/#sorting>
 fn sort_entries(a: &(BlsEntry, BootableEntry), b: &(BlsEntry, BootableEntry)) -> Ordering {
-    // Grab the components of both entries.
     let (a_bls, a_boot) = a;
     let (b_bls, b_boot) = b;
-
-    // Grab the sort keys from both entries.
-    let a_sort_key = a_bls.sort_key();
-    let b_sort_key = b_bls.sort_key();
-
-    // Compare the sort keys of both entries.
-    match a_sort_key.cmp(&b_sort_key) {
-        // If A and B sort keys are equal, sort by machine-id.
-        Ordering::Equal => {
-            // Grab the machine-id from both entries.
-            let a_machine_id = a_bls.machine_id();
-            let b_machine_id = b_bls.machine_id();
-
-            // Compare the machine-id of both entries.
-            match a_machine_id.cmp(&b_machine_id) {
-                // If both machine-id values are equal, sort by version.
-                Ordering::Equal => {
-                    // Grab the version from both entries.
-                    let a_version = a_bls.version();
-                    let b_version = b_bls.version();
-
-                    // Compare the version of both entries, sorting newer versions first.
-                    match vercmp::compare_versions_optional(
-                        a_version.as_deref(),
-                        b_version.as_deref(),
-                    )
-                    .reverse()
-                    {
-                        // If both versions are equal, sort by file name in reverse order.
-                        Ordering::Equal => {
-                            // Grab the file name from both entries.
-                            let a_name = a_boot.name();
-                            let b_name = b_boot.name();
-
-                            // Compare the file names of both entries, sorting newer entries first.
-                            vercmp::compare_versions(a_name, b_name).reverse()
-                        }
-                        other => other,
-                    }
-                }
-                other => other,
-            }
-        }
-
-        other => other,
-    }
+    sort_bls(a_bls, a_boot.name(), b_bls, b_boot.name())
 }
 
 /// Generates entries from the BLS entries directory using the specified `bls` configuration and
