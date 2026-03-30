@@ -1,4 +1,3 @@
-use crate::utils;
 use alloc::string::ToString;
 use alloc::{format, vec};
 use anyhow::{Context, Result};
@@ -6,6 +5,7 @@ use edera_sprout_config::RootConfiguration;
 use edera_sprout_config::actions::ActionDeclaration;
 use edera_sprout_config::actions::chainload::ChainloadConfiguration;
 use edera_sprout_config::entries::EntryDeclaration;
+use edera_sprout_parsing::unique_hash;
 use uefi::CString16;
 use uefi::fs::{FileSystem, Path};
 use uefi::proto::device_path::DevicePath;
@@ -45,7 +45,7 @@ pub fn scan(
     root.push('/');
 
     // Generate a unique hash of the root path.
-    let root_unique_hash = utils::unique_hash(&root);
+    let root_unique_hash = unique_hash(&root);
 
     // Generate a unique name for the Windows chainload action.
     let chainload_action_name = format!("{}{}", WINDOWS_CHAINLOAD_ACTION_PREFIX, root_unique_hash,);

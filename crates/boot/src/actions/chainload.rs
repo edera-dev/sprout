@@ -1,10 +1,10 @@
 use crate::context::SproutContext;
 use crate::phases::before_handoff;
-use crate::utils;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use anyhow::{Context, Result, bail};
 use edera_sprout_config::actions::chainload::ChainloadConfiguration;
+use edera_sprout_parsing::{combine_options, empty_is_none};
 use eficore::bootloader_interface::BootloaderInterface;
 use eficore::loader::source::ImageSource;
 use eficore::loader::{ImageLoadRequest, ImageLoader};
@@ -38,7 +38,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
             .context("unable to open loaded image protocol")?;
 
     // Stamp and combine the options to pass to the image.
-    let options = utils::combine_options(context.stamp_iter(configuration.options.iter()));
+    let options = combine_options(context.stamp_iter(configuration.options.iter()));
 
     // Pass the load options to the image.
     // If no options are provided, the resulting string will be empty.
@@ -68,7 +68,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
         .as_ref()
         .map(|item| context.stamp(item));
     // The initrd can be None or empty, so we need to collapse that into a single Option.
-    let initrd = utils::empty_is_none(initrd);
+    let initrd = empty_is_none(initrd);
 
     // If an initrd is provided, register it with the EFI stack.
     let mut initrd_handle = None;

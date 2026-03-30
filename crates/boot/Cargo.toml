@@ -11,6 +11,8 @@ edition.workspace = true
 anyhow.workspace = true
 edera-sprout-config.path = "../config"
 edera-sprout-eficore.path = "../eficore"
+edera-sprout-bls.path = "../bls"
+edera-sprout-parsing.path = "../parsing"
 hex.workspace = true
 jaarg.workspace = true
 sha2.workspace = true
@@ -25,3 +27,4 @@ edera-sprout-build.path = "../build"
 [[bin]]
 name = "sprout"
 path = "src/main.rs"
+test = false
