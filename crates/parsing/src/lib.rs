@@ -84,8 +84,8 @@ pub fn build_matrix(input: &BTreeMap<String, Vec<String>>) -> Vec<BTreeMap<Strin
 /// Combine a sequence of strings into a single string, separated by spaces, ignoring empty strings.
 pub fn combine_options<T: AsRef<str>>(options: impl Iterator<Item = T>) -> String {
     options
-        .flat_map(|item| empty_is_none(Some(item)))
         .map(|item| item.as_ref().to_string())
+        .filter(|item| !item.is_empty())
         .collect::<Vec<_>>()
         .join(" ")
 }
@@ -94,11 +94,6 @@ pub fn combine_options<T: AsRef<str>>(options: impl Iterator<Item = T>) -> Strin
 /// This uses SHA-256, which is unique enough but relatively short.
 pub fn unique_hash(input: &str) -> String {
     hex::encode(Sha256::digest(input.as_bytes()))
-}
-
-/// Filter a string-like Option `input` such that an empty string is [None].
-pub fn empty_is_none<T: AsRef<str>>(input: Option<T>) -> Option<T> {
-    input.filter(|input| !input.as_ref().is_empty())
 }
 
 /// Build a Xen EFI stub configuration file from pre-stamped `xen_options` and `kernel_options`.
@@ -285,21 +280,6 @@ mod tests {
     fn combine_options_empty_iterator_returns_empty() {
         let result = combine_options(core::iter::empty::<&str>());
         assert_eq!(result, "");
-    }
-
-    #[test]
-    fn empty_is_none_returns_none_for_empty_string() {
-        assert!(empty_is_none(Some("")).is_none());
-    }
-
-    #[test]
-    fn empty_is_none_returns_some_for_nonempty_string() {
-        assert_eq!(empty_is_none(Some("x")), Some("x"));
-    }
-
-    #[test]
-    fn empty_is_none_passthrough_on_none() {
-        assert!(empty_is_none(None::<&str>).is_none());
     }
 
     #[test]

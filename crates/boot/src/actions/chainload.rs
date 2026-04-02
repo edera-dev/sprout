@@ -2,9 +2,10 @@ use crate::context::SproutContext;
 use crate::phases::before_handoff;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
+use alloc::vec::Vec;
 use anyhow::{Context, Result, bail};
 use edera_sprout_config::actions::chainload::ChainloadConfiguration;
-use edera_sprout_parsing::{combine_options, empty_is_none};
+use edera_sprout_parsing::combine_options;
 use eficore::bootloader_interface::BootloaderInterface;
 use eficore::loader::source::ImageSource;
 use eficore::loader::{ImageLoadRequest, ImageLoader};
@@ -62,25 +63,37 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
             .set_load_options(options.as_ptr() as *const u8, options.num_bytes() as u32);
     }
 
-    // Stamp the initrd path, if provided.
-    let initrd = configuration
-        .linux_initrd
-        .as_ref()
-        .map(|item| context.stamp(item));
-    // The initrd can be None or empty, so we need to collapse that into a single Option.
-    let initrd = empty_is_none(initrd);
-
     // If an initrd is provided, register it with the EFI stack.
     let mut initrd_handle = None;
-    if let Some(linux_initrd) = initrd {
-        let content = eficore::path::read_file_contents(
-            Some(context.root().loaded_image_path()?),
-            &linux_initrd,
-        )
-        .context("unable to read linux initrd")?;
-        let handle =
-            MediaLoaderHandle::register(LINUX_EFI_INITRD_MEDIA_GUID, content.into_boxed_slice())
-                .context("unable to register linux initrd")?;
+
+    // Only proceed if the configuration actually contains initrd paths.
+    if !configuration.initrd.is_empty() {
+        // Initialize a master buffer to hold the combined bytes of all initrd files.
+        let mut content = Vec::new();
+
+        // Iterate through each path provided in the configuration.
+        for item in &configuration.initrd {
+            // "Stamp" the path to replace variables (like disk labels) with real values.
+            let stamped_path = context.stamp(item);
+
+            // Read the file contents from the EFI partition.
+            let mut segment = eficore::path::read_file_contents(
+                Some(context.root().loaded_image_path()?),
+                &stamped_path,
+            ).context("unable to read linux initrd segment")?;
+
+            // Append this segment's bytes to the end of our master buffer.
+            // The kernel will see these as a continuous stream of CPIO archives.
+            content.append(&mut segment);
+        }
+
+        // Register the full, concatenated buffer with the EFI stack using the Linux-specific GUID.
+        // This allows the Linux EFI stub to discover the initrd in memory.
+        let handle = MediaLoaderHandle::register(
+            LINUX_EFI_INITRD_MEDIA_GUID,
+            content.into_boxed_slice()
+        ).context("unable to register initrd")?;
+
         initrd_handle = Some(handle);
     }
 

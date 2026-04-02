@@ -2,9 +2,11 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
-/// The configuration of the edera action which boots the Edera hypervisor.
-/// Edera is based on Xen but modified significantly with a Rust stack.
-/// Sprout is a component of the Edera stack and provides the boot functionality of Xen.
+type StringList = Vec<String>;
+
+// The configuration of the edera action which boots the Edera hypervisor.
+// Edera is based on Xen but modified significantly with a Rust stack.
+// Sprout is a component of the Edera stack and provides the boot functionality of Xen.
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct EderaConfiguration {
     /// The path to the Xen hypervisor EFI image.
@@ -13,7 +15,7 @@ pub struct EderaConfiguration {
     pub kernel: String,
     /// The path to the initrd to load for dom0.
     #[serde(default)]
-    pub initrd: Option<String>,
+    pub initrd: StringList,
     /// The options to pass to the kernel.
     #[serde(default, rename = "kernel-options")]
     pub kernel_options: Vec<String>,

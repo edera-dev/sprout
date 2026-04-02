@@ -86,7 +86,7 @@ pub fn scan(
     let chainload = ChainloadConfiguration {
         path: format!("{}\\$chainload", root),
         options: vec!["$options".to_string()],
-        linux_initrd: Some(format!("{}\\$initrd", root)),
+        initrd: alloc::vec![format!("{}\\$initrd", root)],
     };
 
     // Insert the chainload action into the configuration.
