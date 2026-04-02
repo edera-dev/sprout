@@ -64,18 +64,22 @@ features = ["alloc", "global_allocator", "panic_handler"]
 # which don't handle the UEFI target properly.
 [profile.dev]
 opt-level = 2
+panic = "abort"
 
 [profile.release]
 lto = "thin"
 strip = "symbols"
+panic = "abort"
 
 [profile.release-debuginfo]
 inherits = "release"
 strip = "none"
 debug = 1
+panic = "abort"
 
 [profile.dev-fast]
 inherits = "dev"
 strip = "debuginfo"
 debug = 0
 opt-level = 2
+panic = "abort"
