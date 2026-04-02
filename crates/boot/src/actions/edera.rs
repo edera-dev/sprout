@@ -5,7 +5,7 @@ use alloc::{format, vec};
 use anyhow::{Context, Result};
 use edera_sprout_config::actions::chainload::ChainloadConfiguration;
 use edera_sprout_config::actions::edera::EderaConfiguration;
-use edera_sprout_parsing::{build_xen_config, combine_options, empty_is_none};
+use edera_sprout_parsing::{build_xen_config, combine_options};
 use eficore::media_loader::{
     MediaLoaderHandle,
     constants::xen::{
@@ -74,12 +74,16 @@ pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> 
     // Create a vector of media loaders to drop them only after this function completes.
     let mut media_loaders = vec![config, kernel];
 
-    // Register the initrd if it is provided.
-    if let Some(initrd) = empty_is_none(configuration.initrd.as_ref()) {
-        let initrd =
-            register_media_loader_file(&context, XEN_EFI_RAMDISK_MEDIA_GUID, "initrd", initrd)
-                .context("unable to register initrd media loader")?;
-        media_loaders.push(initrd);
+    // Register each initrd segment, filtering out any empty strings or placeholders.
+    for initrd_path in configuration.initrd.iter().filter(|s| !s.is_empty()) {
+        let handle = register_media_loader_file(
+            &context,
+            XEN_EFI_RAMDISK_MEDIA_GUID,
+            "initrd",
+            initrd_path
+        ).context("unable to register initrd segment media loader")?;
+
+        media_loaders.push(handle);
     }
 
     // Chainload to the Xen EFI stub.
@@ -88,7 +92,7 @@ pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> 
         &ChainloadConfiguration {
             path: configuration.xen.clone(),
             options: vec![],
-            linux_initrd: None,
+            initrd: vec![],
         },
     )
     .context("unable to chainload to xen");
