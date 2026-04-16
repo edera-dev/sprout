@@ -34,7 +34,7 @@ impl ResolvedPath {
         let mut fs = FileSystem::new(fs);
         let path = self
             .sub_path
-            .to_string(DisplayOnly(false), AllowShortcuts(false))?;
+            .to_string16(DisplayOnly(false), AllowShortcuts(false))?;
         let content = fs.read(Path::new(&path));
         content.context("unable to read file contents")
     }
@@ -68,7 +68,7 @@ pub fn device_path_root(path: &DevicePath) -> Result<String> {
     let mut path = path
         .node_iter()
         .filter_map(|item| {
-            let item = item.to_string(DisplayOnly(false), AllowShortcuts(false));
+            let item = item.to_string16(DisplayOnly(false), AllowShortcuts(false));
             if item
                 .as_ref()
                 .map(|item| cstring16_contains_char(item, '('))
@@ -93,7 +93,7 @@ pub fn device_path_subpath(path: &DevicePath) -> Result<String> {
     let path = path
         .node_iter()
         .filter_map(|item| {
-            let item = item.to_string(DisplayOnly(false), AllowShortcuts(false));
+            let item = item.to_string16(DisplayOnly(false), AllowShortcuts(false));
             if item
                 .as_ref()
                 .map(|item| cstring16_contains_char(item, '('))
@@ -124,7 +124,7 @@ pub fn resolve_path(
         .node_iter()
         .next()
         .map(|it| {
-            it.to_string(DisplayOnly(false), AllowShortcuts(false))
+            it.to_string16(DisplayOnly(false), AllowShortcuts(false))
                 .unwrap_or_default()
         })
         .map(|it| it.to_string().contains('('))
