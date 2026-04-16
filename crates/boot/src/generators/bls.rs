@@ -49,7 +49,7 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
     let mut entries_path = PathBuf::from(
         bls_resolved
             .sub_path
-            .to_string(DisplayOnly(false), AllowShortcuts(false))
+            .to_string16(DisplayOnly(false), AllowShortcuts(false))
             .context("unable to convert bls path to string")?,
     );
     entries_path.push(cstr16!("entries"));

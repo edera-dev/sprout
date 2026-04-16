@@ -30,7 +30,7 @@ pub fn scan(
 
     // Convert the device path root to a string we can use in the configuration.
     let mut root = root
-        .to_string(DisplayOnly(false), AllowShortcuts(false))
+        .to_string16(DisplayOnly(false), AllowShortcuts(false))
         .context("unable to convert device root to string")?
         .to_string();
     // Add a trailing forward-slash to the root to ensure the device root is completed.

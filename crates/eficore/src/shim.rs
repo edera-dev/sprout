@@ -82,7 +82,7 @@ impl<'a> ShimInput<'a> {
                 };
                 // Convert the underlying path to a string.
                 let path = path
-                    .to_string(DisplayOnly(false), AllowShortcuts(false))
+                    .to_string16(DisplayOnly(false), AllowShortcuts(false))
                     .context("unable to convert device path to string")?;
                 let path = crate::path::resolve_path(None, path.to_string())
                     .context("unable to resolve path")?;
