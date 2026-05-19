@@ -2,7 +2,7 @@ use crate::shim::{ShimInput, ShimSupport, ShimVerificationOutput};
 use anyhow::{Context, Result};
 use core::slice;
 use log::warn;
-use spin::{Lazy, Mutex};
+use spin::{LazyLock, Mutex};
 use uefi::proto::device_path::FfiDevicePath;
 use uefi::proto::unsafe_protocol;
 use uefi::{Guid, guid};
@@ -45,7 +45,8 @@ struct SecurityHookState {
 
 /// Global state for the security hook.
 /// This is messy, but it is safe given the mutex.
-static GLOBAL_HOOK_STATE: Lazy<Mutex<Option<SecurityHookState>>> = Lazy::new(|| Mutex::new(None));
+static GLOBAL_HOOK_STATE: LazyLock<Mutex<Option<SecurityHookState>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 /// Security hook helper.
 pub struct SecurityHook;
