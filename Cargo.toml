@@ -19,7 +19,7 @@ edition = "2024"
 [workspace.dependencies]
 bitflags = "2.11.1"
 log = "0.4.29"
-spin = "0.11.0"
+spin = "0.12.0"
 uefi-raw = "0.14.0"
 
 [workspace.dependencies.anyhow]
