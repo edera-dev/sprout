@@ -19,8 +19,8 @@ edition = "2024"
 [workspace.dependencies]
 bitflags = "2.11.1"
 log = "0.4.29"
-spin = "0.11.0"
-uefi-raw = "0.14.0"
+spin = "0.12.1"
+uefi-raw = "0.15.0"
 
 [workspace.dependencies.anyhow]
 version = "1.0.102"
@@ -55,7 +55,7 @@ default-features = false
 features = ["serde", "parse"]
 
 [workspace.dependencies.uefi]
-version = "0.37.0"
+version = "0.38.0"
 default-features = false
 features = ["alloc", "global_allocator", "panic_handler"]
 
