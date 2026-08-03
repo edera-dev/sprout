@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM debian:trixie@sha256:2c91e484d93f0830a7e05a2b9d92a7b102be7cab562198b984a84fdbc7806d91 AS build
+FROM --platform=$BUILDPLATFORM debian:trixie@sha256:fac46bff2e02f51425b6e33b0e1169f55dfb053d83511ca28aa50c09fd5ed7a4 AS build
 ARG BUILDPLATFORM
 ARG EFI_NAME
 RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y \

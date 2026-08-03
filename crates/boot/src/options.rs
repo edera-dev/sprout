@@ -1,5 +1,5 @@
 use alloc::string::{String, ToString};
-use anyhow::Result;
+use anyhow::{Context, Result, anyhow};
 use core::ptr::null_mut;
 use jaarg::{
     ErrorUsageWriter, ErrorUsageWriterContext, HelpWriter, HelpWriterContext, Opt, Opts,
@@ -131,11 +131,15 @@ impl SproutOptions {
         ) {
             ParseResult::ContinueSuccess => Ok(result),
             ParseResult::ExitSuccess => unsafe {
-                uefi::boot::exit(uefi::boot::image_handle(), Status::SUCCESS, 0, null_mut());
+                uefi::boot::exit(uefi::boot::image_handle(), Status::SUCCESS, 0, null_mut())
+                    .context("unable to exit")?;
+                Err(anyhow!("unable to exit"))
             },
 
             ParseResult::ExitError => unsafe {
-                uefi::boot::exit(uefi::boot::image_handle(), Status::ABORTED, 0, null_mut());
+                uefi::boot::exit(uefi::boot::image_handle(), Status::ABORTED, 0, null_mut())
+                    .context("unable to exit")?;
+                Err(anyhow!("unable to exit"))
             },
         }
     }

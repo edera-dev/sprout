@@ -44,16 +44,8 @@ fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
             .context("unable to create timer event")?
     };
 
-    // The timeout is in increments of 100 nanoseconds.
-    let timeout_hundred_nanos = timeout.as_nanos() / 100;
-
-    // Check if the timeout is too large to fit into an u64.
-    if timeout_hundred_nanos > u64::MAX as u128 {
-        bail!("timeout duration overflow");
-    }
-
     // Set a timer to trigger after the specified duration.
-    let trigger = TimerTrigger::Relative(timeout_hundred_nanos as u64);
+    let trigger = TimerTrigger::Relative(*timeout);
     uefi::boot::set_timer(&timer_event, trigger).context("unable to set timeout timer")?;
 
     let mut events = vec![timer_event, key_event];
