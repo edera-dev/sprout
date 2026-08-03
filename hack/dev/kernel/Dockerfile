@@ -1,7 +1,7 @@
-ARG KERNEL_SOURCE_URL=https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.2.tar.xz
-ARG KERNEL_CHECKSUM=sha256:558c6bbab749492b34f99827fe807b0039a744693c21d3a7e03b3a48edaab96a
+ARG KERNEL_SOURCE_URL=https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.41.tar.xz
+ARG KERNEL_CHECKSUM=sha256:17fc72f0f8d4a8a8633a5d20085f5d9c5a5ec51ee896a0b7ae1ec25da31273ea
 
-FROM --platform=$BUILDPLATFORM debian:trixie@sha256:2c91e484d93f0830a7e05a2b9d92a7b102be7cab562198b984a84fdbc7806d91 AS buildenv
+FROM --platform=$BUILDPLATFORM debian:trixie@sha256:fac46bff2e02f51425b6e33b0e1169f55dfb053d83511ca28aa50c09fd5ed7a4 AS buildenv
 RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -y \
       build-essential squashfs-tools python3-yaml \
       patch diffutils sed mawk findutils zstd \

@@ -49,7 +49,7 @@ fn reconnect() -> Result<()> {
     for handle in handles.iter() {
         // Ignore the result as there is nothing we can do if reconnecting a controller fails.
         // This is also likely to fail in some cases but should fail safely.
-        let _ = uefi::boot::connect_controller(*handle, None, None, true);
+        let _ = uefi::boot::connect_controller(*handle, &[], None, true);
     }
 
     Ok(())
