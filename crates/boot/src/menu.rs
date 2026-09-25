@@ -48,11 +48,11 @@ fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
     let trigger = TimerTrigger::Relative(*timeout);
     uefi::boot::set_timer(&timer_event, trigger).context("unable to set timeout timer")?;
 
-    let mut events = vec![timer_event, key_event];
+    let events = vec![timer_event, key_event];
 
     // Wait for either the timer event or the key event to trigger.
     // Store the result so that we can free the timer event.
-    let event_result = uefi::boot::wait_for_event(&mut events)
+    let event_result = uefi::boot::wait_for_event(&events)
         .discard_errdata()
         .context("unable to wait for event");
 
