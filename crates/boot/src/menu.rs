@@ -1,36 +1,40 @@
 use crate::entries::BootableEntry;
+use crate::menu::basic::BasicMenu;
+use crate::menu::simple::SimpleMenu;
 use alloc::vec;
 use anyhow::{Context, Result};
 use core::time::Duration;
+use edera_sprout_config::MenuStyle;
 use eficore::bootloader_interface::BootloaderInterface;
 use eficore::platform::timer::PlatformTimer;
-use log::{info, warn};
+use log::warn;
 use uefi::ResultExt;
 use uefi::boot::TimerTrigger;
-use uefi::proto::console::text::{Input, Key, ScanCode};
+use uefi::proto::console::text::Input;
 use uefi_raw::table::boot::{EventType, Tpl};
 
-/// The characters that can be used to select an entry from keys.
-const ENTRY_NUMBER_TABLE: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+/// basic: A menu that prints the entries and selects them by number.
+pub mod basic;
 
-/// Represents the operation that can be performed by the boot menu.
-#[derive(PartialEq, Eq)]
-enum MenuOperation {
-    /// The user selected a numbered entry.
-    Number(usize),
-    /// The user selected the escape key to exit the boot menu.
-    Exit,
-    /// The user selected the enter key to display the entries again.
-    Continue,
-    /// Timeout occurred.
-    Timeout,
-    /// No operation should be performed.
-    Nop,
+/// simple: A full-screen menu that selects entries with the arrow keys.
+pub mod simple;
+
+/// A boot menu that can be shown to select an entry to boot.
+pub trait BootMenu {
+    /// Select an entry from `entries` to boot. If no entry is chosen before `timeout` passes,
+    /// the default entry is selected.
+    fn select<'a>(
+        &self,
+        timeout: Duration,
+        entries: &'a [BootableEntry],
+    ) -> Result<&'a BootableEntry>;
 }
 
-/// Read a key from the input device with a duration, returning the [MenuOperation] that was
-/// performed.
-fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
+/// Wait for the key event of `input` to be signaled, giving up once `timeout` passes.
+/// Returns true if the key event was signaled, or false if the timeout passed.
+/// Some firmware signals the key event without a key being available, so reading
+/// the key afterward may still produce no key.
+pub fn wait_for_key(input: &mut Input, timeout: Duration) -> Result<bool> {
     // The event to wait for a key press.
     let key_event = input
         .wait_for_key_event()
@@ -45,7 +49,7 @@ fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
     };
 
     // Set a timer to trigger after the specified duration.
-    let trigger = TimerTrigger::Relative(*timeout);
+    let trigger = TimerTrigger::Relative(timeout);
     uefi::boot::set_timer(&timer_event, trigger).context("unable to set timeout timer")?;
 
     let events = vec![timer_event, key_event];
@@ -79,115 +83,26 @@ fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
     // Acquire the event that triggered.
     let event = event_result?;
 
-    // The first event is the timer event.
-    // If it has triggered, the user did not select a numbered entry.
-    if event == 0 {
-        return Ok(MenuOperation::Timeout);
-    }
-
-    // If we reach here, there is a key event.
-    // Some firmware signals the key event without a key being available,
-    // in which case there is nothing to do.
-    let Some(key) = input.read_key().context("unable to read key")? else {
-        return Ok(MenuOperation::Nop);
-    };
-
-    match key {
-        Key::Printable(c) => {
-            // If the key is not ascii, we can't process it.
-            if !c.is_ascii() {
-                return Ok(MenuOperation::Continue);
-            }
-            // Convert the key to a char.
-            let c: char = c.into();
-            // Find the key pressed in the entry number table or continue.
-            Ok(ENTRY_NUMBER_TABLE
-                .iter()
-                .position(|&x| x == c)
-                .map(MenuOperation::Number)
-                .unwrap_or(MenuOperation::Continue))
-        }
-
-        // The escape key is used to exit the boot menu.
-        Key::Special(ScanCode::ESCAPE) => Ok(MenuOperation::Exit),
-
-        // If the special key is unknown, do nothing.
-        Key::Special(_) => Ok(MenuOperation::Nop),
-    }
+    // The first event is the timer event, so any other event is the key event.
+    Ok(event != 0)
 }
 
-/// Selects an entry from the list of entries using the boot menu.
-fn select_with_input<'a>(
-    input: &mut Input,
-    timeout: Duration,
-    entries: &'a [BootableEntry],
-) -> Result<&'a BootableEntry> {
-    loop {
-        // If the timeout is not zero, let's display the boot menu.
-        if !timeout.is_zero() {
-            // Until a pretty menu is available, we just print all the entries.
-            info!("Boot Menu:");
-            for (index, entry) in entries.iter().enumerate() {
-                let title = entry.context().stamp(&entry.declaration().title);
-                info!("  [{}] {}", index, title);
-            }
-        }
-
-        // Read from input until a valid operation is selected.
-        let operation = loop {
-            // If the timeout is zero, we can exit immediately because there is nothing to do.
-            if timeout.is_zero() {
-                break MenuOperation::Exit;
-            }
-
-            info!("Select a boot entry using the number keys.");
-            info!("Press Escape to exit and enter to display the entries again.");
-
-            let operation = read(input, &timeout)?;
-            if operation != MenuOperation::Nop {
-                break operation;
-            }
-        };
-
-        match operation {
-            // Entry was selected by number. If the number is invalid, we continue.
-            MenuOperation::Number(index) => {
-                let Some(entry) = entries.get(index) else {
-                    info!("invalid entry number");
-                    continue;
-                };
-                return Ok(entry);
-            }
-
-            // When the user exits the boot menu or a timeout occurs, we should
-            // boot the default entry, if any.
-            MenuOperation::Exit | MenuOperation::Timeout => {
-                return entries
-                    .iter()
-                    .find(|item| item.is_default())
-                    .context("no default entry available");
-            }
-
-            // If the operation is to continue or nop, we can just run the loop again.
-            MenuOperation::Continue | MenuOperation::Nop => {
-                continue;
-            }
-        }
-    }
-}
-
-/// Shows a boot menu to select a bootable entry to boot.
-/// The actual work is done internally in [select_with_input] which is called
-/// within the context of the standard input device.
+/// Shows a boot menu of the specified `style` to select a bootable entry to boot.
 pub fn select<'live>(
     timer: &'live PlatformTimer,
     timeout: Duration,
+    style: MenuStyle,
     entries: &'live [BootableEntry],
 ) -> Result<&'live BootableEntry> {
     // Notify the bootloader interface that we are about to display the menu.
     BootloaderInterface::mark_menu(timer)
         .context("unable to mark menu display in bootloader interface")?;
 
-    // Acquire the standard input device and run the boot menu.
-    uefi::system::with_stdin(move |input| select_with_input(input, timeout, entries))
+    // Pick the menu that implements the requested style.
+    let menu: &dyn BootMenu = match style {
+        MenuStyle::Basic => &BasicMenu,
+        MenuStyle::Simple => &SimpleMenu,
+    };
+
+    menu.select(timeout, entries)
 }

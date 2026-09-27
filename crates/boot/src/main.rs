@@ -338,13 +338,21 @@ fn run() -> Result<()> {
     // Convert the menu timeout to a duration.
     let menu_timeout = Duration::from_secs(menu_timeout);
 
+    // Determine the menu style based on the options or configuration.
+    // We prefer the options over the configuration to allow for overriding.
+    let menu_style = context
+        .root()
+        .options()
+        .menu_style
+        .unwrap_or(config.options.menu_style);
+
     // Use the forced boot entry if possible, otherwise pick the first entry using a boot menu.
     let entry = if !force_boot_menu && let Some(ref force_boot_entry) = force_boot_entry {
         BootableEntry::find(force_boot_entry, entries.iter())
             .context(format!("unable to find entry: {force_boot_entry}"))?
     } else {
         // Delegate to the menu to select an entry to boot.
-        menu::select(&timer, menu_timeout, &entries)
+        menu::select(&timer, menu_timeout, menu_style, &entries)
             .context("unable to select entry via boot menu")?
     };
 

@@ -84,9 +84,24 @@ pub struct OptionsConfiguration {
     /// The timeout of the boot menu.
     #[serde(rename = "menu-timeout", default = "default_menu_timeout")]
     pub menu_timeout: u64,
+    /// The style of boot menu to display.
+    #[serde(rename = "menu-style", default)]
+    pub menu_style: MenuStyle,
     /// Enables autoconfiguration of Sprout based on the environment.
     #[serde(default)]
     pub autoconfigure: bool,
+}
+
+/// The style of boot menu to display.
+#[derive(Serialize, Deserialize, Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum MenuStyle {
+    /// A basic menu that prints the entries and selects them by number.
+    #[serde(rename = "basic")]
+    Basic,
+    /// A simple full-screen menu that selects entries with the arrow keys.
+    #[default]
+    #[serde(rename = "simple")]
+    Simple,
 }
 
 /// Get the latest version of the Sprout configuration format.
