@@ -6,7 +6,9 @@ use anyhow::{Context, Result};
 use core::ops::Deref;
 use uefi::fs::{FileSystem, Path};
 use uefi::proto::device_path::text::{AllowShortcuts, DevicePathFromText, DisplayOnly};
-use uefi::proto::device_path::{DevicePath, PoolDevicePath};
+use uefi::proto::device_path::{
+    DevicePath, DevicePathNode, DeviceSubType, DeviceType, PoolDevicePath,
+};
 use uefi::proto::media::fs::SimpleFileSystem;
 use uefi::{CString16, Handle};
 
@@ -40,10 +42,17 @@ impl ResolvedPath {
     }
 }
 
-/// Checks if a [CString16] contains a char `c`.
-/// We need to call to_string() because CString16 doesn't support `contains` with a char.
-fn cstring16_contains_char(string: &CString16, c: char) -> bool {
-    string.to_string().contains(c)
+/// Checks if the device path `node` is a file path node, rather than a device node.
+fn is_file_path_node(node: &DevicePathNode) -> bool {
+    node.device_type() == DeviceType::MEDIA && node.sub_type() == DeviceSubType::MEDIA_FILE_PATH
+}
+
+/// Converts the device path `node` to its text form.
+fn node_to_string(node: &DevicePathNode) -> Result<String> {
+    Ok(node
+        .to_string16(DisplayOnly(false), AllowShortcuts(false))
+        .context("unable to convert device path node to string")?
+        .to_string())
 }
 
 /// Parses the input `path` as a [DevicePath].
@@ -67,20 +76,9 @@ pub fn text_to_device_path(path: impl AsRef<str>) -> Result<PoolDevicePath> {
 pub fn device_path_root(path: &DevicePath) -> Result<String> {
     let mut path = path
         .node_iter()
-        .filter_map(|item| {
-            let item = item.to_string16(DisplayOnly(false), AllowShortcuts(false));
-            if item
-                .as_ref()
-                .map(|item| cstring16_contains_char(item, '('))
-                .unwrap_or(false)
-            {
-                Some(item.unwrap_or_default())
-            } else {
-                None
-            }
-        })
-        .map(|item| item.to_string())
-        .collect::<Vec<_>>()
+        .filter(|node| !is_file_path_node(node))
+        .map(node_to_string)
+        .collect::<Result<Vec<_>>>()?
         .join("/");
     path.push('/');
     Ok(path)
@@ -92,20 +90,9 @@ pub fn device_path_root(path: &DevicePath) -> Result<String> {
 pub fn device_path_subpath(path: &DevicePath) -> Result<String> {
     let path = path
         .node_iter()
-        .filter_map(|item| {
-            let item = item.to_string16(DisplayOnly(false), AllowShortcuts(false));
-            if item
-                .as_ref()
-                .map(|item| cstring16_contains_char(item, '('))
-                .unwrap_or(false)
-            {
-                None
-            } else {
-                Some(item.unwrap_or_default())
-            }
-        })
-        .map(|item| item.to_string())
-        .collect::<Vec<_>>()
+        .filter(|node| is_file_path_node(node))
+        .map(node_to_string)
+        .collect::<Result<Vec<_>>>()?
         .join("\\");
     Ok(path)
 }
@@ -120,15 +107,12 @@ pub fn resolve_path(
     let mut input = input.to_string();
 
     let mut path = text_to_device_path(&input).context("unable to convert text to path")?;
+    // A path that starts with a device node has a device, while a path that starts
+    // with a file path node is relative to the default root path.
     let path_has_device = path
         .node_iter()
         .next()
-        .map(|it| {
-            it.to_string16(DisplayOnly(false), AllowShortcuts(false))
-                .unwrap_or_default()
-        })
-        .map(|it| it.to_string().contains('('))
-        .unwrap_or(false);
+        .is_some_and(|node| !is_file_path_node(node));
     if !path_has_device {
         if !input.starts_with('\\') {
             input.insert(0, '\\');
