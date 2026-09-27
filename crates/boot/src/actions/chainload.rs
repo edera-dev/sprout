@@ -12,8 +12,8 @@ use eficore::loader::{ImageLoadRequest, ImageLoader};
 use eficore::media_loader::MediaLoaderHandle;
 use eficore::media_loader::constants::linux::LINUX_EFI_INITRD_MEDIA_GUID;
 use log::warn;
-use uefi::CString16;
 use uefi::proto::loaded_image::LoadedImage;
+use uefi::{CString16, Handle};
 
 /// Read the initrd at the stamped `path` relative to the sprout image.
 /// Provides [None] if the path refers to the root of a filesystem rather than a file.
@@ -32,6 +32,20 @@ pub fn read_initrd(context: &Rc<SproutContext>, path: &str) -> Result<Option<Vec
 
     let content = resolved.read_file().context("unable to read initrd")?;
     Ok(Some(content))
+}
+
+/// Unloads the image with the contained handle when dropped, unless the handle is taken.
+/// This ensures that an image that is loaded but never started is not left in memory.
+struct UnloadGuard(Option<Handle>);
+
+impl Drop for UnloadGuard {
+    fn drop(&mut self) {
+        if let Some(handle) = self.0.take()
+            && let Err(error) = uefi::boot::unload_image(handle)
+        {
+            warn!("unable to unload image: {}", error);
+        }
+    }
 }
 
 /// Executes the chainload action using the specified `configuration` inside the provided `context`.
@@ -57,6 +71,9 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     // Load the image to chainload using the image loader support module.
     // It will determine if the image needs to be loaded via the shim or can be loaded directly.
     let image = ImageLoader::load(request)?;
+
+    // Unload the image if an error occurs before it is started.
+    let mut unload_guard = UnloadGuard(Some(*image.handle()));
 
     // Stamp and combine the options to pass to the image.
     let options = combine_options(context.stamp_iter(configuration.options.iter()));
@@ -138,6 +155,10 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     // Since we are about to hand off control to another image, we need to execute the handoff hook.
     // This will perform operations like clearing the screen.
     before_handoff(&context).context("unable to execute before handoff hook")?;
+
+    // The image is about to be started, so it is no longer ours to unload.
+    // Once started, the image is unloaded by the firmware when it exits.
+    unload_guard.0 = None;
 
     // Start the loaded image.
     // This call might return, or it may pass full control to another image that will never return.
