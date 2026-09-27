@@ -123,7 +123,8 @@ pub fn build_xen_config(xen_options: &str, kernel_options: &str) -> String {
 }
 
 /// Filename prefixes used to identify Linux kernel images.
-pub const LINUX_KERNEL_PREFIXES: &[&str] = &["vmlinuz", "Image"];
+/// These must be lowercase, as file names are lowercased before matching.
+pub const LINUX_KERNEL_PREFIXES: &[&str] = &["vmlinuz", "image"];
 
 /// Filename prefixes used to identify initramfs images paired with a kernel.
 pub const LINUX_INITRAMFS_PREFIXES: &[&str] = &["initramfs", "initrd", "initrd.img"];
@@ -360,6 +361,19 @@ mod tests {
         assert_eq!(
             match_kernel_prefix("vmlinuz-6.1.0", LINUX_KERNEL_PREFIXES),
             Some("vmlinuz")
+        );
+    }
+
+    #[test]
+    fn kernel_prefix_matches_lowercased_arm64_image() {
+        // Callers lowercase file names before matching, so "Image-6.1" arrives as "image-6.1".
+        assert_eq!(
+            match_kernel_prefix("image-6.1", LINUX_KERNEL_PREFIXES),
+            Some("image")
+        );
+        assert_eq!(
+            match_kernel_prefix("image", LINUX_KERNEL_PREFIXES),
+            Some("image")
         );
     }
 
