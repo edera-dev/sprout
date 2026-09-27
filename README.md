@@ -120,6 +120,8 @@ $ sprout.efi --config=\path\to\config.toml
 $ sprout.efi --boot="Boot Xen"
 # Autoconfigure Sprout, without loading a configuration file.
 $ sprout.efi --autoconfigure
+# Use the basic boot menu instead of the simple one.
+$ sprout.efi --menu-style=basic
 ```
 
 ### Boot Linux from ESP

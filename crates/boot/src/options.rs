@@ -1,9 +1,11 @@
 use alloc::string::{String, ToString};
 use anyhow::{Context, Result, anyhow};
 use core::ptr::null_mut;
+use edera_sprout_config::MenuStyle;
 use jaarg::{
     ErrorUsageWriter, ErrorUsageWriterContext, HelpWriter, HelpWriterContext, Opt, Opts,
-    ParseControl, ParseResult, StandardErrorUsageWriter, StandardFullHelpWriter,
+    ParseControl, ParseError, ParseErrorKind, ParseResult, StandardErrorUsageWriter,
+    StandardFullHelpWriter,
 };
 use log::{error, info};
 use uefi_raw::Status;
@@ -24,6 +26,8 @@ pub struct SproutOptions {
     pub force_menu: bool,
     /// The timeout for the boot menu in seconds.
     pub menu_timeout: Option<u64>,
+    /// The style of boot menu to display.
+    pub menu_style: Option<MenuStyle>,
     /// Retains the boot console before boot.
     pub retain_boot_console: bool,
 }
@@ -37,6 +41,7 @@ impl Default for SproutOptions {
             boot: None,
             force_menu: false,
             menu_timeout: None,
+            menu_style: None,
             retain_boot_console: false,
         }
     }
@@ -54,6 +59,7 @@ impl SproutOptions {
             Boot,
             ForceMenu,
             MenuTimeout,
+            MenuStyle,
             RetainBootConsole,
         }
 
@@ -69,6 +75,8 @@ impl SproutOptions {
             Opt::flag(ArgID::ForceMenu, &["--force-menu"]).help_text("Force showing the boot menu"),
             Opt::value(ArgID::MenuTimeout, &["--menu-timeout"], "TIMEOUT")
                 .help_text("Boot menu timeout, in seconds"),
+            Opt::value(ArgID::MenuStyle, &["--menu-style"], "STYLE")
+                .help_text("Boot menu style, basic or simple"),
             Opt::flag(ArgID::RetainBootConsole, &["--retain-boot-console"])
                 .help_text("Retain boot console before boot"),
         ]);
@@ -104,6 +112,23 @@ impl SproutOptions {
                     ArgID::MenuTimeout => {
                         // The timeout for the boot menu in seconds.
                         result.menu_timeout = Some(value.parse::<u64>()?);
+                    }
+                    ArgID::MenuStyle => {
+                        // The style of boot menu to display.
+                        result.menu_style = Some(match value {
+                            "basic" => MenuStyle::Basic,
+                            "simple" => MenuStyle::Simple,
+                            // jaarg has no error kind for an unknown choice, but this one is
+                            // printed as an invalid argument. The parser fills in the option
+                            // and value of the error.
+                            _ => {
+                                return Err(ParseError::ArgumentError(
+                                    "",
+                                    "",
+                                    ParseErrorKind::InvalidInteger,
+                                ));
+                            }
+                        });
                     }
                     ArgID::RetainBootConsole => {
                         // Retain the boot console before booting.
