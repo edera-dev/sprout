@@ -74,6 +74,16 @@ impl BootableEntry {
         self.title = self.context.stamp(&self.title);
     }
 
+    /// Restamp the declared sort key with the current context.
+    /// A sort key that was set on this entry directly is left as is.
+    pub fn restamp_sort_key(&mut self) {
+        if self.sort_key.is_none()
+            && let Some(ref sort_key) = self.declaration.sort_key
+        {
+            self.sort_key = Some(self.context.stamp(sort_key));
+        }
+    }
+
     /// Mark this entry as the default entry.
     pub fn mark_default(&mut self) {
         self.default = true;

@@ -271,8 +271,9 @@ fn run() -> Result<()> {
             .freeze();
         // Provide the new context to the bootable entry.
         entry.swap_context(context);
-        // Restamp the title with any values.
+        // Restamp the title and sort key with any values.
         entry.restamp_title();
+        entry.restamp_sort_key();
 
         // Mark this entry as the default entry if it is declared as such.
         if let Some(ref default_entry) = config.options.default_entry {
