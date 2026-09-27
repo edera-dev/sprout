@@ -5,7 +5,7 @@ use alloc::rc::Rc;
 use alloc::vec::Vec;
 use anyhow::{Context, Result, bail};
 use edera_sprout_config::actions::chainload::ChainloadConfiguration;
-use edera_sprout_parsing::{combine_options, empty_is_none};
+use edera_sprout_parsing::{append_initrd, combine_options, empty_is_none};
 use eficore::bootloader_interface::BootloaderInterface;
 use eficore::loader::source::ImageSource;
 use eficore::loader::{ImageLoadRequest, ImageLoader};
@@ -112,7 +112,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
             continue;
         };
         match initrd.as_mut() {
-            Some(initrd) => initrd.extend_from_slice(&content),
+            Some(initrd) => append_initrd(initrd, &content),
             None => initrd = Some(content),
         }
     }

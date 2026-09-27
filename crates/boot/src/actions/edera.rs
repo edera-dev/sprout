@@ -5,7 +5,7 @@ use alloc::{format, vec};
 use anyhow::{Context, Result, bail};
 use edera_sprout_config::actions::chainload::ChainloadConfiguration;
 use edera_sprout_config::actions::edera::EderaConfiguration;
-use edera_sprout_parsing::{build_xen_config, combine_options, empty_is_none};
+use edera_sprout_parsing::{append_initrd, build_xen_config, combine_options, empty_is_none};
 use eficore::media_loader::{
     MediaLoaderHandle,
     constants::xen::{
@@ -94,7 +94,10 @@ pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> 
         .chain(configuration.initrd_chain.iter())
     {
         if let Some(p) = empty_is_none(Some(p)) {
-            initrd_bytes.extend(read_loader_payload(&context, "initrd", p)?);
+            append_initrd(
+                &mut initrd_bytes,
+                &read_loader_payload(&context, "initrd", p)?,
+            );
         }
     }
     PlatformTpm::log_event(

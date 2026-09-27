@@ -90,6 +90,18 @@ pub fn combine_options<T: AsRef<str>>(options: impl Iterator<Item = T>) -> Strin
         .join(" ")
 }
 
+/// The alignment of each initrd when initrds are concatenated.
+const INITRD_ALIGNMENT: usize = 4;
+
+/// Append the `initrd` to the concatenated `initrds`, padding with zeros so that it starts
+/// on a 4-byte boundary. Linux only finds a cpio archive at a 4-byte aligned offset when
+/// unpacking concatenated initrds, as GRUB and systemd-boot pad them the same way.
+pub fn append_initrd(initrds: &mut Vec<u8>, initrd: &[u8]) {
+    let padded = initrds.len().next_multiple_of(INITRD_ALIGNMENT);
+    initrds.resize(padded, 0);
+    initrds.extend_from_slice(initrd);
+}
+
 /// Produce a unique hash for the input.
 /// This uses SHA-256, which is unique enough but relatively short.
 pub fn unique_hash(input: &str) -> String {
@@ -356,6 +368,24 @@ mod tests {
         // Required or the last line will be ignored by the Xen config parser.
         let config = build_xen_config("", "");
         assert!(config.ends_with('\n'));
+    }
+
+    #[test]
+    fn append_initrd_pads_to_four_bytes() {
+        let mut initrds = Vec::new();
+        append_initrd(&mut initrds, b"abcde");
+        assert_eq!(initrds, b"abcde");
+        append_initrd(&mut initrds, b"fg");
+        assert_eq!(initrds, b"abcde\0\0\0fg");
+        append_initrd(&mut initrds, b"h");
+        assert_eq!(initrds, b"abcde\0\0\0fg\0\0h");
+    }
+
+    #[test]
+    fn append_initrd_aligned_needs_no_padding() {
+        let mut initrds = b"abcd".to_vec();
+        append_initrd(&mut initrds, b"efgh");
+        assert_eq!(initrds, b"abcdefgh");
     }
 
     #[test]
