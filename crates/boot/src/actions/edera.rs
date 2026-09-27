@@ -87,18 +87,24 @@ pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> 
 
     // Read the initrd, or each initrd in the chain concatenated in order, then
     // extend PCR 9 with the combined bytes (empty when no initrd is configured).
+    // Paths are stamped first, and paths that are empty after stamping or that refer
+    // to the root of a filesystem are skipped, the same as the chainload action.
     let mut initrd_bytes = Vec::new();
-    for p in configuration
+    let initrd_paths = configuration
         .initrd
         .iter()
         .chain(configuration.initrd_chain.iter())
-    {
-        if let Some(p) = empty_is_none(Some(p)) {
-            append_initrd(
-                &mut initrd_bytes,
-                &read_loader_payload(&context, "initrd", p)?,
-            );
-        }
+        .map(|item| context.stamp(item));
+    for path in initrd_paths {
+        let Some(path) = empty_is_none(Some(path)) else {
+            continue;
+        };
+        let Some(content) = actions::chainload::read_initrd(&context, &path)
+            .context("unable to read initrd file")?
+        else {
+            continue;
+        };
+        append_initrd(&mut initrd_bytes, &content);
     }
     PlatformTpm::log_event(
         PlatformTpm::PCR_INITRD,

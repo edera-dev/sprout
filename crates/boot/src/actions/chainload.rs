@@ -15,24 +15,22 @@ use log::warn;
 use uefi::CString16;
 use uefi::proto::loaded_image::LoadedImage;
 
-/// Read the Linux initrd at `path` relative to the sprout image.
+/// Read the initrd at the stamped `path` relative to the sprout image.
 /// Provides [None] if the path refers to the root of a filesystem rather than a file.
-fn read_linux_initrd(context: &Rc<SproutContext>, path: &str) -> Result<Option<Vec<u8>>> {
+pub fn read_initrd(context: &Rc<SproutContext>, path: &str) -> Result<Option<Vec<u8>>> {
     let resolved = eficore::path::resolve_path(Some(context.root().loaded_image_path()?), path)
-        .context("unable to resolve linux initrd path")?;
+        .context("unable to resolve initrd path")?;
 
     // A path without a file component refers to the root of the filesystem, not an initrd.
     // This happens when a path template like "$root\\$initrd-0" is stamped with an empty
     // initrd value, such as a BLS entry without an initrd or an unused BLS initrd slot.
     let subpath = eficore::path::device_path_subpath(&resolved.full_path)
-        .context("unable to get linux initrd subpath")?;
+        .context("unable to get initrd subpath")?;
     if subpath.trim_matches('\\').is_empty() {
         return Ok(None);
     }
 
-    let content = resolved
-        .read_file()
-        .context("unable to read linux initrd")?;
+    let content = resolved.read_file().context("unable to read initrd")?;
     Ok(Some(content))
 }
 
@@ -108,7 +106,7 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
         let Some(path) = empty_is_none(Some(path)) else {
             continue;
         };
-        let Some(content) = read_linux_initrd(&context, &path)? else {
+        let Some(content) = read_initrd(&context, &path)? else {
             continue;
         };
         match initrd.as_mut() {
