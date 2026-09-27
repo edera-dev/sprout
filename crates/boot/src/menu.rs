@@ -19,6 +19,10 @@ pub mod basic;
 /// simple: A full-screen menu that selects entries with the arrow keys.
 pub mod simple;
 
+/// The longest duration a single timer is set for. This is well within the range of
+/// the 100ns units that timers are set in, and still over a century long.
+const MAX_TIMER_DURATION: Duration = Duration::from_secs(u32::MAX as u64);
+
 /// A boot menu that can be shown to select an entry to boot.
 pub trait BootMenu {
     /// Select an entry from `entries` to boot. If no entry is chosen before `timeout` passes,
@@ -49,7 +53,9 @@ pub fn wait_for_key(input: &mut Input, timeout: Duration) -> Result<bool> {
     };
 
     // Set a timer to trigger after the specified duration.
-    let trigger = TimerTrigger::Relative(timeout);
+    // The timer is limited to what the firmware can represent, as a longer timeout
+    // can't be converted into a timer trigger.
+    let trigger = TimerTrigger::Relative(timeout.min(MAX_TIMER_DURATION));
     uefi::boot::set_timer(&timer_event, trigger).context("unable to set timeout timer")?;
 
     let events = vec![timer_event, key_event];
