@@ -294,9 +294,14 @@ pub fn compare_versions(a: &str, b: &str) -> Ordering {
                 handle_single_char!(ca, cb, a_chars, b_chars, '.');
 
                 // Handle digits with numerical comparison.
-                // We key off of the A character being a digit intentionally as we presume
-                // this indicates it will be the same at this position.
+                // If only one string has digits at this position, that string is newer.
                 if ca.is_ascii_digit() || cb.is_ascii_digit() {
+                    if !ca.is_ascii_digit() {
+                        return Ordering::Less;
+                    }
+                    if !cb.is_ascii_digit() {
+                        return Ordering::Greater;
+                    }
                     let result = compare_numeric(&mut a_chars, &mut b_chars);
                     if result != Ordering::Equal {
                         return result;
@@ -717,6 +722,14 @@ efi        /EFI/fedora/shimx64.efi
         assert_eq!(compare_versions("", "~1"), Ordering::Less);
         assert_eq!(compare_versions("~1", ""), Ordering::Greater);
         assert_eq!(compare_versions("", "1"), Ordering::Less);
+    }
+
+    #[test]
+    fn digits_are_newer_than_letters() {
+        assert_eq!(compare_versions("0", "a"), Ordering::Greater);
+        assert_eq!(compare_versions("a", "0"), Ordering::Less);
+        assert_eq!(compare_versions("1.0", "1.a"), Ordering::Greater);
+        assert_eq!(compare_versions("1.a", "1.0"), Ordering::Less);
     }
 
     #[test]
