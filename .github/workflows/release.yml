@@ -13,7 +13,8 @@ permissions:
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.event.inputs.release-tag }}"
-  cancel-in-progress: true
+  # Let a running release finish, so its assets are never left partially uploaded.
+  cancel-in-progress: false
 
 jobs:
   release:
