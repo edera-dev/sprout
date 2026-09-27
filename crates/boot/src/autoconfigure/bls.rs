@@ -1,3 +1,4 @@
+use crate::generators::bls::BLS_INITRD_SLOTS;
 use alloc::string::ToString;
 use alloc::{format, vec};
 use anyhow::{Context, Result};
@@ -83,10 +84,15 @@ pub fn scan(
 
     // Generate a chainload configuration for BLS.
     // BLS will provide these values to us.
+    // Every initrd slot is chained in order. Unused slots stamp to the root of the
+    // filesystem, which the chainload action skips.
     let chainload = ChainloadConfiguration {
         path: format!("{}\\$chainload", root),
         options: vec!["$options".to_string()],
-        linux_initrd: Some(format!("{}\\$initrd", root)),
+        linux_initrd: None,
+        linux_initrd_chain: (0..BLS_INITRD_SLOTS)
+            .map(|slot| format!("{}\\$initrd-{}", root, slot))
+            .collect(),
     };
 
     // Insert the chainload action into the configuration.

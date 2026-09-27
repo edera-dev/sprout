@@ -232,6 +232,7 @@ pub fn scan(
         path: "$kernel".to_string(),
         options: vec!["$linux-options".to_string()],
         linux_initrd: Some("$initrd".to_string()),
+        linux_initrd_chain: vec![],
     };
 
     // Insert the chainload action into the configuration.

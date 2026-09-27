@@ -2,6 +2,7 @@
 extern crate alloc;
 
 use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use anyhow::{Error, Result};
 use core::{cmp::Ordering, iter::Peekable, str::FromStr};
 
@@ -15,8 +16,8 @@ pub struct BlsEntry {
     pub options: Option<String>,
     /// The path to the linux kernel.
     pub linux: Option<String>,
-    /// The path to the initrd.
-    pub initrd: Option<String>,
+    /// The paths to the initrds, in the order they appear.
+    pub initrd: Vec<String>,
     /// The path to an EFI image.
     pub efi: Option<String>,
     /// The sort key for the entry.
@@ -38,7 +39,7 @@ impl FromStr for BlsEntry {
         let mut title: Option<String> = None;
         let mut options: Option<String> = None;
         let mut linux: Option<String> = None;
-        let mut initrd: Option<String> = None;
+        let mut initrd: Vec<String> = Vec::new();
         let mut efi: Option<String> = None;
         let mut sort_key: Option<String> = None;
         let mut version: Option<String> = None;
@@ -75,9 +76,10 @@ impl FromStr for BlsEntry {
                     linux = Some(value.trim().to_string());
                 }
 
-                // The path to the initrd.
+                // The path to an initrd. An entry can have multiple initrds, either as
+                // repeated initrd lines or as multiple paths separated by whitespace.
                 "initrd" => {
-                    initrd = Some(value.trim().to_string());
+                    initrd.extend(value.split_whitespace().map(|path| path.to_string()));
                 }
 
                 // The path to an EFI image.
@@ -134,12 +136,13 @@ impl BlsEntry {
             .map(|path| path.replace('/', "\\").trim_start_matches('\\').to_string())
     }
 
-    /// Fetches the path to an initrd to pass to the kernel, if any.
+    /// Fetches the paths to the initrds to pass to the kernel, in order.
     /// It also converts / to \\ to match EFI path style.
-    pub fn initrd_path(&self) -> Option<String> {
+    pub fn initrd_paths(&self) -> Vec<String> {
         self.initrd
-            .clone()
+            .iter()
             .map(|path| path.replace('/', "\\").trim_start_matches('\\').to_string())
+            .collect()
     }
 
     /// Fetches the options to pass to the kernel, if any.
@@ -431,7 +434,7 @@ mod tests {
         assert!(entry.title.is_none());
         assert!(entry.linux.is_none());
         assert!(entry.efi.is_none());
-        assert!(entry.initrd.is_none());
+        assert!(entry.initrd.is_empty());
         assert!(entry.options.is_none());
         assert!(entry.sort_key.is_none());
         assert!(entry.version.is_none());
@@ -455,7 +458,7 @@ efi        /EFI/fedora/shimx64.efi
         assert_eq!(entry.version.as_deref(), Some("6.5.6-300.fc39.x86_64"));
         assert_eq!(entry.machine_id.as_deref(), Some("abc123def456"));
         assert_eq!(entry.linux.as_deref(), Some("/boot/vmlinuz-6.5.6"));
-        assert_eq!(entry.initrd.as_deref(), Some("/boot/initrd-6.5.6.img"));
+        assert_eq!(entry.initrd, ["/boot/initrd-6.5.6.img"]);
         assert_eq!(entry.options.as_deref(), Some("root=/dev/sda1 ro quiet"));
         assert_eq!(entry.sort_key.as_deref(), Some("fedora"));
         assert_eq!(entry.efi.as_deref(), Some("/EFI/fedora/shimx64.efi"));
@@ -555,15 +558,29 @@ efi        /EFI/fedora/shimx64.efi
     }
 
     #[test]
-    fn initrd_path_normalises_slashes() {
-        let entry: BlsEntry = "linux /vmlinuz\ninitrd /boot/initrd.img\n".parse().unwrap();
-        assert_eq!(entry.initrd_path().as_deref(), Some("boot\\initrd.img"));
+    fn parse_multiple_initrd_lines_in_order() {
+        let input = "linux /vmlinuz\ninitrd /intel-ucode.img\ninitrd /initramfs.img\n";
+        let entry: BlsEntry = input.parse().unwrap();
+        assert_eq!(entry.initrd, ["/intel-ucode.img", "/initramfs.img"]);
     }
 
     #[test]
-    fn initrd_path_none_when_not_set() {
+    fn parse_multiple_initrds_on_one_line() {
+        let input = "linux /vmlinuz\ninitrd /intel-ucode.img  /initramfs.img\n";
+        let entry: BlsEntry = input.parse().unwrap();
+        assert_eq!(entry.initrd, ["/intel-ucode.img", "/initramfs.img"]);
+    }
+
+    #[test]
+    fn initrd_paths_normalises_slashes() {
+        let entry: BlsEntry = "linux /vmlinuz\ninitrd /boot/initrd.img\n".parse().unwrap();
+        assert_eq!(entry.initrd_paths(), ["boot\\initrd.img"]);
+    }
+
+    #[test]
+    fn initrd_paths_empty_when_not_set() {
         let entry: BlsEntry = "linux /vmlinuz\n".parse().unwrap();
-        assert!(entry.initrd_path().is_none());
+        assert!(entry.initrd_paths().is_empty());
     }
 
     #[test]

@@ -18,4 +18,9 @@ pub struct ChainloadConfiguration {
     /// generally better and safer as it can support additional load options in the future.
     #[serde(default, rename = "linux-initrd")]
     pub linux_initrd: Option<String>,
+    /// An optional list of paths to Linux initrds to chain together.
+    /// The contents of each initrd are concatenated in order and loaded as a single initrd
+    /// using the same mechanism as `linux-initrd`. This cannot be used with `linux-initrd`.
+    #[serde(default, rename = "linux-initrd-chain")]
+    pub linux_initrd_chain: Vec<String>,
 }
