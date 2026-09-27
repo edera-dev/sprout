@@ -260,15 +260,24 @@ fn run() -> Result<()> {
         }
     }
 
-    for entry in &mut entries {
+    // Entries whose context can't be finalized are skipped, as one broken entry
+    // should not prevent booting any of the other entries.
+    entries.retain_mut(|entry| {
         let mut context = entry.context().fork();
         // Insert the values from the entry configuration into the
         // sprout context to use with the entry itself.
         context.insert(&entry.declaration().values);
-        let context = context
-            .finalize()
-            .context("unable to finalize context")?
-            .freeze();
+        let context = match context.finalize() {
+            Ok(context) => context.freeze(),
+            Err(error) => {
+                warn!(
+                    "skipping entry {}, unable to finalize context: {:#}",
+                    entry.name(),
+                    error
+                );
+                return false;
+            }
+        };
         // Provide the new context to the bootable entry.
         entry.swap_context(context);
         // Restamp the title and sort key with any values.
@@ -282,7 +291,9 @@ fn run() -> Result<()> {
                 entry.mark_default();
             }
         }
-    }
+
+        true
+    });
 
     // Sort the entries by their sort key, finalizing the order to show entries. This happens
     // in reverse order so that entries that would come last show up first in the menu.

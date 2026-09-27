@@ -14,6 +14,11 @@ use uefi::proto::device_path::DevicePath;
 /// The maximum number of iterations that can be performed in [SproutContext::finalize].
 const CONTEXT_FINALIZE_ITERATION_LIMIT: usize = 100;
 
+/// The maximum length of a value produced by [SproutContext::finalize].
+/// A value that refers to itself more than once doubles in length on every iteration,
+/// so this stops it from using up all memory before the iteration limit is reached.
+const CONTEXT_FINALIZE_VALUE_LENGTH_LIMIT: usize = 64 * 1024;
+
 /// Declares a root context for Sprout.
 /// This contains data that needs to be shared across Sprout.
 pub struct RootContext {
@@ -200,6 +205,10 @@ impl SproutContext {
                 if changed {
                     // If the value changed, we need to re-stamp it.
                     did_change = true;
+                }
+                // Ensure the value has not grown without bound.
+                if result.len() > CONTEXT_FINALIZE_VALUE_LENGTH_LIMIT {
+                    bail!("value {} is too long while finalizing context", key);
                 }
                 // Insert the new value into the value map.
                 values.insert(key.clone(), result);
