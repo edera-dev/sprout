@@ -55,7 +55,7 @@ $ cp /usr/lib/shim/fbaa64.efi.signed /boot/efi/EFI/sprout/fbaa64.efi
 
 Download the latest sprout.efi release from the [GitHub releases page](https://github.com/edera-dev/sprout/releases).
 For x86_64 systems, download the `sprout-x86_64.efi` file, and for ARM64 systems, download the `sprout-aarch64.efi` file.
-Copy the downloaded `sprout.efi` file to `/boot/efi/EFI/sprout/sprout.unsigned.efi` on your EFI System Partition.
+Copy the downloaded file to `/boot/efi/EFI/sprout/sprout.unsigned.efi` on your EFI System Partition.
 
 ## Step 4: Sign Sprout for Secure Boot
 
