@@ -261,9 +261,6 @@ fn run() -> Result<()> {
     BootloaderInterface::set_entries(entries.iter().map(|entry| entry.name()))
         .context("unable to set entries in bootloader interface")?;
 
-    // Execute the late phase.
-    phase(context.clone(), &config.phases.late).context("unable to execute late phase")?;
-
     // Acquire the timeout setting from the bootloader interface.
     let bootloader_interface_timeout =
         BootloaderInterface::get_timeout().context("unable to get bootloader interface timeout")?;
@@ -354,6 +351,9 @@ fn run() -> Result<()> {
     // Tell the bootloader interface what the selected entry is.
     BootloaderInterface::set_selected_entry(entry.name().to_string())
         .context("unable to set selected entry in bootloader interface")?;
+
+    // Execute the late phase, now that the entry is chosen but before its actions are executed.
+    phase(context.clone(), &config.phases.late).context("unable to execute late phase")?;
 
     // Execute all the actions for the selected entry.
     for action in &entry.declaration().actions {
