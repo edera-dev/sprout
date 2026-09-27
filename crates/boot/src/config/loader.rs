@@ -1,10 +1,14 @@
 use crate::options::SproutOptions;
+use alloc::format;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use anyhow::{Context, Result, bail};
+use core::fmt::Display;
 use core::ops::Deref;
 use edera_sprout_config::{RootConfiguration, latest_version};
 use eficore::platform::tpm::PlatformTpm;
-use log::info;
+use log::{info, warn};
+use serde_ignored::Path;
 use toml::Value;
 use uefi::proto::device_path::LoadedImageDevicePath;
 
@@ -35,6 +39,59 @@ fn load_raw_config(options: &SproutOptions) -> Result<Vec<u8>> {
     Ok(content)
 }
 
+/// Format the configuration key `path` with dots, like "actions.linux.chainload.path".
+fn key_path(path: &Path) -> String {
+    // Joins the `parent` path and the `key` with a dot, unless the parent is the root.
+    fn join(parent: &Path, key: impl Display) -> String {
+        match parent {
+            Path::Root => key.to_string(),
+            parent => format!("{}.{}", key_path(parent), key),
+        }
+    }
+
+    match path {
+        Path::Root => String::new(),
+        Path::Seq { parent, index } => join(parent, index),
+        Path::Map { parent, key } => join(parent, key),
+        // Optional values and wrapper types don't add a key of their own.
+        Path::Some { parent }
+        | Path::NewtypeStruct { parent }
+        | Path::NewtypeVariant { parent } => key_path(parent),
+    }
+}
+
+/// Warn about each declaration in `config` that configures more than one kind.
+/// For example, an action with both chainload and print configured only runs chainload.
+fn warn_multiple_kinds(config: &RootConfiguration) {
+    for (name, action) in &config.actions {
+        let kinds = [
+            action.chainload.is_some(),
+            action.print.is_some(),
+            action.edera.is_some(),
+        ];
+        if kinds.iter().filter(|kind| **kind).count() > 1 {
+            warn!(
+                "action {} configures more than one action, only one is used",
+                name
+            );
+        }
+    }
+
+    for (name, generator) in &config.generators {
+        let kinds = [
+            generator.matrix.is_some(),
+            generator.bls.is_some(),
+            generator.list.is_some(),
+        ];
+        if kinds.iter().filter(|kind| **kind).count() > 1 {
+            warn!(
+                "generator {} configures more than one generator, only one is used",
+                name
+            );
+        }
+    }
+}
+
 /// Loads the [RootConfiguration] for Sprout.
 pub fn load(options: &SproutOptions) -> Result<RootConfiguration> {
     // Load the raw configuration from the sprout config file.
@@ -59,9 +116,15 @@ pub fn load(options: &SproutOptions) -> Result<RootConfiguration> {
     }
 
     // If the version is supported, parse the full configuration.
-    let config: RootConfiguration = value
-        .try_into()
-        .context("unable to parse sprout.toml file")?;
+    // Keys that aren't part of the configuration, such as misspelled keys, are ignored.
+    // Warn about each one, as the configuration may not do what was intended.
+    let config: RootConfiguration = serde_ignored::deserialize(value, |path| {
+        warn!("ignoring unknown configuration key: {}", key_path(&path));
+    })
+    .context("unable to parse sprout.toml file")?;
+
+    // Warn about declarations that configure more than one kind, as only one is used.
+    warn_multiple_kinds(&config);
 
     // Return the parsed configuration.
     Ok(config)
