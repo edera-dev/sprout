@@ -3,8 +3,6 @@ description: Request a feature.
 title: "want: "
 labels: ["enhancement", "triage"]
 type: feature
-assignees:
-- edera-dev/engineering
 body:
 - type: markdown
   attributes:
