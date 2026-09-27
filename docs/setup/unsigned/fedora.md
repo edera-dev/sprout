@@ -67,7 +67,7 @@ $ [ ! -d /boot/grub2/x86_64-efi ] && sudo cp -r /usr/lib/grub/x86_64-efi /boot/g
 # Install ARM64 GRUB modules.
 $ sudo dnf install grub2-efi-aa64-modules
 # Copy ARM64 GRUB modules to /boot/grub2 for use by GRUB if it isn't installed already.
-$ [ ! -d /boot/grub2/arm64-efi ] && sudo cp -r /usr/lib/grub/arm64-efi /boot/grub2/x86_64-efi
+$ [ ! -d /boot/grub2/arm64-efi ] && sudo cp -r /usr/lib/grub/arm64-efi /boot/grub2/arm64-efi
 ```
 
 You will need to find the UUID of your EFI System Partition. You can do this by running the following command:
