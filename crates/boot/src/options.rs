@@ -1,13 +1,12 @@
 use alloc::string::{String, ToString};
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
+use core::cell::Cell;
 use core::ptr::null_mut;
 use edera_sprout_config::MenuStyle;
 use jaarg::{
-    ErrorUsageWriter, ErrorUsageWriterContext, HelpWriter, HelpWriterContext, Opt, Opts,
-    ParseControl, ParseError, ParseErrorKind, ParseResult, StandardErrorUsageWriter,
-    StandardFullHelpWriter,
+    HelpWriter, HelpWriterContext, Opt, Opts, ParseControl, ParseResult, StandardFullHelpWriter,
 };
-use log::{error, info};
+use log::{info, warn};
 use uefi_raw::Status;
 
 /// Default configuration file path.
@@ -82,90 +81,105 @@ impl SproutOptions {
         ]);
 
         // Acquire the arguments as determined by the UEFI core.
-        let args = eficore::env::args()?;
+        let mut args = eficore::env::args()?;
 
-        // Use the default value of sprout options and have the raw options be parsed into it.
-        let mut result = Self::default();
+        // Parse the arguments, dropping any argument that can't be parsed and parsing again.
+        // A typo in a boot entry or junk from the firmware should not prevent booting.
+        loop {
+            // Use the default value of sprout options and have the raw options be parsed into it.
+            let mut result = Self::default();
 
-        // Parse the OPTIONS into a map using jaarg.
-        match OPTIONS.parse(
-            "sprout",
-            args.iter(),
-            |program_name, id, _opt, _name, value| {
-                match id {
-                    ArgID::AutoConfigure => {
-                        // Enable autoconfiguration.
-                        result.autoconfigure = true;
-                    }
-                    ArgID::Config => {
-                        // The configuration file to load.
-                        result.config = value.into();
-                    }
-                    ArgID::Boot => {
-                        // The entry to boot.
-                        result.boot = Some(value.into());
-                    }
-                    ArgID::ForceMenu => {
-                        // Force showing of the boot menu.
-                        result.force_menu = true;
-                    }
-                    ArgID::MenuTimeout => {
-                        // The timeout for the boot menu in seconds.
-                        result.menu_timeout = Some(value.parse::<u64>()?);
-                    }
-                    ArgID::MenuStyle => {
-                        // The style of boot menu to display.
-                        result.menu_style = Some(match value {
-                            "basic" => MenuStyle::Basic,
-                            "simple" => MenuStyle::Simple,
-                            // jaarg has no error kind for an unknown choice, but this one is
-                            // printed as an invalid argument. The parser fills in the option
-                            // and value of the error.
-                            _ => {
-                                return Err(ParseError::ArgumentError(
-                                    "",
-                                    "",
-                                    ParseErrorKind::InvalidInteger,
-                                ));
+            // The number of arguments handed to the parser, used to find the one it rejected.
+            let consumed = Cell::new(0usize);
+            // The reason the parser rejected an argument, if it did.
+            let mut rejection = None;
+
+            // Parse the OPTIONS into a map using jaarg.
+            let parsed = OPTIONS.parse(
+                "sprout",
+                args.iter().inspect(|_| consumed.set(consumed.get() + 1)),
+                |program_name, id, _opt, name, value| {
+                    match id {
+                        ArgID::AutoConfigure => {
+                            // Enable autoconfiguration.
+                            result.autoconfigure = true;
+                        }
+                        ArgID::Config => {
+                            // The configuration file to load.
+                            result.config = value.into();
+                        }
+                        ArgID::Boot => {
+                            // The entry to boot.
+                            result.boot = Some(value.into());
+                        }
+                        ArgID::ForceMenu => {
+                            // Force showing of the boot menu.
+                            result.force_menu = true;
+                        }
+                        ArgID::MenuTimeout => {
+                            // The timeout for the boot menu in seconds.
+                            match value.parse::<u64>() {
+                                Ok(timeout) => result.menu_timeout = Some(timeout),
+                                Err(error) => {
+                                    warn!("ignoring invalid {} value '{}': {}", name, value, error)
+                                }
                             }
-                        });
+                        }
+                        ArgID::MenuStyle => {
+                            // The style of boot menu to display.
+                            match value {
+                                "basic" => result.menu_style = Some(MenuStyle::Basic),
+                                "simple" => result.menu_style = Some(MenuStyle::Simple),
+                                _ => warn!(
+                                    "ignoring invalid {} value '{}': expected basic or simple",
+                                    name, value
+                                ),
+                            }
+                        }
+                        ArgID::RetainBootConsole => {
+                            // Retain the boot console before booting.
+                            result.retain_boot_console = true;
+                        }
+                        ArgID::Help => {
+                            let ctx = HelpWriterContext {
+                                options: &OPTIONS,
+                                program_name,
+                            };
+                            info!("{}", StandardFullHelpWriter::new(ctx));
+                            return Ok(ParseControl::Quit);
+                        }
                     }
-                    ArgID::RetainBootConsole => {
-                        // Retain the boot console before booting.
-                        result.retain_boot_console = true;
-                    }
-                    ArgID::Help => {
-                        let ctx = HelpWriterContext {
-                            options: &OPTIONS,
-                            program_name,
-                        };
-                        info!("{}", StandardFullHelpWriter::new(ctx));
-                        return Ok(ParseControl::Quit);
-                    }
-                }
-                Ok(ParseControl::Continue)
-            },
-            |program_name, error| {
-                let ctx = ErrorUsageWriterContext {
-                    options: &OPTIONS,
-                    program_name,
-                    error,
-                };
-                error!("{}", StandardErrorUsageWriter::new(ctx));
-            },
-        ) {
-            ParseResult::ContinueSuccess => Ok(result),
-            ParseResult::ExitSuccess => unsafe {
-                uefi::boot::exit(uefi::boot::image_handle(), Status::SUCCESS, 0, null_mut())
-                    .context("unable to exit")?;
-                Err(anyhow!("unable to exit"))
-            },
+                    Ok(ParseControl::Continue)
+                },
+                |_program_name, error| {
+                    rejection = Some(error.to_string());
+                },
+            );
 
-            ParseResult::ExitError => unsafe {
-                uefi::boot::exit(uefi::boot::image_handle(), Status::ABORTED, 0, null_mut())
-                    .context("unable to exit")?;
-                Err(anyhow!("unable to exit"))
-            },
+            match parsed {
+                ParseResult::ContinueSuccess => return Ok(result),
+                ParseResult::ExitSuccess => unsafe {
+                    uefi::boot::exit(uefi::boot::image_handle(), Status::SUCCESS, 0, null_mut())
+                        .context("unable to exit")?;
+                    return Err(anyhow!("unable to exit"));
+                },
+
+                ParseResult::ExitError => {
+                    // The parser stops at the argument it rejected, which makes it the last
+                    // argument it was handed. This is also true of an option missing its value,
+                    // which is only detected once the arguments run out.
+                    let Some(index) = consumed.get().checked_sub(1).filter(|i| *i < args.len())
+                    else {
+                        bail!("unable to parse options: {}", rejection.unwrap_or_default());
+                    };
+                    let arg = args.remove(index);
+                    warn!(
+                        "ignoring argument '{}': {}",
+                        arg,
+                        rejection.unwrap_or_default()
+                    );
+                }
+            }
         }
     }
 }
