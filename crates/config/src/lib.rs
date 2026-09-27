@@ -28,7 +28,7 @@ pub const LATEST_VERSION: u32 = 1;
 pub const DEFAULT_MENU_TIMEOUT_SECONDS: u64 = 10;
 
 /// The Sprout configuration format.
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RootConfiguration {
     /// The version of the configuration. This should always be declared
     /// and be the latest version that is supported. If not specified, it is assumed
@@ -76,7 +76,7 @@ pub struct RootConfiguration {
 }
 
 /// Options configuration for Sprout, used when the corresponding options are not specified.
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OptionsConfiguration {
     /// The entry to mark as the default entry, instead of the first entry.
     #[serde(rename = "default-entry", default)]
@@ -90,6 +90,35 @@ pub struct OptionsConfiguration {
     /// Enables autoconfiguration of Sprout based on the environment.
     #[serde(default)]
     pub autoconfigure: bool,
+}
+
+/// The default configuration, which matches an empty configuration file.
+impl Default for RootConfiguration {
+    fn default() -> Self {
+        Self {
+            version: latest_version(),
+            options: Default::default(),
+            values: Default::default(),
+            drivers: Default::default(),
+            extractors: Default::default(),
+            actions: Default::default(),
+            entries: Default::default(),
+            generators: Default::default(),
+            phases: Default::default(),
+        }
+    }
+}
+
+/// The default options, which match an empty options section.
+impl Default for OptionsConfiguration {
+    fn default() -> Self {
+        Self {
+            default_entry: None,
+            menu_timeout: default_menu_timeout(),
+            menu_style: Default::default(),
+            autoconfigure: false,
+        }
+    }
 }
 
 /// The style of boot menu to display.
@@ -111,4 +140,35 @@ pub fn latest_version() -> u32 {
 
 fn default_menu_timeout() -> u64 {
     DEFAULT_MENU_TIMEOUT_SECONDS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::de::value::{Error, MapDeserializer};
+
+    /// Deserialize a configuration from an empty map, like an empty configuration file.
+    fn empty() -> RootConfiguration {
+        let map = MapDeserializer::<_, Error>::new(core::iter::empty::<(&str, &str)>());
+        RootConfiguration::deserialize(map).expect("empty configuration should deserialize")
+    }
+
+    #[test]
+    fn default_matches_empty_configuration() {
+        let default = RootConfiguration::default();
+        let empty = empty();
+        assert_eq!(default.version, empty.version);
+        assert_eq!(default.options.menu_timeout, empty.options.menu_timeout);
+        assert_eq!(default.options.menu_style, empty.options.menu_style);
+        assert_eq!(default.options.default_entry, empty.options.default_entry);
+        assert_eq!(default.options.autoconfigure, empty.options.autoconfigure);
+    }
+
+    #[test]
+    fn default_menu_timeout_is_not_zero() {
+        assert_eq!(
+            RootConfiguration::default().options.menu_timeout,
+            DEFAULT_MENU_TIMEOUT_SECONDS
+        );
+    }
 }
