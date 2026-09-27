@@ -77,15 +77,26 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     // If an initrd is provided, register it with the EFI stack.
     let mut initrd_handle = None;
     if let Some(linux_initrd) = initrd {
-        let content = eficore::path::read_file_contents(
-            Some(context.root().loaded_image_path()?),
-            &linux_initrd,
-        )
-        .context("unable to read linux initrd")?;
-        let handle =
-            MediaLoaderHandle::register(LINUX_EFI_INITRD_MEDIA_GUID, content.into_boxed_slice())
-                .context("unable to register linux initrd")?;
-        initrd_handle = Some(handle);
+        let resolved_initrd =
+            eficore::path::resolve_path(Some(context.root().loaded_image_path()?), &linux_initrd)
+                .context("unable to resolve linux initrd path")?;
+
+        // A path without a file component refers to the root of the filesystem, not an initrd.
+        // This happens when a path template like "$root\\$initrd" is stamped with an empty
+        // initrd value, such as a BLS entry without an initrd.
+        let initrd_subpath = eficore::path::device_path_subpath(&resolved_initrd.full_path)
+            .context("unable to get linux initrd subpath")?;
+        if !initrd_subpath.trim_matches('\\').is_empty() {
+            let content = resolved_initrd
+                .read_file()
+                .context("unable to read linux initrd")?;
+            let handle = MediaLoaderHandle::register(
+                LINUX_EFI_INITRD_MEDIA_GUID,
+                content.into_boxed_slice(),
+            )
+            .context("unable to register linux initrd")?;
+            initrd_handle = Some(handle);
+        }
     }
 
     // Mark execution of an entry in the bootloader interface.
