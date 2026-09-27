@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use edera_sprout_config::RootConfiguration;
+use log::warn;
 use uefi::fs::FileSystem;
 use uefi::proto::device_path::DevicePath;
 use uefi::proto::media::fs::SimpleFileSystem;
@@ -25,15 +26,24 @@ pub fn autoconfigure(config: &mut RootConfiguration) -> Result<()> {
     // For each filesystem that was detected, scan it for supported autoconfig mechanisms.
     for handle in filesystem_handles {
         // Acquire the device path root for the filesystem.
-        let root = {
-            uefi::boot::open_protocol_exclusive::<DevicePath>(handle)
-                .context("unable to get root for filesystem")?
-                .to_boxed()
+        // A filesystem that can't be opened is skipped, as it should not prevent
+        // autoconfiguring the other filesystems.
+        let root = match uefi::boot::open_protocol_exclusive::<DevicePath>(handle) {
+            Ok(root) => root.to_boxed(),
+            Err(error) => {
+                warn!("skipping filesystem, unable to get its root: {}", error);
+                continue;
+            }
         };
 
         // Open the filesystem that was detected.
-        let filesystem = uefi::boot::open_protocol_exclusive::<SimpleFileSystem>(handle)
-            .context("unable to open filesystem")?;
+        let filesystem = match uefi::boot::open_protocol_exclusive::<SimpleFileSystem>(handle) {
+            Ok(filesystem) => filesystem,
+            Err(error) => {
+                warn!("skipping filesystem, unable to open it: {}", error);
+                continue;
+            }
+        };
 
         // Trade the filesystem protocol for the uefi filesystem helper.
         let mut filesystem = FileSystem::new(filesystem);
