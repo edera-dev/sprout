@@ -45,6 +45,10 @@ impl FromStr for BlsEntry {
         let mut version: Option<String> = None;
         let mut machine_id: Option<String> = None;
 
+        // Some editors write a UTF-8 byte order mark at the start of the file.
+        // It isn't whitespace, so it would otherwise be part of the first key.
+        let input = input.strip_prefix('\u{feff}').unwrap_or(input);
+
         // Iterate over each line in the input and parse it.
         for line in input.lines() {
             let line = line.trim();
@@ -584,6 +588,12 @@ efi        /EFI/fedora/shimx64.efi
         let input = "linux /vmlinuz\noptions root=/dev/sda1 ro\noptions quiet\n";
         let entry: BlsEntry = input.parse().unwrap();
         assert_eq!(entry.options().as_deref(), Some("root=/dev/sda1 ro quiet"));
+    }
+
+    #[test]
+    fn parse_ignores_byte_order_mark() {
+        let entry: BlsEntry = "\u{feff}title Linux\nlinux /vmlinuz\n".parse().unwrap();
+        assert_eq!(entry.title().as_deref(), Some("Linux"));
     }
 
     #[test]
