@@ -10,6 +10,7 @@ use anyhow::{Context, Result};
 use core::{cmp::Ordering, str::FromStr};
 use edera_sprout_bls::{BlsEntry, sort_bls};
 use edera_sprout_config::generators::bls::BlsConfiguration;
+use log::warn;
 use uefi::{
     cstr16,
     fs::{FileSystem, PathBuf},
@@ -105,15 +106,33 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         full_entry_path.push(entry.file_name());
 
         // Read the entry file.
-        let content = fs
-            .read(full_entry_path)
-            .context("unable to read bls file")?;
+        // Entries that can't be read or parsed are skipped, as one broken entry
+        // should not prevent booting any of the other entries.
+        let content = match fs.read(full_entry_path) {
+            Ok(content) => content,
+            Err(error) => {
+                warn!("unable to read bls entry {}: {}", name, error);
+                continue;
+            }
+        };
 
         // Parse the entry file as a UTF-8 string.
-        let content = String::from_utf8(content).context("unable to read bls entry as utf8")?;
+        let content = match String::from_utf8(content) {
+            Ok(content) => content,
+            Err(error) => {
+                warn!("unable to read bls entry {} as utf8: {}", name, error);
+                continue;
+            }
+        };
 
         // Parse the entry file as a BLS entry.
-        let entry = BlsEntry::from_str(&content).context("unable to parse bls entry")?;
+        let entry = match BlsEntry::from_str(&content) {
+            Ok(entry) => entry,
+            Err(error) => {
+                warn!("unable to parse bls entry {}: {}", name, error);
+                continue;
+            }
+        };
 
         // Ignore entries that are not valid for Sprout.
         if !entry.is_valid() {
