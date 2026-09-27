@@ -15,7 +15,12 @@ set --
 if [ "${TARGET_ARCH}" = "x86_64" ]; then
 	set -- "${@}" qemu-system-x86_64 -M q35 -cpu SandyBridge,vmx=on
 elif [ "${TARGET_ARCH}" = "aarch64" ]; then
-	set -- "${@}" qemu-system-aarch64 -M virt -cpu cortex-a57
+	# Hardware acceleration on aarch64 only supports the host CPU model.
+	if [ -n "${QEMU_ACCEL}" ] && [ "${QEMU_ACCEL}" != "tcg" ]; then
+		set -- "${@}" qemu-system-aarch64 -M virt -cpu host
+	else
+		set -- "${@}" qemu-system-aarch64 -M virt -cpu cortex-a57
+	fi
 fi
 
 if [ -n "${QEMU_ACCEL}" ]; then
