@@ -66,9 +66,17 @@ impl FromStr for BlsEntry {
                     title = Some(value.trim().to_string());
                 }
 
-                // The options to pass to the entry.
+                // The options to pass to the entry. The options key can appear more than once,
+                // and all the options are combined in the order they appear.
                 "options" => {
-                    options = Some(value.trim().to_string());
+                    let value = value.trim();
+                    match options.as_mut() {
+                        Some(options) => {
+                            options.push(' ');
+                            options.push_str(value);
+                        }
+                        None => options = Some(value.to_string()),
+                    }
                 }
 
                 // The path to the linux kernel.
@@ -569,6 +577,13 @@ efi        /EFI/fedora/shimx64.efi
         let input = "linux /vmlinuz\ninitrd /intel-ucode.img  /initramfs.img\n";
         let entry: BlsEntry = input.parse().unwrap();
         assert_eq!(entry.initrd, ["/intel-ucode.img", "/initramfs.img"]);
+    }
+
+    #[test]
+    fn parse_multiple_options_lines_combined_in_order() {
+        let input = "linux /vmlinuz\noptions root=/dev/sda1 ro\noptions quiet\n";
+        let entry: BlsEntry = input.parse().unwrap();
+        assert_eq!(entry.options().as_deref(), Some("root=/dev/sda1 ro quiet"));
     }
 
     #[test]
