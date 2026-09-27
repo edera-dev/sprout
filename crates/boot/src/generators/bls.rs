@@ -60,6 +60,15 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
             .context("unable to open bls filesystem")?;
     let mut fs = FileSystem::new(fs);
 
+    // The entries directory is optional, as a BLS directory may only contain a loader.conf file.
+    // If it does not exist, there are no entries to generate.
+    if !fs
+        .try_exists(&entries_path)
+        .context("unable to check for bls entries directory")?
+    {
+        return Ok(Vec::new());
+    }
+
     // Read the BLS entries directory.
     let entries_iter = fs
         .read_dir(&entries_path)
