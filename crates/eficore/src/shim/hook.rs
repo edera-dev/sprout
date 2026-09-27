@@ -6,7 +6,7 @@ use spin::{LazyLock, Mutex};
 use uefi::proto::device_path::FfiDevicePath;
 use uefi::proto::unsafe_protocol;
 use uefi::{Guid, guid};
-use uefi_raw::Status;
+use uefi_raw::{Boolean, Status};
 
 /// GUID for the EFI_SECURITY_ARCH protocol.
 const SECURITY_ARCH_GUID: Guid = guid!("a46423e3-4617-49f1-b9ff-d1bfa9115839");
@@ -33,7 +33,7 @@ pub struct SecurityArch2Protocol {
         path: *const FfiDevicePath,
         file_buffer: *const u8,
         file_size: usize,
-        boot_policy: bool,
+        boot_policy: Boolean,
     ) -> Status,
 }
 
@@ -137,7 +137,7 @@ impl SecurityHook {
         path: *const FfiDevicePath,
         file_buffer: *const u8,
         file_size: usize,
-        boot_policy: bool,
+        boot_policy: Boolean,
     ) -> Status {
         // Verify the path and file buffer are not null.
         if path.is_null() || file_buffer.is_null() {
@@ -145,7 +145,7 @@ impl SecurityHook {
         }
 
         // If the boot policy is true, we can't continue as we don't support that.
-        if boot_policy {
+        if bool::from(boot_policy) {
             return Status::INVALID_PARAMETER;
         }
 
