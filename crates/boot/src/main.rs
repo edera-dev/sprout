@@ -64,6 +64,17 @@ pub mod sbat;
 /// The delay to wait for when an error occurs in Sprout.
 const DELAY_ON_ERROR: Duration = Duration::from_secs(10);
 
+/// Unwraps the `result` of a bootloader interface operation, logging the error if one occurs.
+/// The bootloader interface only exchanges information with the operating system, so a
+/// firmware variable that can't be read or written should not prevent booting.
+/// If an error occurs, the default value is provided instead.
+fn advisory<T: Default>(result: Result<T>) -> T {
+    result.unwrap_or_else(|error| {
+        warn!("{:#}", error);
+        T::default()
+    })
+}
+
 /// Run Sprout, returning an error if one occurs.
 fn run() -> Result<()> {
     // For safety reasons, we will note that Secure Boot is in beta on Sprout.
@@ -75,16 +86,22 @@ fn run() -> Result<()> {
     let timer = PlatformTimer::start();
 
     // Mark the initialization of Sprout in the bootloader interface.
-    BootloaderInterface::mark_init(&timer)
-        .context("unable to mark initialization in bootloader interface")?;
+    advisory(
+        BootloaderInterface::mark_init(&timer)
+            .context("unable to mark initialization in bootloader interface"),
+    );
 
     // Tell the bootloader interface what firmware we are running on.
-    BootloaderInterface::set_firmware_info()
-        .context("unable to set firmware info in bootloader interface")?;
+    advisory(
+        BootloaderInterface::set_firmware_info()
+            .context("unable to set firmware info in bootloader interface"),
+    );
 
     // Tell the bootloader interface what loader is being used.
-    BootloaderInterface::set_loader_info()
-        .context("unable to set loader info in bootloader interface")?;
+    advisory(
+        BootloaderInterface::set_loader_info()
+            .context("unable to set loader info in bootloader interface"),
+    );
 
     // Acquire the number of active PCR banks on the TPM.
     // If no TPM is available, this will return zero.
@@ -95,8 +112,10 @@ fn run() -> Result<()> {
         0
     });
     // Tell the bootloader interface what the number of active PCR banks is.
-    BootloaderInterface::set_tpm2_active_pcr_banks(active_pcr_banks)
-        .context("unable to set tpm2 active PCR banks in bootloader interface")?;
+    advisory(
+        BootloaderInterface::set_tpm2_active_pcr_banks(active_pcr_banks)
+            .context("unable to set tpm2 active PCR banks in bootloader interface"),
+    );
 
     // Parse the options to the sprout executable.
     let options = SproutOptions::parse().context("unable to parse options")?;
@@ -123,20 +142,26 @@ fn run() -> Result<()> {
     };
 
     // Grab the partition GUID of the ESP that sprout was loaded from.
-    let loaded_image_partition_guid =
+    // This is only reported to the bootloader interface.
+    let loaded_image_partition_guid = advisory(
         eficore::partition::partition_guid(&loaded_image_path, PartitionGuidForm::Partition)
-            .context("unable to retrieve loaded image partition guid")?;
+            .context("unable to retrieve loaded image partition guid"),
+    );
 
     // Set the partition GUID of the ESP that sprout was loaded from in the bootloader interface.
     if let Some(loaded_image_partition_guid) = loaded_image_partition_guid {
         // Tell the system about the partition GUID.
-        BootloaderInterface::set_partition_guid(&loaded_image_partition_guid)
-            .context("unable to set partition guid in bootloader interface")?;
+        advisory(
+            BootloaderInterface::set_partition_guid(&loaded_image_partition_guid)
+                .context("unable to set partition guid in bootloader interface"),
+        );
     }
 
     // Tell the bootloader interface what the loaded image path is.
-    BootloaderInterface::set_loader_path(&loaded_image_path)
-        .context("unable to set loader path in bootloader interface")?;
+    advisory(
+        BootloaderInterface::set_loader_path(&loaded_image_path)
+            .context("unable to set loader path in bootloader interface"),
+    );
 
     // Create the root context.
     let mut root = RootContext::new(loaded_image_path, timer, options);
@@ -263,20 +288,27 @@ fn run() -> Result<()> {
     entries.sort_by(|a, b| compare_versions(a.sort_key(), b.sort_key()).reverse());
 
     // Tell the bootloader interface what entries are available.
-    BootloaderInterface::set_entries(entries.iter().map(|entry| entry.name()))
-        .context("unable to set entries in bootloader interface")?;
+    advisory(
+        BootloaderInterface::set_entries(entries.iter().map(|entry| entry.name()))
+            .context("unable to set entries in bootloader interface"),
+    );
 
     // Acquire the timeout setting from the bootloader interface.
-    let bootloader_interface_timeout =
-        BootloaderInterface::get_timeout().context("unable to get bootloader interface timeout")?;
+    let bootloader_interface_timeout = advisory(
+        BootloaderInterface::get_timeout().context("unable to get bootloader interface timeout"),
+    );
 
     // Acquire the default entry from the bootloader interface.
-    let bootloader_interface_default_entry = BootloaderInterface::get_default_entry()
-        .context("unable to get bootloader interface default entry")?;
+    let bootloader_interface_default_entry = advisory(
+        BootloaderInterface::get_default_entry()
+            .context("unable to get bootloader interface default entry"),
+    );
 
     // Acquire the oneshot entry from the bootloader interface.
-    let bootloader_interface_oneshot_entry = BootloaderInterface::get_oneshot_entry()
-        .context("unable to get bootloader interface oneshot entry")?;
+    let bootloader_interface_oneshot_entry = advisory(
+        BootloaderInterface::get_oneshot_entry()
+            .context("unable to get bootloader interface oneshot entry"),
+    );
 
     // If --boot is specified, boot that entry immediately.
     let mut force_boot_entry = context.root().options().boot.clone();
@@ -405,8 +437,10 @@ fn run() -> Result<()> {
     };
 
     // Tell the bootloader interface what the selected entry is.
-    BootloaderInterface::set_selected_entry(entry.name().to_string())
-        .context("unable to set selected entry in bootloader interface")?;
+    advisory(
+        BootloaderInterface::set_selected_entry(entry.name().to_string())
+            .context("unable to set selected entry in bootloader interface"),
+    );
 
     // Execute the late phase, now that the entry is chosen but before its actions are executed.
     phase(context.clone(), &config.phases.late).context("unable to execute late phase")?;

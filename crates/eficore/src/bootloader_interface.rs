@@ -17,6 +17,7 @@ mod bitflags;
 const LOADER_NAME: &str = "Sprout";
 
 /// Represents the configured timeout for the bootloader interface.
+#[derive(Default)]
 pub enum BootloaderInterfaceTimeout {
     /// Force the menu to be shown, and wait for the user.
     MenuForce,
@@ -29,6 +30,7 @@ pub enum BootloaderInterfaceTimeout {
     /// Set a timeout for the menu.
     Timeout(u64),
     /// Timeout is unspecified.
+    #[default]
     Unspecified,
 }
 
@@ -221,10 +223,9 @@ impl BootloaderInterface {
 
         // If we reach here, we know the value was specified.
         // If `remove` is true, remove the variable.
-        if remove {
-            Self::VENDOR
-                .remove(key)
-                .context("unable to remove timeout variable")?;
+        // If removal fails, the value is still used, as it was meant for this boot.
+        if remove && let Err(error) = Self::VENDOR.remove(key) {
+            warn!("unable to remove {} variable: {:#}", key, error);
         }
 
         // If the value is empty, return Unspecified.
@@ -325,9 +326,10 @@ impl BootloaderInterface {
         };
 
         // Remove the oneshot entry from the bootloader interface.
-        Self::VENDOR
-            .remove("LoaderEntryOneShot")
-            .context("unable to remove oneshot entry")?;
+        // If removal fails, the value is still used, as it was meant for this boot.
+        if let Err(error) = Self::VENDOR.remove("LoaderEntryOneShot") {
+            warn!("unable to remove LoaderEntryOneShot variable: {:#}", error);
+        }
 
         // Return the oneshot value.
         // An empty value is treated as if the oneshot entry was not set.

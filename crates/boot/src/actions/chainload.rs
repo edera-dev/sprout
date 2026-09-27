@@ -11,6 +11,7 @@ use eficore::loader::source::ImageSource;
 use eficore::loader::{ImageLoadRequest, ImageLoader};
 use eficore::media_loader::MediaLoaderHandle;
 use eficore::media_loader::constants::linux::LINUX_EFI_INITRD_MEDIA_GUID;
+use log::warn;
 use uefi::CString16;
 use uefi::proto::loaded_image::LoadedImage;
 
@@ -126,8 +127,13 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     }
 
     // Mark execution of an entry in the bootloader interface.
-    BootloaderInterface::mark_exec(context.root().timer())
-        .context("unable to mark execution of boot entry in bootloader interface")?;
+    // This is only informational, so it should not prevent booting.
+    if let Err(error) = BootloaderInterface::mark_exec(context.root().timer()) {
+        warn!(
+            "unable to mark execution of boot entry in bootloader interface: {:#}",
+            error
+        );
+    }
 
     // Since we are about to hand off control to another image, we need to execute the handoff hook.
     // This will perform operations like clearing the screen.
