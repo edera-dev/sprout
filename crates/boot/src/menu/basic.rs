@@ -76,16 +76,16 @@ fn default_entry(entries: &[BootableEntry]) -> Result<&BootableEntry> {
 /// Selects an entry from the list of entries using the boot menu.
 fn select_with_input<'a>(
     input: &mut Input,
-    timeout: Duration,
+    timeout: Option<Duration>,
     entries: &'a [BootableEntry],
 ) -> Result<&'a BootableEntry> {
     // If the timeout is zero, boot the default entry without showing the menu.
-    if timeout.is_zero() {
+    if timeout.is_some_and(|timeout| timeout.is_zero()) {
         return default_entry(entries);
     }
 
     // The time to wait for a key, or None once a key stops the countdown.
-    let mut countdown = Some(timeout);
+    let mut countdown = timeout;
 
     // The entry number typed so far, while more digits could still select another entry.
     let mut typed: Option<usize> = None;
@@ -176,7 +176,7 @@ impl BootMenu for BasicMenu {
     /// within the context of the standard input device.
     fn select<'a>(
         &self,
-        timeout: Duration,
+        timeout: Option<Duration>,
         entries: &'a [BootableEntry],
     ) -> Result<&'a BootableEntry> {
         uefi::system::with_stdin(move |input| select_with_input(input, timeout, entries))

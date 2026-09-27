@@ -291,11 +291,15 @@ fn run() -> Result<()> {
         .menu_timeout
         .unwrap_or(config.options.menu_timeout);
 
+    // Whether the boot menu should wait for the user, instead of counting down.
+    let mut wait_for_user = false;
+
     // Apply bootloader interface timeout settings.
     match bootloader_interface_timeout {
         BootloaderInterfaceTimeout::MenuForce => {
-            // Force the boot menu.
+            // Force the boot menu, and wait for the user to choose an entry.
             force_boot_menu = true;
+            wait_for_user = true;
         }
 
         BootloaderInterfaceTimeout::MenuHidden | BootloaderInterfaceTimeout::MenuDisabled => {
@@ -341,7 +345,13 @@ fn run() -> Result<()> {
     }
 
     // Convert the menu timeout to a duration.
-    let menu_timeout = Duration::from_secs(menu_timeout);
+    // A zero timeout boots without showing the menu, so a forced menu with a zero timeout
+    // waits for the user instead.
+    let menu_timeout = if wait_for_user || (force_boot_menu && menu_timeout == 0) {
+        None
+    } else {
+        Some(Duration::from_secs(menu_timeout))
+    };
 
     // Determine the menu style based on the options or configuration.
     // We prefer the options over the configuration to allow for overriding.

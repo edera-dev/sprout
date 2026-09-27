@@ -163,11 +163,12 @@ fn render(
 
 /// Run the menu until an entry is chosen, returning the index of that entry.
 /// The `selected` entry is booted if no key is pressed before `timeout` passes.
+/// Without a timeout, the menu waits for the user.
 fn run(
     input: &mut Input,
     output: &mut Output,
     layout: &Layout,
-    timeout: Duration,
+    timeout: Option<Duration>,
     entries: &[BootableEntry],
     mut selected: usize,
 ) -> Result<usize> {
@@ -175,7 +176,7 @@ fn run(
     // The first visible entry, which changes when scrolling through a long list.
     let mut offset = 0;
     // The time left before booting, or None once a key stops the countdown.
-    let mut remaining = Some(timeout);
+    let mut remaining = timeout;
 
     loop {
         // Scroll so that the selected entry is visible.
@@ -230,7 +231,7 @@ fn run(
 fn select_with_console<'a>(
     input: &mut Input,
     output: &mut Output,
-    timeout: Duration,
+    timeout: Option<Duration>,
     entries: &'a [BootableEntry],
 ) -> Result<&'a BootableEntry> {
     let default = entries
@@ -239,7 +240,7 @@ fn select_with_console<'a>(
         .context("no default entry available")?;
 
     // If the timeout is zero, boot the default entry without showing the menu.
-    if timeout.is_zero() {
+    if timeout.is_some_and(|timeout| timeout.is_zero()) {
         return Ok(&entries[default]);
     }
 
@@ -269,7 +270,7 @@ impl BootMenu for SimpleMenu {
     /// within the context of the standard input and output devices.
     fn select<'a>(
         &self,
-        timeout: Duration,
+        timeout: Option<Duration>,
         entries: &'a [BootableEntry],
     ) -> Result<&'a BootableEntry> {
         uefi::system::with_stdin(|input| {

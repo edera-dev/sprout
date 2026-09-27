@@ -26,10 +26,11 @@ const MAX_TIMER_DURATION: Duration = Duration::from_secs(u32::MAX as u64);
 /// A boot menu that can be shown to select an entry to boot.
 pub trait BootMenu {
     /// Select an entry from `entries` to boot. If no entry is chosen before `timeout` passes,
-    /// the default entry is selected.
+    /// the default entry is selected. If `timeout` is zero, the default entry is selected
+    /// without showing the menu. If `timeout` is [None], the menu waits for the user.
     fn select<'a>(
         &self,
-        timeout: Duration,
+        timeout: Option<Duration>,
         entries: &'a [BootableEntry],
     ) -> Result<&'a BootableEntry>;
 }
@@ -108,9 +109,10 @@ pub fn read_key(input: &mut Input, timeout: Option<Duration>) -> Result<Option<K
 }
 
 /// Shows a boot menu of the specified `style` to select a bootable entry to boot.
+/// See [BootMenu::select] for how `timeout` is handled.
 pub fn select<'live>(
     timer: &'live PlatformTimer,
-    timeout: Duration,
+    timeout: Option<Duration>,
     style: MenuStyle,
     entries: &'live [BootableEntry],
 ) -> Result<&'live BootableEntry> {
