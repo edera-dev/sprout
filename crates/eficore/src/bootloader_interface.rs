@@ -295,9 +295,11 @@ impl BootloaderInterface {
 
     /// Get the default entry set by the bootloader interface.
     pub fn get_default_entry() -> Result<Option<String>> {
-        Self::VENDOR
+        // An empty value is treated as if the default entry was not set.
+        Ok(Self::VENDOR
             .get_cstr16("LoaderEntryDefault")
-            .context("unable to get default entry from bootloader interface")
+            .context("unable to get default entry from bootloader interface")?
+            .filter(|value| !value.is_empty()))
     }
 
     /// Get the oneshot entry set by the bootloader interface.
@@ -318,6 +320,7 @@ impl BootloaderInterface {
             .context("unable to remove oneshot entry")?;
 
         // Return the oneshot value.
-        Ok(Some(value))
+        // An empty value is treated as if the oneshot entry was not set.
+        Ok(Some(value).filter(|value| !value.is_empty()))
     }
 }
