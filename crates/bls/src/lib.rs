@@ -340,6 +340,8 @@ fn is_valid_char(c: char) -> bool {
 }
 
 /// Compares numerical prefixes by extracting numbers.
+/// Numbers are compared by their digit count first and then digit by digit,
+/// which supports numbers of any length.
 fn compare_numeric<I: Iterator<Item = char>>(
     iter_a: &mut Peekable<I>,
     iter_b: &mut Peekable<I>,
@@ -347,21 +349,24 @@ fn compare_numeric<I: Iterator<Item = char>>(
     let num_a = extract_number(iter_a);
     let num_b = extract_number(iter_b);
 
-    num_a.cmp(&num_b)
+    num_a
+        .len()
+        .cmp(&num_b.len())
+        .then_with(|| num_a.cmp(&num_b))
 }
 
-/// Extracts a number from the iterator, skipping leading zeros.
-fn extract_number<I: Iterator<Item = char>>(iter: &mut Peekable<I>) -> u64 {
+/// Extracts the digits of a number from the iterator, skipping leading zeros.
+fn extract_number<I: Iterator<Item = char>>(iter: &mut Peekable<I>) -> String {
     // Skip leading zeros
     while let Some(&'0') = iter.peek() {
         iter.next();
     }
 
-    let mut num = 0u64;
+    let mut num = String::new();
     while let Some(&c) = iter.peek() {
         if c.is_ascii_digit() {
             iter.next();
-            num = num.saturating_mul(10).saturating_add(c as u64 - '0' as u64);
+            num.push(c);
         } else {
             break;
         }
@@ -730,6 +735,18 @@ efi        /EFI/fedora/shimx64.efi
         assert_eq!(compare_versions("a", "0"), Ordering::Less);
         assert_eq!(compare_versions("1.0", "1.a"), Ordering::Greater);
         assert_eq!(compare_versions("1.a", "1.0"), Ordering::Less);
+    }
+
+    #[test]
+    fn large_numbers_do_not_saturate() {
+        assert_eq!(
+            compare_versions("99999999999999999999", "99999999999999999998"),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare_versions("1.99999999999999999998", "1.99999999999999999999"),
+            Ordering::Less
+        );
     }
 
     #[test]
