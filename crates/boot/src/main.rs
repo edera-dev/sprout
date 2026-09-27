@@ -325,15 +325,27 @@ fn run() -> Result<()> {
 
     // Apply bootloader interface default entry settings.
     if let Some(ref bootloader_interface_default_entry) = bootloader_interface_default_entry {
-        // Iterate over all the entries and mark the default entry as the one specified.
-        for entry in &mut entries {
-            // Mark the entry as the default entry if it matches the specified entry.
-            // If the entry does not match the specified entry, unmark it as the default entry.
-            if entry.is_match(bootloader_interface_default_entry) {
-                entry.mark_default();
-            } else {
-                entry.unmark_default();
+        if entries
+            .iter()
+            .any(|entry| entry.is_match(bootloader_interface_default_entry))
+        {
+            // Iterate over all the entries and mark the default entry as the one specified.
+            for entry in &mut entries {
+                // Mark the entry as the default entry if it matches the specified entry.
+                // If the entry does not match the specified entry, unmark it as the default entry.
+                if entry.is_match(bootloader_interface_default_entry) {
+                    entry.mark_default();
+                } else {
+                    entry.unmark_default();
+                }
             }
+        } else {
+            // If no entry matches, such as when the entry was removed, the setting is ignored
+            // so that the configured default entry is still used.
+            warn!(
+                "ignoring bootloader interface default entry '{}': no matching entry",
+                bootloader_interface_default_entry
+            );
         }
     }
 
