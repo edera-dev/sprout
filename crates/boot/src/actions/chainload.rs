@@ -116,8 +116,10 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     }
 
     // If an initrd was read, register it with the EFI stack.
+    // An empty initrd is not registered, as Linux fails to boot if the initrd it is
+    // given can't be loaded, instead of booting without one.
     let mut initrd_handle = None;
-    if let Some(content) = initrd {
+    if let Some(content) = initrd.filter(|content| !content.is_empty()) {
         let handle =
             MediaLoaderHandle::register(LINUX_EFI_INITRD_MEDIA_GUID, content.into_boxed_slice())
                 .context("unable to register linux initrd")?;
