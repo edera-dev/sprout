@@ -35,8 +35,9 @@ pub trait BootMenu {
 }
 
 /// Read a key from `input`, giving up once `timeout` passes.
+/// If `timeout` is [None], this waits for a key indefinitely.
 /// Returns the key that was pressed, or [None] if the timeout passed.
-pub fn read_key(input: &mut Input, timeout: Duration) -> Result<Option<Key>> {
+pub fn read_key(input: &mut Input, timeout: Option<Duration>) -> Result<Option<Key>> {
     // The event to wait for a key press.
     let key_event = input
         .wait_for_key_event()
@@ -58,8 +59,11 @@ pub fn read_key(input: &mut Input, timeout: Duration) -> Result<Option<Key>> {
         // Set a timer to trigger after the specified duration.
         // The timer is limited to what the firmware can represent, as a longer timeout
         // can't be converted into a timer trigger.
-        let trigger = TimerTrigger::Relative(timeout.min(MAX_TIMER_DURATION));
-        uefi::boot::set_timer(&events[0], trigger).context("unable to set timeout timer")?;
+        // Without a timeout, the timer is never set, so it never triggers.
+        if let Some(timeout) = timeout {
+            let trigger = TimerTrigger::Relative(timeout.min(MAX_TIMER_DURATION));
+            uefi::boot::set_timer(&events[0], trigger).context("unable to set timeout timer")?;
+        }
 
         loop {
             // Wait for either the timer event or the key event to trigger.
