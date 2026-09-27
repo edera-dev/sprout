@@ -105,6 +105,7 @@ if [ "${SKIP_SPROUT_BUILD}" != "1" ]; then
 		cp "target/${RUST_TARGET}/${RUST_TARGET_SUBDIR}/sprout.efi" "${FINAL_DIR}/sprout.efi"
 	else
 		docker build --platform="${DOCKER_TARGET}" -t "${DOCKER_PREFIX}/sprout-${TARGET_ARCH}:${DOCKER_TAG}" \
+			--build-arg="RUST_PROFILE=${RUST_PROFILE}" \
 			--build-arg="RUST_TARGET_SUBDIR=${RUST_TARGET_SUBDIR}" \
 			-f Dockerfile .
 		copy_from_image "${DOCKER_PREFIX}/sprout-${TARGET_ARCH}" "sprout.efi" "${FINAL_DIR}/sprout.efi"
