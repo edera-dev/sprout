@@ -140,14 +140,24 @@ pub fn match_kernel_prefix<'a>(name: &str, kernel_prefixes: &[&'a str]) -> Optio
 }
 
 /// Generate initramfs candidate filenames by combining each entry of `initramfs_prefixes`
-/// with `suffix`. The caller is expected to check which candidates actually exist.
-pub fn initramfs_candidates<'a>(
-    suffix: &'a str,
-    initramfs_prefixes: &'a [&'a str],
-) -> impl Iterator<Item = String> + 'a {
-    initramfs_prefixes
-        .iter()
-        .map(move |prefix| format!("{}{}", prefix, suffix))
+/// with `suffix`, and then with `suffix` followed by `.img`, which many distributions use.
+/// For example, Arch Linux pairs `vmlinuz-linux` with `initramfs-linux.img`.
+/// The caller is expected to check which candidates actually exist.
+pub fn initramfs_candidates(
+    suffix: &str,
+    initramfs_prefixes: &[&str],
+) -> impl Iterator<Item = String> {
+    let mut candidates: Vec<String> = Vec::new();
+    for extension in ["", ".img"] {
+        for prefix in initramfs_prefixes {
+            let candidate = format!("{}{}{}", prefix, suffix, extension);
+            // Skip duplicates, like "initrd" with ".img" when "initrd.img" is also a prefix.
+            if !candidates.contains(&candidate) {
+                candidates.push(candidate);
+            }
+        }
+    }
+    candidates.into_iter()
 }
 
 #[cfg(test)]
@@ -399,14 +409,44 @@ mod tests {
         let candidates: Vec<_> = initramfs_candidates("-6.1.0", LINUX_INITRAMFS_PREFIXES).collect();
         assert_eq!(
             candidates,
-            &["initramfs-6.1.0", "initrd-6.1.0", "initrd.img-6.1.0"]
+            &[
+                "initramfs-6.1.0",
+                "initrd-6.1.0",
+                "initrd.img-6.1.0",
+                "initramfs-6.1.0.img",
+                "initrd-6.1.0.img",
+                "initrd.img-6.1.0.img",
+            ]
+        );
+    }
+
+    #[test]
+    fn initramfs_candidates_include_img_extension() {
+        // Arch Linux, and Fedora or Gentoo with dracut, add .img to the initramfs name.
+        let arch: Vec<_> = initramfs_candidates("-linux", LINUX_INITRAMFS_PREFIXES).collect();
+        assert!(arch.iter().any(|c| c == "initramfs-linux.img"));
+        let fedora: Vec<_> =
+            initramfs_candidates("-6.8.5-301.fc40.x86_64", LINUX_INITRAMFS_PREFIXES).collect();
+        assert!(
+            fedora
+                .iter()
+                .any(|c| c == "initramfs-6.8.5-301.fc40.x86_64.img")
         );
     }
 
     #[test]
     fn initramfs_candidates_empty_suffix() {
         let candidates: Vec<_> = initramfs_candidates("", LINUX_INITRAMFS_PREFIXES).collect();
-        assert_eq!(candidates, &["initramfs", "initrd", "initrd.img"]);
+        assert_eq!(
+            candidates,
+            &[
+                "initramfs",
+                "initrd",
+                "initrd.img",
+                "initramfs.img",
+                "initrd.img.img"
+            ]
+        );
     }
 
     #[test]
