@@ -14,11 +14,14 @@ pub struct BasicMenu;
 /// Represents the operation that can be performed by the boot menu.
 #[derive(PartialEq, Eq)]
 enum MenuOperation {
-    /// The user selected a numbered entry.
-    Number(usize),
+    /// The user typed a digit of an entry number.
+    Digit(usize),
     /// The user selected the escape key to exit the boot menu.
     Exit,
-    /// The user selected the enter key to display the entries again.
+    /// The user selected the enter key to boot the typed entry number,
+    /// or to display the entries again if no number was typed.
+    Enter,
+    /// The user selected some other key to display the entries again.
     Continue,
     /// Timeout occurred.
     Timeout,
@@ -42,11 +45,15 @@ fn read(input: &mut Input, timeout: Option<Duration>) -> Result<MenuOperation> {
             }
             // Convert the key to a char.
             let c: char = c.into();
+            // Serial consoles may send a line feed instead of a carriage return.
+            if matches!(c, '\r' | '\n') {
+                return Ok(MenuOperation::Enter);
+            }
             // Find the key pressed in the entry number table or continue.
             Ok(ENTRY_NUMBER_TABLE
                 .iter()
                 .position(|&x| x == c)
-                .map(MenuOperation::Number)
+                .map(MenuOperation::Digit)
                 .unwrap_or(MenuOperation::Continue))
         }
 
@@ -80,35 +87,65 @@ fn select_with_input<'a>(
     // The time to wait for a key, or None once a key stops the countdown.
     let mut countdown = Some(timeout);
 
+    // The entry number typed so far, while more digits could still select another entry.
+    let mut typed: Option<usize> = None;
+    // Whether to print the entries before reading the next key.
+    let mut display = true;
+
     loop {
-        // Print all the entries with the number used to select them.
-        info!("Boot Menu:");
-        for (index, entry) in entries.iter().enumerate() {
-            let title = entry.context().stamp(&entry.declaration().title);
-            info!("  [{}] {}", index, title);
+        if display {
+            // Print all the entries with the number used to select them.
+            info!("Boot Menu:");
+            for (index, entry) in entries.iter().enumerate() {
+                let title = entry.context().stamp(&entry.declaration().title);
+                info!("  [{}] {}", index, title);
+            }
+
+            info!("Select a boot entry using the number keys.");
+            if entries.len() > ENTRY_NUMBER_TABLE.len() {
+                info!("Press enter after the number if the entry does not boot right away.");
+            }
+            info!("Press Escape to exit and enter to display the entries again.");
+            display = false;
         }
 
-        // Read from input until a valid operation is selected.
-        let operation = loop {
-            info!("Select a boot entry using the number keys.");
-            info!("Press Escape to exit and enter to display the entries again.");
+        let operation = read(input, countdown)?;
 
-            let operation = read(input, countdown)?;
-
-            // Any key stops the countdown, so the menu waits for the user from now on.
-            if operation != MenuOperation::Timeout {
-                countdown = None;
-            }
-
-            if operation != MenuOperation::Nop {
-                break operation;
-            }
-        };
+        // Any key stops the countdown, so the menu waits for the user from now on.
+        if operation != MenuOperation::Timeout {
+            countdown = None;
+        }
 
         match operation {
-            // Entry was selected by number. If the number is invalid, we continue.
-            MenuOperation::Number(index) => {
-                let Some(entry) = entries.get(index) else {
+            // A digit of the entry number was typed.
+            MenuOperation::Digit(digit) => {
+                let number = typed
+                    .take()
+                    .unwrap_or(0)
+                    .saturating_mul(10)
+                    .saturating_add(digit);
+
+                // If another digit could select a different entry, wait for it or for enter.
+                if number != 0 && number.saturating_mul(10) < entries.len() {
+                    typed = Some(number);
+                    continue;
+                }
+
+                // Otherwise, boot the entry. If the number is invalid, we continue.
+                let Some(entry) = entries.get(number) else {
+                    info!("invalid entry number");
+                    continue;
+                };
+                return Ok(entry);
+            }
+
+            // Enter boots the typed entry number, or displays the entries again.
+            MenuOperation::Enter => {
+                let Some(number) = typed.take() else {
+                    display = true;
+                    continue;
+                };
+                let Some(entry) = entries.get(number) else {
                     info!("invalid entry number");
                     continue;
                 };
@@ -121,10 +158,14 @@ fn select_with_input<'a>(
                 return default_entry(entries);
             }
 
-            // If the operation is to continue or nop, we can just run the loop again.
-            MenuOperation::Continue | MenuOperation::Nop => {
-                continue;
+            // Any other key clears the typed number and displays the entries again.
+            MenuOperation::Continue => {
+                typed = None;
+                display = true;
             }
+
+            // If the operation is nop, there is nothing to do.
+            MenuOperation::Nop => {}
         }
     }
 }
