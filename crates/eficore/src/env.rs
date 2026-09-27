@@ -1,7 +1,7 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use anyhow::{Context, Result, bail};
-use uefi::proto::loaded_image::{LoadOptionsError, LoadedImage};
+use anyhow::{Context, Result};
+use uefi::proto::loaded_image::LoadedImage;
 
 /// Loads the command-line arguments passed to the current image.
 pub fn args() -> Result<Vec<String>> {
@@ -13,26 +13,25 @@ pub fn args() -> Result<Vec<String>> {
         .context("unable to open loaded image protocol for current image")?;
 
     // Load the command-line argument string.
-    let options = match loaded_image.load_options_as_cstr16() {
-        // Load options were passed. We will return them for processing.
-        Ok(options) => options,
-
+    // Load options are usually a null-terminated UCS-2 string, but firmware is not consistent
+    // about this. Some firmware passes an odd number of bytes, leaves off the null terminator,
+    // or pads the string with extra nulls. We decode everything up to the first null and
+    // replace anything that isn't valid UCS-2, instead of refusing to boot.
+    let Some(options) = loaded_image.load_options_as_bytes() else {
         // No load options were passed. We will return an empty vector.
-        Err(LoadOptionsError::NotSet) => {
-            return Ok(Vec::new());
-        }
-
-        Err(LoadOptionsError::NotAligned) => {
-            bail!("load options are not properly aligned");
-        }
-
-        Err(LoadOptionsError::InvalidString(error)) => {
-            bail!("load options are not a valid string: {}", error);
-        }
+        return Ok(Vec::new());
     };
 
-    // Convert the options to a string.
-    let options = options.to_string();
+    // Decode the options as little-endian UTF-16, stopping at the first null.
+    // A trailing odd byte can't be part of a character, so it is dropped.
+    let options = options
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| u16::from_le_bytes(*pair))
+        .take_while(|c| *c != 0)
+        .collect::<Vec<u16>>();
+    let options = String::from_utf16_lossy(&options);
 
     // Use shlex to parse the options.
     // If shlex fails, we will perform a simple whitespace split.
