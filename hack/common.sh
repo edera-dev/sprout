@@ -40,7 +40,7 @@ if [ -z "${QEMU_ACCEL}" ] && [ "${TARGET_ARCH}" = "${HOST_ARCH}" ] && [ -e "/dev
 	QEMU_ACCEL="kvm"
 fi
 
-if [ "$(uname)" = "Darwin" ] && [ "${TARGET_ARCH}" = "${HOST_ARCH}" ] &&
+if [ -z "${QEMU_ACCEL}" ] && [ "$(uname)" = "Darwin" ] && [ "${TARGET_ARCH}" = "${HOST_ARCH}" ] &&
 	[ "$(sysctl -n kern.hv_support 2>&1 || true)" = "1" ]; then
 	QEMU_ACCEL="hvf"
 fi
