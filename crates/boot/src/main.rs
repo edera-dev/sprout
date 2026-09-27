@@ -379,14 +379,29 @@ fn run() -> Result<()> {
         .menu_style
         .unwrap_or(config.options.menu_style);
 
-    // Use the forced boot entry if possible, otherwise pick the first entry using a boot menu.
-    let entry = if !force_boot_menu && let Some(ref force_boot_entry) = force_boot_entry {
-        BootableEntry::find(force_boot_entry, entries.iter())
-            .context(format!("unable to find entry: {force_boot_entry}"))?
-    } else {
+    // Find the forced boot entry, unless the boot menu is forced.
+    // If the forced boot entry can't be found, such as when it was removed,
+    // the boot menu is used instead.
+    let forced_entry = force_boot_entry
+        .as_ref()
+        .filter(|_| !force_boot_menu)
+        .and_then(|force_boot_entry| {
+            let entry = BootableEntry::find(force_boot_entry, entries.iter());
+            if entry.is_none() {
+                warn!(
+                    "unable to find entry '{}', using the boot menu",
+                    force_boot_entry
+                );
+            }
+            entry
+        });
+
+    // Use the forced boot entry if possible, otherwise pick an entry using a boot menu.
+    let entry = match forced_entry {
+        Some(entry) => entry,
         // Delegate to the menu to select an entry to boot.
-        menu::select(&timer, menu_timeout, menu_style, &entries)
-            .context("unable to select entry via boot menu")?
+        None => menu::select(&timer, menu_timeout, menu_style, &entries)
+            .context("unable to select entry via boot menu")?,
     };
 
     // Tell the bootloader interface what the selected entry is.
