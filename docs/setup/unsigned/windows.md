@@ -23,9 +23,9 @@ Standard editors can, however, be used to edit files on the ESP.
 
 Download the latest sprout.efi release from the [GitHub releases page](https://github.com/edera-dev/sprout/releases).
 For x86_64 systems, download the `sprout-x86_64.efi` file, and for ARM systems, download the `sprout-aarch64.efi` file.
-Copy the downloaded `sprout.efi` file to `X:\EFI\BOOT\sprout.efi` on your EFI System Partition.
+Copy the downloaded file to `X:\EFI\BOOT\sprout.efi` on your EFI System Partition.
 
-## Step 3: Configure Sprout
+## Step 2: Configure Sprout
 
 Write the following file to `X:\sprout.toml`:
 
@@ -39,7 +39,7 @@ version = 1
 autoconfigure = true
 ```
 
-## Step 4: Configure EFI Firmware to boot Sprout
+## Step 3: Configure EFI Firmware to boot Sprout
 
 It is not trivial to add an EFI boot entry inside Windows.
 However, most firmware lets you load arbitrary EFI files from the firmware settings.

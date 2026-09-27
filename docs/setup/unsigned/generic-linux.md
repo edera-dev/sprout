@@ -12,7 +12,7 @@ First, identify the path to your EFI System Partition. On most systems, this is 
 
 Download the latest sprout.efi release from the [GitHub releases page](https://github.com/edera-dev/sprout/releases).
 For x86_64 systems, download the `sprout-x86_64.efi` file, and for ARM systems, download the `sprout-aarch64.efi` file.
-Copy the downloaded `sprout.efi` file to `/EFI/BOOT/sprout.efi` on your EFI System Partition.
+Copy the downloaded file to `/EFI/BOOT/sprout.efi` on your EFI System Partition.
 
 ## Step 2: Copy kernel and optional initramfs
 
