@@ -23,8 +23,8 @@ use uefi::proto::device_path::text::{AllowShortcuts, DisplayOnly};
 const LINUX_CHAINLOAD_ACTION_PREFIX: &str = "linux-chainload-";
 
 /// The locations to scan for kernel pairs.
-/// We will check for symlinks and if this directory is a symlink, we will skip it.
-/// The empty string represents the root of the filesystem.
+/// A location that doesn't exist or can't be read is skipped.
+/// The "\\" location represents the root of the filesystem.
 const SCAN_LOCATIONS: &[&str] = &["\\boot", "\\"];
 
 /// This is really silly, but if what we are booting is the Canonical stubble stub,
