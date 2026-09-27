@@ -193,7 +193,7 @@ fn run(
 
         // Wait for a key, waking up every tick to update the countdown.
         let tick = remaining.map_or(TICK, |remaining| remaining.min(TICK));
-        let Some(key) = read_key(input, tick)? else {
+        let Some(key) = read_key(input, Some(tick))? else {
             // Without a countdown there's nothing to do until a key is pressed.
             let Some(left) = remaining else {
                 continue;

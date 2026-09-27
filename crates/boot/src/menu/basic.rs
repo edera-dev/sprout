@@ -26,11 +26,11 @@ enum MenuOperation {
     Nop,
 }
 
-/// Read a key from the input device with a duration, returning the [MenuOperation] that was
-/// performed.
-fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
+/// Read a key from the input device with an optional timeout, returning the [MenuOperation]
+/// that was performed. Without a timeout, this waits for a key indefinitely.
+fn read(input: &mut Input, timeout: Option<Duration>) -> Result<MenuOperation> {
     // If the timer triggered, the user did not select a numbered entry.
-    let Some(key) = read_key(input, *timeout)? else {
+    let Some(key) = read_key(input, timeout)? else {
         return Ok(MenuOperation::Timeout);
     };
 
@@ -58,34 +58,48 @@ fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
     }
 }
 
+/// Find the default entry in `entries`.
+fn default_entry(entries: &[BootableEntry]) -> Result<&BootableEntry> {
+    entries
+        .iter()
+        .find(|item| item.is_default())
+        .context("no default entry available")
+}
+
 /// Selects an entry from the list of entries using the boot menu.
 fn select_with_input<'a>(
     input: &mut Input,
     timeout: Duration,
     entries: &'a [BootableEntry],
 ) -> Result<&'a BootableEntry> {
+    // If the timeout is zero, boot the default entry without showing the menu.
+    if timeout.is_zero() {
+        return default_entry(entries);
+    }
+
+    // The time to wait for a key, or None once a key stops the countdown.
+    let mut countdown = Some(timeout);
+
     loop {
-        // If the timeout is not zero, let's display the boot menu.
-        if !timeout.is_zero() {
-            // Print all the entries with the number used to select them.
-            info!("Boot Menu:");
-            for (index, entry) in entries.iter().enumerate() {
-                let title = entry.context().stamp(&entry.declaration().title);
-                info!("  [{}] {}", index, title);
-            }
+        // Print all the entries with the number used to select them.
+        info!("Boot Menu:");
+        for (index, entry) in entries.iter().enumerate() {
+            let title = entry.context().stamp(&entry.declaration().title);
+            info!("  [{}] {}", index, title);
         }
 
         // Read from input until a valid operation is selected.
         let operation = loop {
-            // If the timeout is zero, we can exit immediately because there is nothing to do.
-            if timeout.is_zero() {
-                break MenuOperation::Exit;
-            }
-
             info!("Select a boot entry using the number keys.");
             info!("Press Escape to exit and enter to display the entries again.");
 
-            let operation = read(input, &timeout)?;
+            let operation = read(input, countdown)?;
+
+            // Any key stops the countdown, so the menu waits for the user from now on.
+            if operation != MenuOperation::Timeout {
+                countdown = None;
+            }
+
             if operation != MenuOperation::Nop {
                 break operation;
             }
@@ -104,10 +118,7 @@ fn select_with_input<'a>(
             // When the user exits the boot menu or a timeout occurs, we should
             // boot the default entry, if any.
             MenuOperation::Exit | MenuOperation::Timeout => {
-                return entries
-                    .iter()
-                    .find(|item| item.is_default())
-                    .context("no default entry available");
+                return default_entry(entries);
             }
 
             // If the operation is to continue or nop, we can just run the loop again.
