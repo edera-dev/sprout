@@ -107,10 +107,12 @@ You may now reboot your system and select Sprout from the GRUB menu.
 
 You can configure your EFI boot menu to show Sprout as an option.
 
-To do so, please find the partition device of your EFI System Partition and run the following:
+To do so, please find the disk and partition number of your EFI System Partition and run the following.
+For example, if your EFI System Partition is `/dev/nvme0n1p1`, the disk is `/dev/nvme0n1` and the partition
+number is `1`:
 
 ```bash
-$ sudo efibootmgr -d /dev/esp_partition_here -C -L 'Sprout' -l '\EFI\BOOT\sprout.efi'
+$ sudo efibootmgr -d /dev/BLOCK_DEVICE -p PARTITION_NUMBER -C -L 'Sprout' -l '\EFI\BOOT\sprout.efi'
 ```
 
 This will add a new entry to your EFI boot menu called `Sprout` that will boot Sprout with your configuration.
