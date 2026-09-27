@@ -12,8 +12,9 @@ permissions:
   contents: read # Needed to checkout the repository.
 
 concurrency:
-  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}"
-  cancel-in-progress: true
+  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
+  # Only cancel superseded pull request runs, so every push to main is fully checked.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   artifacts:
