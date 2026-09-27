@@ -82,16 +82,71 @@ impl SecurityHook {
         status.is_success()
     }
 
+    /// Call the original EFI_SECURITY_ARCH hook with `this`, `status`, and `path`.
+    /// This lets the firmware decide on images that the shim can't verify.
+    unsafe fn original_file_authentication_state(
+        this: *const SecurityArchProtocol,
+        status: u32,
+        path: *const FfiDevicePath,
+    ) -> Status {
+        // Acquire the global hook state to grab the original hook.
+        let function = match GLOBAL_HOOK_STATE.lock().as_ref() {
+            // The hook state is available, so we can acquire the original hook.
+            Some(state) => state.original_hook.file_authentication_state,
+
+            // The hook state is not available, so we can't call the original hook.
+            None => {
+                warn!("global hook state is not available, unable to call original hook");
+                return Status::LOAD_ERROR;
+            }
+        };
+
+        // Call the original hook function to see what it reports.
+        // SAFETY: This function is safe to call as it is stored by us and is required
+        // in the UEFI specification.
+        unsafe { function(this, status, path) }
+    }
+
+    /// Call the original EFI_SECURITY_ARCH2 hook with `this`, `path`, `file_buffer`,
+    /// `file_size`, and `boot_policy`.
+    /// This lets the firmware decide on images that the shim can't verify.
+    unsafe fn original_file_authentication(
+        this: *const SecurityArch2Protocol,
+        path: *const FfiDevicePath,
+        file_buffer: *const u8,
+        file_size: usize,
+        boot_policy: Boolean,
+    ) -> Status {
+        // Acquire the global hook state to grab the original hook.
+        let function = match GLOBAL_HOOK_STATE.lock().as_ref() {
+            // The hook state is available, so we can acquire the original hook.
+            Some(state) => state.original_hook2.file_authentication,
+
+            // The hook state is not available, so we can't call the original hook.
+            None => {
+                warn!("global hook state is not available, unable to call original hook");
+                return Status::LOAD_ERROR;
+            }
+        };
+
+        // Call the original hook function to see what it reports.
+        // SAFETY: This function is safe to call as it is stored by us and is required
+        // in the UEFI specification.
+        unsafe { function(this, path, file_buffer, file_size, boot_policy) }
+    }
+
     /// File authentication state verifier for the EFI_SECURITY_ARCH protocol.
     /// Takes the `path` and determines the verification.
+    /// Anything the shim can't verify is passed to the original hook.
     unsafe extern "efiapi" fn arch_file_authentication_state(
         this: *const SecurityArchProtocol,
         status: u32,
         path: *const FfiDevicePath,
     ) -> Status {
-        // Verify the path is not null.
+        // Without a path, there is nothing for the shim to read and verify.
         if path.is_null() {
-            return Status::INVALID_PARAMETER;
+            // SAFETY: The arguments are passed through unchanged from the firmware.
+            return unsafe { Self::original_file_authentication_state(this, status, path) };
         }
 
         // Construct a shim input from the path.
@@ -100,31 +155,19 @@ impl SecurityHook {
         // Convert the input to an owned data buffer.
         let input = match input.into_owned_data_buffer() {
             Ok(input) => input,
-            // If an error occurs, log the error and return the not found status.
+            // If the data can't be read, such as for a path the shim can't access,
+            // let the original hook decide.
             Err(error) => {
                 warn!("unable to read data to be authenticated: {}", error);
-                return Status::NOT_FOUND;
+                // SAFETY: The arguments are passed through unchanged from the firmware.
+                return unsafe { Self::original_file_authentication_state(this, status, path) };
             }
         };
 
         // Verify the input, if it fails, call the original hook.
         if !Self::verify(input) {
-            // Acquire the global hook state to grab the original hook.
-            let function = match GLOBAL_HOOK_STATE.lock().as_ref() {
-                // The hook state is available, so we can acquire the original hook.
-                Some(state) => state.original_hook.file_authentication_state,
-
-                // The hook state is not available, so we can't call the original hook.
-                None => {
-                    warn!("global hook state is not available, unable to call original hook");
-                    return Status::LOAD_ERROR;
-                }
-            };
-
-            // Call the original hook function to see what it reports.
-            // SAFETY: This function is safe to call as it is stored by us and is required
-            // in the UEFI specification.
-            unsafe { function(this, status, path) }
+            // SAFETY: The arguments are passed through unchanged from the firmware.
+            unsafe { Self::original_file_authentication_state(this, status, path) }
         } else {
             Status::SUCCESS
         }
@@ -132,6 +175,7 @@ impl SecurityHook {
 
     /// File authentication verifier for the EFI_SECURITY_ARCH2 protocol.
     /// Takes the `path` and a file buffer to determine the verification.
+    /// Anything the shim can't verify is passed to the original hook.
     unsafe extern "efiapi" fn arch2_file_authentication(
         this: *const SecurityArch2Protocol,
         path: *const FfiDevicePath,
@@ -139,14 +183,13 @@ impl SecurityHook {
         file_size: usize,
         boot_policy: Boolean,
     ) -> Status {
-        // Verify the path and file buffer are not null.
-        if path.is_null() || file_buffer.is_null() {
-            return Status::INVALID_PARAMETER;
-        }
-
-        // If the boot policy is true, we can't continue as we don't support that.
-        if bool::from(boot_policy) {
-            return Status::INVALID_PARAMETER;
+        // The path and file buffer are optional, and the shim can't verify without them.
+        // The shim also doesn't support the boot policy.
+        if path.is_null() || file_buffer.is_null() || bool::from(boot_policy) {
+            // SAFETY: The arguments are passed through unchanged from the firmware.
+            return unsafe {
+                Self::original_file_authentication(this, path, file_buffer, file_size, boot_policy)
+            };
         }
 
         // Construct a slice out of the file buffer and size.
@@ -157,22 +200,10 @@ impl SecurityHook {
 
         // Verify the input, if it fails, call the original hook.
         if !Self::verify(input) {
-            // Acquire the global hook state to grab the original hook.
-            let function = match GLOBAL_HOOK_STATE.lock().as_ref() {
-                // The hook state is available, so we can acquire the original hook.
-                Some(state) => state.original_hook2.file_authentication,
-
-                // The hook state is not available, so we can't call the original hook.
-                None => {
-                    warn!("global hook state is not available, unable to call original hook");
-                    return Status::LOAD_ERROR;
-                }
-            };
-
-            // Call the original hook function to see what it reports.
-            // SAFETY: This function is safe to call as it is stored by us and is required
-            // in the UEFI specification.
-            unsafe { function(this, path, file_buffer, file_size, boot_policy) }
+            // SAFETY: The arguments are passed through unchanged from the firmware.
+            unsafe {
+                Self::original_file_authentication(this, path, file_buffer, file_size, boot_policy)
+            }
         } else {
             Status::SUCCESS
         }
