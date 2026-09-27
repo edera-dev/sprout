@@ -126,10 +126,17 @@ pub fn select<'live>(
     }
 
     // Pick the menu that implements the requested style.
-    let menu: &dyn BootMenu = match style {
-        MenuStyle::Basic => &BasicMenu,
-        MenuStyle::Simple => &SimpleMenu,
-    };
+    match style {
+        MenuStyle::Basic => BasicMenu.select(timeout, entries),
 
-    menu.select(timeout, entries)
+        // The simple menu needs a console that can move the cursor and set colors, which
+        // not every console supports. If it fails, the basic menu is used instead.
+        MenuStyle::Simple => SimpleMenu.select(timeout, entries).or_else(|error| {
+            warn!(
+                "unable to show the simple boot menu, using the basic menu: {:#}",
+                error
+            );
+            BasicMenu.select(timeout, entries)
+        }),
+    }
 }
