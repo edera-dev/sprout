@@ -1,6 +1,6 @@
 use crate::entries::BootableEntry;
 use alloc::vec;
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use core::time::Duration;
 use eficore::bootloader_interface::BootloaderInterface;
 use eficore::platform::timer::PlatformTimer;
@@ -86,8 +86,10 @@ fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
     }
 
     // If we reach here, there is a key event.
+    // Some firmware signals the key event without a key being available,
+    // in which case there is nothing to do.
     let Some(key) = input.read_key().context("unable to read key")? else {
-        bail!("no key was pressed");
+        return Ok(MenuOperation::Nop);
     };
 
     match key {
