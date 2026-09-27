@@ -70,8 +70,8 @@ impl MediaLoaderHandle {
         }
 
         // Boot policy must not be true, and if it is, that is special behavior that is irrelevant
-        // for the media loader concept.
-        if boot_policy == Boolean::TRUE {
+        // for the media loader concept. Any non-zero value is true.
+        if bool::from(boot_policy) {
             return Status::UNSUPPORTED;
         }
 
