@@ -13,6 +13,7 @@ use edera_sprout_parsing::{
     LINUX_INITRAMFS_PREFIXES, LINUX_KERNEL_PREFIXES, initramfs_candidates, match_kernel_prefix,
     unique_hash,
 };
+use log::warn;
 use uefi::CString16;
 use uefi::fs::{FileSystem, Path, PathBuf};
 use uefi::proto::device_path::DevicePath;
@@ -169,10 +170,12 @@ pub fn scan(
     let root_unique_hash = unique_hash(&root);
 
     // Scan all locations for kernel pairs, adding them to the list.
+    // A location that can't be scanned is skipped, so the other locations are still used.
     for location in SCAN_LOCATIONS {
-        let scanned = scan_directory(filesystem, location)
-            .with_context(|| format!("unable to scan directory {}", location))?;
-        pairs.extend(scanned);
+        match scan_directory(filesystem, location) {
+            Ok(scanned) => pairs.extend(scanned),
+            Err(error) => warn!("unable to scan directory {}: {:#}", location, error),
+        }
     }
 
     // If no kernel pairs were found, return false.

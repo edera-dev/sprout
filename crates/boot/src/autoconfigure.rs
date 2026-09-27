@@ -48,19 +48,36 @@ pub fn autoconfigure(config: &mut RootConfiguration) -> Result<()> {
         // Trade the filesystem protocol for the uefi filesystem helper.
         let mut filesystem = FileSystem::new(filesystem);
 
+        // A scan that fails is skipped, as a filesystem that can't be read should not
+        // prevent autoconfiguring the other filesystems.
+
         // Scan the filesystem for BLS supported configurations.
-        let bls_found = bls::scan(&mut filesystem, &root, config)
-            .context("unable to scan for bls configurations")?;
+        let bls_found = match bls::scan(&mut filesystem, &root, config) {
+            Ok(found) => found,
+            Err(error) => {
+                warn!(
+                    "unable to scan filesystem for bls configurations: {:#}",
+                    error
+                );
+                false
+            }
+        };
 
         // If BLS was not found, scan for Linux configurations.
-        if !bls_found {
-            linux::scan(&mut filesystem, &root, config)
-                .context("unable to scan for linux configurations")?;
+        if !bls_found && let Err(error) = linux::scan(&mut filesystem, &root, config) {
+            warn!(
+                "unable to scan filesystem for linux configurations: {:#}",
+                error
+            );
         }
 
         // Always look for Windows configurations.
-        windows::scan(&mut filesystem, &root, config)
-            .context("unable to scan for windows configurations")?;
+        if let Err(error) = windows::scan(&mut filesystem, &root, config) {
+            warn!(
+                "unable to scan filesystem for windows configurations: {:#}",
+                error
+            );
+        }
     }
 
     Ok(())
