@@ -52,7 +52,7 @@ pub fn args() -> Result<Vec<String>> {
                 .next()
                 // Filter out unprintable characters and backticks.
                 // Both of which have been observed in the wild.
-                .map(|c| c < 0x1f as char || c == '`')
+                .map(|c| c.is_ascii_control() || c == '`')
                 .unwrap_or(false)
         })
         .collect();
