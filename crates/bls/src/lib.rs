@@ -247,6 +247,11 @@ pub fn compare_versions_optional(a: Option<&str>, b: Option<&str>) -> Ordering {
 /// Compares two strings using the BLS version comparison specification.
 /// See: <https://uapi-group.org/specifications/specs/version_format_specification/>
 pub fn compare_versions(a: &str, b: &str) -> Ordering {
+    // An empty string is older than any other string.
+    if a.is_empty() || b.is_empty() {
+        return a.len().cmp(&b.len());
+    }
+
     // Acquire a peekable iterator for each string.
     let mut a_chars = a.chars().peekable();
     let mut b_chars = b.chars().peekable();
@@ -257,6 +262,19 @@ pub fn compare_versions(a: &str, b: &str) -> Ordering {
         skip_invalid(&mut a_chars);
         skip_invalid(&mut b_chars);
 
+        // Handle the ~ character. This must happen before the end of string check,
+        // as a string with ~ is older than a string that has ended (1~rc1 < 1).
+        match (a_chars.peek() == Some(&'~'), b_chars.peek() == Some(&'~')) {
+            (true, false) => return Ordering::Less,
+            (false, true) => return Ordering::Greater,
+            (true, true) => {
+                a_chars.next();
+                b_chars.next();
+                continue;
+            }
+            (false, false) => {}
+        }
+
         // Check if either string has ended.
         match (a_chars.peek(), b_chars.peek()) {
             // No more characters in either string.
@@ -266,9 +284,6 @@ pub fn compare_versions(a: &str, b: &str) -> Ordering {
             (Some(_), None) => return Ordering::Greater,
             // Both strings have characters left.
             (Some(&ca), Some(&cb)) => {
-                // Handle the ~ character.
-                handle_single_char!(ca, cb, a_chars, b_chars, '~');
-
                 // Handle '-' character.
                 handle_single_char!(ca, cb, a_chars, b_chars, '-');
 
@@ -687,6 +702,21 @@ efi        /EFI/fedora/shimx64.efi
         assert_eq!(compare_versions("1~rc1", "1.0"), Ordering::Less);
         // When b has ~ but a doesn't, a > b
         assert_eq!(compare_versions("1.0", "1~rc1"), Ordering::Greater);
+    }
+
+    #[test]
+    fn tilde_is_older_than_end_of_string() {
+        // A pre-release is older than the release it precedes.
+        assert_eq!(compare_versions("1~rc1", "1"), Ordering::Less);
+        assert_eq!(compare_versions("1", "1~rc1"), Ordering::Greater);
+        assert_eq!(compare_versions("6.1~rc3", "6.1"), Ordering::Less);
+    }
+
+    #[test]
+    fn empty_string_is_oldest() {
+        assert_eq!(compare_versions("", "~1"), Ordering::Less);
+        assert_eq!(compare_versions("~1", ""), Ordering::Greater);
+        assert_eq!(compare_versions("", "1"), Ordering::Less);
     }
 
     #[test]
