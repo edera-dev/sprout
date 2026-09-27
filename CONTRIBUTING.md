@@ -21,7 +21,7 @@ We encourage opening an issue on GitHub to report bugs.
 
 1. For anything more than simple bug/doc fixes, please open a GitHub issue for tracking purposes.
 2. Discuss the change with the teams to ensure we have consensus on the change being welcome.
-3. We encourage opening the PR sooner than later, and prefixing with `WIP:` so GitHub labels it as a Draft.
+3. We encourage opening the PR sooner than later, as a draft pull request.
 4. Please include a detailed list of changes that the PR makes.
 5. Once the PR is ready for review, remove the Draft status, and request a review from `edera-dev/engineering`.
 6. After the review cycle concludes, and we know you are ready for merging, a team member will submit the PR to the merge queue.
