@@ -216,14 +216,15 @@ macro_rules! handle_single_char {
 
 /// Compares two strings using the BLS version comparison specification.
 /// Handles optional values as well by comparing only if both are specified.
+/// A missing value is considered older than any specified value.
 pub fn compare_versions_optional(a: Option<&str>, b: Option<&str>) -> Ordering {
     match (a, b) {
         // If both have values, compare them.
         (Some(a), Some(b)) => compare_versions(a, b),
-        // If the second value is None, then `a` is less than `b`.
-        (Some(_a), None) => Ordering::Less,
-        // If the first value is None, the `a` is greater than `b`.
-        (None, Some(_b)) => Ordering::Greater,
+        // If the second value is None, then `a` is greater than `b`.
+        (Some(_a), None) => Ordering::Greater,
+        // If the first value is None, the `a` is less than `b`.
+        (None, Some(_b)) => Ordering::Less,
         // If both values are None, return that they are equal.
         (None, None) => Ordering::Equal,
     }
@@ -755,23 +756,30 @@ efi        /EFI/fedora/shimx64.efi
     }
 
     #[test]
+    fn entry_with_version_sorts_before_entry_without() {
+        let a = sort_entry(Some("linux"), Some("abc"), Some("6.5.0"));
+        let b = sort_entry(Some("linux"), Some("abc"), None);
+        assert_eq!(sort_bls(&a, "a", &b, "b"), Ordering::Less);
+        assert_eq!(sort_bls(&b, "b", &a, "a"), Ordering::Greater);
+    }
+
+    #[test]
     fn optional_both_none_equal() {
         assert_eq!(compare_versions_optional(None, None), Ordering::Equal);
     }
 
     #[test]
-    fn optional_some_vs_none_is_less() {
-        // Documented behavior: (Some, None) → Less
-        assert_eq!(compare_versions_optional(Some("1.0"), None), Ordering::Less);
+    fn optional_some_vs_none_is_greater() {
+        // A missing version is older than any specified version.
+        assert_eq!(
+            compare_versions_optional(Some("1.0"), None),
+            Ordering::Greater
+        );
     }
 
     #[test]
-    fn optional_none_vs_some_is_greater() {
-        // Documented behavior: (None, Some) → Greater
-        assert_eq!(
-            compare_versions_optional(None, Some("1.0")),
-            Ordering::Greater
-        );
+    fn optional_none_vs_some_is_less() {
+        assert_eq!(compare_versions_optional(None, Some("1.0")), Ordering::Less);
     }
 
     #[test]
