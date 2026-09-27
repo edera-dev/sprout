@@ -117,8 +117,13 @@ pub fn select<'live>(
     entries: &'live [BootableEntry],
 ) -> Result<&'live BootableEntry> {
     // Notify the bootloader interface that we are about to display the menu.
-    BootloaderInterface::mark_menu(timer)
-        .context("unable to mark menu display in bootloader interface")?;
+    // This is only informational, so it should not prevent booting.
+    if let Err(error) = BootloaderInterface::mark_menu(timer) {
+        warn!(
+            "unable to mark menu display in bootloader interface: {:#}",
+            error
+        );
+    }
 
     // Pick the menu that implements the requested style.
     let menu: &dyn BootMenu = match style {
