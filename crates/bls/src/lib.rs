@@ -177,40 +177,25 @@ pub fn sort_bls(a_bls: &BlsEntry, a_name: &str, b_bls: &BlsEntry, b_name: &str) 
     let a_sort_key = a_bls.sort_key();
     let b_sort_key = b_bls.sort_key();
 
-    // Compare the sort keys of both entries.
-    match a_sort_key.cmp(&b_sort_key) {
-        // If A and B sort keys are equal, sort by machine-id.
-        Ordering::Equal => {
-            // Grab the machine-id from both entries.
-            let a_machine_id = a_bls.machine_id();
-            let b_machine_id = b_bls.machine_id();
+    // Sort keys, machine-id and version are only considered when both entries have a sort key.
+    // If only one entry has a sort key, that entry sorts first.
+    let ordering = match (a_sort_key, b_sort_key) {
+        (Some(a_sort_key), Some(b_sort_key)) => a_sort_key
+            .cmp(&b_sort_key)
+            // If the sort keys are equal, sort by machine-id.
+            .then_with(|| a_bls.machine_id().cmp(&b_bls.machine_id()))
+            // If the machine-id values are equal, sort by version, sorting newer versions first.
+            .then_with(|| {
+                compare_versions_optional(a_bls.version().as_deref(), b_bls.version().as_deref())
+                    .reverse()
+            }),
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => Ordering::Equal,
+    };
 
-            // Compare the machine-id of both entries.
-            match a_machine_id.cmp(&b_machine_id) {
-                // If both machine-id values are equal, sort by version.
-                Ordering::Equal => {
-                    // Grab the version from both entries.
-                    let a_version = a_bls.version();
-                    let b_version = b_bls.version();
-
-                    // Compare the version of both entries, sorting newer versions first.
-                    match compare_versions_optional(a_version.as_deref(), b_version.as_deref())
-                        .reverse()
-                    {
-                        // If both versions are equal, sort by file name in reverse order.
-                        Ordering::Equal => {
-                            // Compare the file names of both entries, sorting newer entries first.
-                            compare_versions(a_name, b_name).reverse()
-                        }
-                        other => other,
-                    }
-                }
-                other => other,
-            }
-        }
-
-        other => other,
-    }
+    // If all else is equal, compare the file names of both entries, sorting newer entries first.
+    ordering.then_with(|| compare_versions(a_name, b_name).reverse())
 }
 
 /// Handles single character advancement and comparison.
@@ -747,6 +732,26 @@ efi        /EFI/fedora/shimx64.efi
             compare_versions("1.99999999999999999998", "1.99999999999999999999"),
             Ordering::Less
         );
+    }
+
+    #[test]
+    fn entry_with_sort_key_sorts_before_entry_without() {
+        let with_key = sort_entry(Some("fedora"), None, None);
+        let without_key = sort_entry(None, None, None);
+        assert_eq!(sort_bls(&with_key, "a", &without_key, "b"), Ordering::Less);
+        assert_eq!(
+            sort_bls(&without_key, "b", &with_key, "a"),
+            Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn entries_without_sort_key_sort_by_name_only() {
+        // Without a sort key, machine-id and version are ignored.
+        let a = sort_entry(None, Some("aaa"), Some("1.0"));
+        let b = sort_entry(None, Some("bbb"), Some("2.0"));
+        assert_eq!(sort_bls(&a, "entry-2", &b, "entry-1"), Ordering::Less);
+        assert_eq!(sort_bls(&b, "entry-1", &a, "entry-2"), Ordering::Greater);
     }
 
     #[test]
