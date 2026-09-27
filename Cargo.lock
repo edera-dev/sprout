@@ -65,14 +65,14 @@ dependencies = [
 
 [[package]]
 name = "edera-sprout-bls"
-version = "0.0.28"
+version = "0.0.29"
 dependencies = [
  "anyhow",
 ]
 
 [[package]]
 name = "edera-sprout-boot"
-version = "0.0.28"
+version = "0.0.29"
 dependencies = [
  "anyhow",
  "edera-sprout-bls",
@@ -91,18 +91,18 @@ dependencies = [
 
 [[package]]
 name = "edera-sprout-build"
-version = "0.0.28"
+version = "0.0.29"
 
 [[package]]
 name = "edera-sprout-config"
-version = "0.0.28"
+version = "0.0.29"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "edera-sprout-eficore"
-version = "0.0.28"
+version = "0.0.29"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -115,7 +115,7 @@ dependencies = [
 
 [[package]]
 name = "edera-sprout-parsing"
-version = "0.0.28"
+version = "0.0.29"
 dependencies = [
  "hex",
  "sha2",
