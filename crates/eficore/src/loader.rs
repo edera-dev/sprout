@@ -83,16 +83,6 @@ impl ImageLoader {
         // If the image loader is installed, we can skip over the security hook.
         let requires_security_hook = secure_boot && shim_loaded && !shim_loader_available;
 
-        // If the security hook is required, we will bail for now.
-        if requires_security_hook {
-            // Install the security hook, if possible. If it's not, this is necessary to continue,
-            // so we should bail.
-            let installed = SecurityHook::install().context("unable to install security hook")?;
-            if !installed {
-                bail!("unable to install security hook required for this platform");
-            }
-        }
-
         // If the shim is loaded, we will need to retain the shim protocol to allow
         // loading multiple images.
         if shim_loaded {
@@ -113,6 +103,18 @@ impl ImageLoader {
             buffer: input.buffer().context("unable to get buffer from input")?,
             file_path: input.file_path(),
         };
+
+        // If the security hook is required, install it right before loading the image.
+        // Installing it here ensures that an error while preparing the image can't
+        // return without uninstalling the hook.
+        if requires_security_hook {
+            // Install the security hook, if possible. If it's not, this is necessary to continue,
+            // so we should bail.
+            let installed = SecurityHook::install().context("unable to install security hook")?;
+            if !installed {
+                bail!("unable to install security hook required for this platform");
+            }
+        }
 
         // Loads the image using Boot Services LoadImage function.
         let result = uefi::boot::load_image(current_image, source).context("unable to load image");
