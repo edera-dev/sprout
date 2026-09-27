@@ -18,8 +18,10 @@ const LOADER_NAME: &str = "Sprout";
 
 /// Represents the configured timeout for the bootloader interface.
 pub enum BootloaderInterfaceTimeout {
-    /// Force the menu to be shown.
+    /// Force the menu to be shown, and wait for the user.
     MenuForce,
+    /// Force the menu to be shown, with a timeout.
+    MenuForceTimeout(u64),
     /// Hide the menu.
     MenuHidden,
     /// Disable the menu.
@@ -255,12 +257,8 @@ impl BootloaderInterface {
             }
         };
 
-        // The specification says that a value of 0 means that the menu should be hidden.
-        if value == 0 {
-            return Ok(Some(BootloaderInterfaceTimeout::MenuHidden));
-        }
-
         // If we reach here, we know it must be a real timeout value.
+        // A value of 0 is left to the caller, as its meaning depends on the variable.
         Ok(Some(BootloaderInterfaceTimeout::Timeout(value)))
     }
 
@@ -274,8 +272,16 @@ impl BootloaderInterface {
             .context("unable to check for LoaderConfigTimeoutOneShot variable")?;
 
         // If oneshot was found, return it.
+        // The specification says the one-shot timeout shows the menu on this boot,
+        // and a value of 0 means the menu waits for the user.
         if let Some(oneshot) = oneshot {
-            return Ok(oneshot);
+            return Ok(match oneshot {
+                BootloaderInterfaceTimeout::Timeout(0) => BootloaderInterfaceTimeout::MenuForce,
+                BootloaderInterfaceTimeout::Timeout(value) => {
+                    BootloaderInterfaceTimeout::MenuForceTimeout(value)
+                }
+                other => other,
+            });
         }
 
         // Attempt to acquire the value of the LoaderConfigTimeout variable.
@@ -284,8 +290,12 @@ impl BootloaderInterface {
             .context("unable to check for LoaderConfigTimeout variable")?;
 
         // If direct was found, return it.
+        // The specification says that a value of 0 means that the menu should be hidden.
         if let Some(direct) = direct {
-            return Ok(direct);
+            return Ok(match direct {
+                BootloaderInterfaceTimeout::Timeout(0) => BootloaderInterfaceTimeout::MenuHidden,
+                other => other,
+            });
         }
 
         // If we reach here, we know that neither variable was set.
