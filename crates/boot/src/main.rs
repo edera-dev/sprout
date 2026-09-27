@@ -88,7 +88,12 @@ fn run() -> Result<()> {
 
     // Acquire the number of active PCR banks on the TPM.
     // If no TPM is available, this will return zero.
-    let active_pcr_banks = PlatformTpm::active_pcr_banks()?;
+    // This is only reported to the bootloader interface, so a TPM that fails to report its
+    // PCR banks is treated as having none, rather than preventing boot.
+    let active_pcr_banks = PlatformTpm::active_pcr_banks().unwrap_or_else(|error| {
+        warn!("unable to determine the active TPM PCR banks: {}", error);
+        0
+    });
     // Tell the bootloader interface what the number of active PCR banks is.
     BootloaderInterface::set_tpm2_active_pcr_banks(active_pcr_banks)
         .context("unable to set tpm2 active PCR banks in bootloader interface")?;
