@@ -125,10 +125,11 @@ fn scan_directory(filesystem: &mut FileSystem, path: &str) -> Result<Vec<KernelP
             let mut initramfs_path = path_for_join.clone();
             initramfs_path.push(Path::new(&initramfs));
 
-            // Check if the initramfs path exists, if it does, break out of the loop.
+            // Check if the initramfs path is a file, if it is, break out of the loop.
+            // A path that can't be checked is treated as not existing.
             if filesystem
-                .try_exists(&initramfs_path)
-                .context("unable to check if initramfs path exists")?
+                .metadata(&initramfs_path)
+                .is_ok_and(|metadata| metadata.is_regular_file())
             {
                 break Some(initramfs_path);
             }
