@@ -2,7 +2,7 @@ use crate::{actions, context::SproutContext};
 use alloc::rc::Rc;
 use alloc::vec::Vec;
 use alloc::{format, vec};
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use edera_sprout_config::actions::chainload::ChainloadConfiguration;
 use edera_sprout_config::actions::edera::EderaConfiguration;
 use edera_sprout_parsing::{build_xen_config, combine_options, empty_is_none};
@@ -40,6 +40,11 @@ fn read_loader_payload(context: &Rc<SproutContext>, what: &str, path: &str) -> R
 /// Executes the edera action which will boot the Edera hypervisor with the specified
 /// `configuration` and `context`. This action uses Edera-specific Xen EFI stub functionality.
 pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> Result<()> {
+    // The initrd can be provided as either a single initrd or a chain, but not both.
+    if configuration.initrd.is_some() && !configuration.initrd_chain.is_empty() {
+        bail!("initrd and initrd-chain cannot be used together");
+    }
+
     // Only register the initrd media loader if the user actually configured one.
     let xen_opts = combine_options(context.stamp_iter(configuration.xen_options.iter()));
     let dom0_args = combine_options(context.stamp_iter(configuration.kernel_options.iter()));
@@ -80,12 +85,18 @@ pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> 
         register_media_loader_bytes(XEN_EFI_KERNEL_MEDIA_GUID, "kernel", kernel_bytes)
             .context("unable to register kernel media loader")?;
 
-    // Extend PCR 9 with the initrd bytes (empty when no initrd is
-    // configured).
-    let initrd_bytes = match empty_is_none(configuration.initrd.as_ref()) {
-        Some(p) => read_loader_payload(&context, "initrd", p)?,
-        None => Vec::new(),
-    };
+    // Read the initrd, or each initrd in the chain concatenated in order, then
+    // extend PCR 9 with the combined bytes (empty when no initrd is configured).
+    let mut initrd_bytes = Vec::new();
+    for p in configuration
+        .initrd
+        .iter()
+        .chain(configuration.initrd_chain.iter())
+    {
+        if let Some(p) = empty_is_none(Some(p)) {
+            initrd_bytes.extend(read_loader_payload(&context, "initrd", p)?);
+        }
+    }
     PlatformTpm::log_event(
         PlatformTpm::PCR_INITRD,
         &initrd_bytes,
@@ -111,6 +122,7 @@ pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> 
             path: configuration.xen.clone(),
             options: vec![],
             linux_initrd: None,
+            linux_initrd_chain: vec![],
         },
     )
     .context("unable to chainload to xen");

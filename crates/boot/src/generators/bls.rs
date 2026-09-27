@@ -18,11 +18,18 @@ use uefi::{
     proto::media::fs::SimpleFileSystem,
 };
 
+/// The number of initrd slots set on each BLS entry.
+/// Entries set `initrd-0` through `initrd-7`, and slots without an initrd are empty.
+pub const BLS_INITRD_SLOTS: usize = 8;
+
 // TODO(azenla): remove this once variable substitution is implemented.
-/// This function is used to remove the `tuned_initrd` variable from entry values.
+/// This function is used to remove the `tuned_initrd` variable from the initrd paths.
 /// Fedora uses tuned which adds an initrd that shouldn't be used.
-fn quirk_initrd_remove_tuned(input: String) -> String {
-    input.replace("$tuned_initrd", "").trim().to_string()
+fn quirk_initrd_remove_tuned(paths: Vec<String>) -> Vec<String> {
+    paths
+        .into_iter()
+        .filter(|path| path != "$tuned_initrd")
+        .collect()
 }
 
 /// Sorts two entries according to the BLS sort system.
@@ -139,6 +146,18 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
             continue;
         }
 
+        // Put the initrds through a quirk modifier to support Fedora.
+        let initrds = quirk_initrd_remove_tuned(entry.initrd_paths());
+
+        // Skip entries with more initrds than there are slots, as they can't be fully loaded.
+        if initrds.len() > BLS_INITRD_SLOTS {
+            warn!(
+                "bls entry {} has more than {} initrds, skipping",
+                name, BLS_INITRD_SLOTS
+            );
+            continue;
+        }
+
         // Produce a new sprout context for the entry with the extracted values.
         let mut context = context.fork();
 
@@ -147,9 +166,6 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         let options = entry.options().unwrap_or_default();
         let version = entry.version().unwrap_or_default();
         let machine_id = entry.machine_id().unwrap_or_default();
-
-        // Put the initrd through a quirk modifier to support Fedora.
-        let initrd = quirk_initrd_remove_tuned(entry.initrd_path().unwrap_or_default());
 
         // Combine the title with the version if a version is present, except if it already contains it.
         // Sometimes BLS will have a version in the title already, and this makes it unique.
@@ -163,7 +179,19 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         context.set("title", title_full);
         context.set("chainload", chainload);
         context.set("options", options);
-        context.set("initrd", initrd);
+        // The initrd value keeps the last initrd, which is what it held before
+        // multiple initrds were supported.
+        context.set("initrd", initrds.last().cloned().unwrap_or_default());
+
+        // Set every initrd slot, even the unused ones. An unset slot would let "$initrd-1"
+        // match "$initrd" instead, producing the initrd value followed by "-1".
+        for slot in 0..BLS_INITRD_SLOTS {
+            context.set(
+                format!("initrd-{}", slot),
+                initrds.get(slot).cloned().unwrap_or_default(),
+            );
+        }
+
         context.set("version", version);
         context.set("machine-id", machine_id);
 

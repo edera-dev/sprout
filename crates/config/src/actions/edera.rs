@@ -14,6 +14,11 @@ pub struct EderaConfiguration {
     /// The path to the initrd to load for dom0.
     #[serde(default)]
     pub initrd: Option<String>,
+    /// The paths to the initrds to chain together for dom0.
+    /// The contents of each initrd are concatenated in order and loaded as a single initrd.
+    /// This cannot be used with `initrd`.
+    #[serde(default, rename = "initrd-chain")]
+    pub initrd_chain: Vec<String>,
     /// The options to pass to the kernel.
     #[serde(default, rename = "kernel-options")]
     pub kernel_options: Vec<String>,
