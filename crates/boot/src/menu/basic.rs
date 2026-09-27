@@ -1,5 +1,5 @@
 use crate::entries::BootableEntry;
-use crate::menu::{BootMenu, wait_for_key};
+use crate::menu::{BootMenu, read_key};
 use anyhow::{Context, Result};
 use core::time::Duration;
 use log::info;
@@ -30,15 +30,8 @@ enum MenuOperation {
 /// performed.
 fn read(input: &mut Input, timeout: &Duration) -> Result<MenuOperation> {
     // If the timer triggered, the user did not select a numbered entry.
-    if !wait_for_key(input, *timeout)? {
+    let Some(key) = read_key(input, *timeout)? else {
         return Ok(MenuOperation::Timeout);
-    }
-
-    // If we reach here, there is a key event.
-    // Some firmware signals the key event without a key being available,
-    // in which case there is nothing to do.
-    let Some(key) = input.read_key().context("unable to read key")? else {
-        return Ok(MenuOperation::Nop);
     };
 
     match key {
