@@ -102,10 +102,12 @@ You will need to install the `efibootmgr` package:
 $ apk add efibootmgr
 ```
 
-Once `efibootmgr` is installed, find the partition device of your EFI System Partition and run the following:
+Once `efibootmgr` is installed, find the disk and partition number of your EFI System Partition and run the following.
+For example, if your EFI System Partition is `/dev/nvme0n1p1`, the disk is `/dev/nvme0n1` and the partition
+number is `1`:
 
 ```bash
-$ efibootmgr -d /dev/esp_partition_here -C -L 'Sprout' -l '\EFI\boot\sprout.efi'
+$ efibootmgr -d /dev/BLOCK_DEVICE -p PARTITION_NUMBER -C -L 'Sprout' -l '\EFI\boot\sprout.efi'
 ```
 
 This will add a new entry to your EFI boot menu called `Sprout` that will boot Sprout with your configuration.

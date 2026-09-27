@@ -52,10 +52,12 @@ They will be concatenated by a space and passed to the kernel.
 Since Sprout is still experimental, the following commands will add a boot entry to your EFI firmware for sprout but
 intentionally do not set it as the default boot entry.
 
-To add the entry, please find the partition device of your EFI System Partition and run the following:
+To add the entry, please find the disk and partition number of your EFI System Partition and run the following.
+For example, if your EFI System Partition is `/dev/nvme0n1p1`, the disk is `/dev/nvme0n1` and the partition
+number is `1`:
 
 ```bash
-$ sudo efibootmgr -d /dev/esp_partition_here -C -L 'Sprout' -l '\EFI\BOOT\sprout.efi'
+$ sudo efibootmgr -d /dev/BLOCK_DEVICE -p PARTITION_NUMBER -C -L 'Sprout' -l '\EFI\BOOT\sprout.efi'
 ```
 
 This will add a new entry to your EFI boot menu called `Sprout` that will boot Sprout with your configuration.
