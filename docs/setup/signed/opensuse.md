@@ -60,7 +60,7 @@ $ cp /usr/share/efi/aarch64/fallback.efi /boot/efi/EFI/sprout/fallback.efi
 Download the latest sprout.efi release from the [GitHub releases page](https://github.com/edera-dev/sprout/releases).
 For x86_64 systems, download the `sprout-x86_64.efi` file, and for ARM64 systems, download the `sprout-aarch64.efi`
 file.
-Copy the downloaded `sprout.efi` file to `/boot/efi/EFI/sprout/sprout.unsigned.efi` on your EFI System Partition.
+Copy the downloaded file to `/boot/efi/EFI/sprout/sprout.unsigned.efi` on your EFI System Partition.
 
 ## Step 4: Sign Sprout for Secure Boot
 
@@ -78,8 +78,10 @@ $ sbsign \
 You will need a filesystem EFI driver if `/boot` is not FAT32 or ExFAT.
 If `/boot` is FAT32 or ExFAT, you can skip this step.
 
-Most Debian systems use an ext4 filesystem for `/boot`.
+openSUSE puts `/boot` on a Btrfs filesystem by default, but it may be ext4 or another filesystem depending on how
+the system was installed. This guide uses an ext4 driver as the example, so use the driver for your filesystem instead.
 You can download an EFI filesystem driver from [EfiFs releases](https://github.com/pbatard/EfiFs/releases).
+For Btrfs, download the `btrfs` file for your platform.
 For ext4, download the `ext2` file for your platform. It should work for ext4 filesystems too.
 
 If you have an EFI driver, copy the driver to `/boot/efi/EFI/sprout/DRIVER_NAME.unsigned.efi` for signing.
