@@ -10,7 +10,7 @@ use eficore::platform::timer::PlatformTimer;
 use log::warn;
 use uefi::ResultExt;
 use uefi::boot::TimerTrigger;
-use uefi::proto::console::text::Input;
+use uefi::proto::console::text::{Input, Key};
 use uefi_raw::table::boot::{EventType, Tpl};
 
 /// basic: A menu that prints the entries and selects them by number.
@@ -34,11 +34,9 @@ pub trait BootMenu {
     ) -> Result<&'a BootableEntry>;
 }
 
-/// Wait for the key event of `input` to be signaled, giving up once `timeout` passes.
-/// Returns true if the key event was signaled, or false if the timeout passed.
-/// Some firmware signals the key event without a key being available, so reading
-/// the key afterward may still produce no key.
-pub fn wait_for_key(input: &mut Input, timeout: Duration) -> Result<bool> {
+/// Read a key from `input`, giving up once `timeout` passes.
+/// Returns the key that was pressed, or [None] if the timeout passed.
+pub fn read_key(input: &mut Input, timeout: Duration) -> Result<Option<Key>> {
     // The event to wait for a key press.
     let key_event = input
         .wait_for_key_event()
@@ -52,19 +50,35 @@ pub fn wait_for_key(input: &mut Input, timeout: Duration) -> Result<bool> {
             .context("unable to create timer event")?
     };
 
-    // Set a timer to trigger after the specified duration.
-    // The timer is limited to what the firmware can represent, as a longer timeout
-    // can't be converted into a timer trigger.
-    let trigger = TimerTrigger::Relative(timeout.min(MAX_TIMER_DURATION));
-    uefi::boot::set_timer(&timer_event, trigger).context("unable to set timeout timer")?;
-
     let events = vec![timer_event, key_event];
 
-    // Wait for either the timer event or the key event to trigger.
+    // Wait for a key until the timer triggers.
     // Store the result so that we can free the timer event.
-    let event_result = uefi::boot::wait_for_event(&events)
-        .discard_errdata()
-        .context("unable to wait for event");
+    let result = (|| {
+        // Set a timer to trigger after the specified duration.
+        // The timer is limited to what the firmware can represent, as a longer timeout
+        // can't be converted into a timer trigger.
+        let trigger = TimerTrigger::Relative(timeout.min(MAX_TIMER_DURATION));
+        uefi::boot::set_timer(&events[0], trigger).context("unable to set timeout timer")?;
+
+        loop {
+            // Wait for either the timer event or the key event to trigger.
+            let event = uefi::boot::wait_for_event(&events)
+                .discard_errdata()
+                .context("unable to wait for event")?;
+
+            // The first event is the timer event, so the timeout has passed.
+            if event == 0 {
+                return Ok(None);
+            }
+
+            // Some firmware signals the key event without a key being available.
+            // In that case, keep waiting on the same timer so the timeout is not extended.
+            if let Some(key) = input.read_key().context("unable to read key")? {
+                return Ok(Some(key));
+            }
+        }
+    })();
 
     // Close the timer event that we acquired.
     // We don't need to close the key event because it is owned globally.
@@ -73,24 +87,20 @@ pub fn wait_for_key(input: &mut Input, timeout: Duration) -> Result<bool> {
         // Store the result of the close event so we can determine if we can safely assert it.
         let close_event_result =
             uefi::boot::close_event(timer_event).context("unable to close timer event");
-        if event_result.is_err()
+        if result.is_err()
             && let Err(ref close_event_error) = close_event_result
         {
             // Log a warning if we failed to close the timer event.
-            // This is done to ensure we don't mask the wait_for_event error.
+            // This is done to ensure we don't mask the error from reading the key.
             warn!("unable to close timer event: {}", close_event_error);
         } else {
             // If we reach here, we can safely assert that the close event succeeded without
-            // masking the wait_for_event error.
+            // masking the error from reading the key.
             close_event_result?;
         }
     }
 
-    // Acquire the event that triggered.
-    let event = event_result?;
-
-    // The first event is the timer event, so any other event is the key event.
-    Ok(event != 0)
+    result
 }
 
 /// Shows a boot menu of the specified `style` to select a bootable entry to boot.

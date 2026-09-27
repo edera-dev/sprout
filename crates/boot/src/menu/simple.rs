@@ -1,5 +1,5 @@
 use crate::entries::BootableEntry;
-use crate::menu::{BootMenu, wait_for_key};
+use crate::menu::{BootMenu, read_key};
 use alloc::format;
 use alloc::string::String;
 use anyhow::{Context, Result, anyhow};
@@ -193,7 +193,7 @@ fn run(
 
         // Wait for a key, waking up every tick to update the countdown.
         let tick = remaining.map_or(TICK, |remaining| remaining.min(TICK));
-        if !wait_for_key(input, tick)? {
+        let Some(key) = read_key(input, tick)? else {
             // Without a countdown there's nothing to do until a key is pressed.
             let Some(left) = remaining else {
                 continue;
@@ -204,12 +204,6 @@ fn run(
                 return Ok(selected);
             }
             remaining = Some(left);
-            continue;
-        }
-
-        // Some firmware signals the key event without a key being available,
-        // in which case there is nothing to do.
-        let Some(key) = input.read_key().context("unable to read key")? else {
             continue;
         };
 
