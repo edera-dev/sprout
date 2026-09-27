@@ -2,6 +2,7 @@
 // Architecturally modified to support UEFI and remove x86 (32-bit) support.
 
 use core::time::Duration;
+use log::warn;
 
 /// Support for aarch64 timers.
 #[cfg(target_arch = "aarch64")]
@@ -35,7 +36,11 @@ impl TickFrequency {
     }
 
     /// Produce a duration from the provided elapsed `ticks` value.
+    /// If the frequency is unknown, the duration is zero.
     fn duration(&self, ticks: u64) -> Duration {
+        if self.ticks() == 0 {
+            return Duration::ZERO;
+        }
         let accuracy = self.nanos();
         let nanos = ticks as f64 * accuracy;
         Duration::from_nanos(nanos as u64)
@@ -56,9 +61,10 @@ fn arch_frequency() -> TickFrequency {
     let frequency = aarch64::frequency();
     #[cfg(target_arch = "x86_64")]
     let frequency = x86_64::frequency();
-    // If the frequency is 0, then something went very wrong and we should panic.
+    // Some firmware does not program the timer frequency. The timer is only used to report
+    // timestamps to the bootloader interface, so this should not prevent booting.
     if frequency.ticks() == 0 {
-        panic!("timer frequency is zero");
+        warn!("timer frequency is zero, timestamps will not be reported");
     }
     frequency
 }
