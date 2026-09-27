@@ -216,6 +216,13 @@ impl SecurityHook {
 
         // Acquire the lock to the global state and replace it.
         let mut global_state = GLOBAL_HOOK_STATE.lock();
+
+        // If the hook is already installed, the protocols contain our hooks.
+        // Storing them as the original hooks would cause infinite recursion on
+        // verification failure, so keep the existing state instead.
+        if global_state.is_some() {
+            return Ok(true);
+        }
         global_state.replace(state);
 
         // Install the hooks into the UEFI stack.
