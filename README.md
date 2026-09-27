@@ -85,7 +85,7 @@ We recommend running Sprout without Secure Boot for development, and with Secure
 - [ ] [Full-featured boot menu](https://github.com/edera-dev/sprout/issues/1)
 - [ ] [UKI support](https://github.com/edera-dev/sprout/issues/6): partial
 - [ ] [multiboot2 support](https://github.com/edera-dev/sprout/issues/7)
-- [ ] [Linux boot protocol (boot without EFI stub)](https://github.com/edera-dev/sprout/issues/7)
+- [ ] [Linux boot protocol (boot without EFI stub)](https://github.com/edera-dev/sprout/issues/8)
 
 ## Concepts
 
