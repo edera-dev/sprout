@@ -5,6 +5,7 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use anyhow::{Context, Result};
+use log::warn;
 use uefi::proto::device_path::DevicePath;
 use uefi::{Guid, guid};
 use uefi_raw::table::runtime::VariableVendor;
@@ -245,9 +246,14 @@ impl BootloaderInterface {
         }
 
         // Parse the value as a u64 to decode an numeric value.
-        let value = value
-            .parse::<u64>()
-            .context("unable to parse timeout value")?;
+        // An invalid value is ignored, as a bad variable should not prevent booting.
+        let value = match value.parse::<u64>() {
+            Ok(value) => value,
+            Err(error) => {
+                warn!("ignoring invalid {} value '{}': {}", key, value, error);
+                return Ok(None);
+            }
+        };
 
         // The specification says that a value of 0 means that the menu should be hidden.
         if value == 0 {
