@@ -16,7 +16,7 @@ Additionally, you will want to install the `efifs` package, which provides the f
 
 ```bash
 # Install the efifs package which provides filesystem support for Sprout.
-$ apk install efifs
+$ apk add efifs
 ```
 
 ## Step 2: Configure Sprout
