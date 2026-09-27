@@ -52,6 +52,9 @@ jobs:
       with:
         app-id: "${{ secrets.EDERA_CULTIVATION_APP_ID }}"
         private-key: "${{ secrets.EDERA_CULTIVATION_APP_PRIVATE_KEY }}"
+        # Scope to what uploading assets and `gh release edit` need: write to
+        # release contents.
+        permission-contents: write
       if: ${{ github.event.inputs.release-tag != '' }}
 
     - name: 'upload release artifacts'
