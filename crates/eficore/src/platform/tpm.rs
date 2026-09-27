@@ -1,8 +1,10 @@
 use anyhow::{Context, Result};
+use log::warn;
 use uefi::ResultExt;
 use uefi::boot::ScopedProtocol;
 use uefi::proto::tcg::PcrIndex;
 use uefi::proto::tcg::v2::{PcrEventInputs, Tcg};
+use uefi_raw::Status;
 use uefi_raw::protocol::tcg::EventType;
 use uefi_raw::protocol::tcg::v2::{Tcg2HashLogExtendEventFlags, Tcg2Protocol, Tcg2Version};
 
@@ -121,18 +123,33 @@ impl PlatformTpm {
         };
 
         // Encode the description as UTF-8.
-        let description = description.as_bytes().to_vec();
+        let encoded_description = description.as_bytes().to_vec();
 
         // Construct an event input for the TPM.
-        let event = PcrEventInputs::new_in_box(pcr_index, EventType::IPL, &description)
+        let event = PcrEventInputs::new_in_box(pcr_index, EventType::IPL, &encoded_description)
             .discard_errdata()
             .context("unable to construct pcr event inputs")?;
 
         // Log the event into the TPM.
-        handle
-            .protocol()
-            .hash_log_extend_event(Tcg2HashLogExtendEventFlags::empty(), buffer, &event)
-            .context("unable to log event to tpm")?;
+        let result = handle.protocol().hash_log_extend_event(
+            Tcg2HashLogExtendEventFlags::empty(),
+            buffer,
+            &event,
+        );
+
+        // A full event log means the PCR was extended, but the event could not be logged.
+        // The measurement still happened, so this should not prevent booting.
+        if let Err(ref error) = result
+            && error.status() == Status::VOLUME_FULL
+        {
+            warn!(
+                "tpm event log is full, unable to log event: {}",
+                description
+            );
+            return Ok(());
+        }
+
+        result.context("unable to log event to tpm")?;
         Ok(())
     }
 }
