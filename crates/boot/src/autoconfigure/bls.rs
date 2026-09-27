@@ -46,12 +46,22 @@ pub fn scan(
         .context("unable to check for BLS loader.conf file")?;
 
     // Whether we have an entries directory.
-    // We actually iterate the entries to see if there are any.
+    // We actually iterate the entries to see if there are any entry files, as the
+    // directory itself always has the "." and ".." items, even when it is empty.
     let has_entries_dir = filesystem
         .read_dir(bls_entries_path)
-        .ok()
-        .and_then(|mut iterator| iterator.next())
-        .map(|entry| entry.is_ok())
+        .map(|mut iterator| {
+            iterator.any(|entry| {
+                entry.is_ok_and(|entry| {
+                    entry.is_regular_file()
+                        && entry
+                            .file_name()
+                            .to_string()
+                            .to_lowercase()
+                            .ends_with(".conf")
+                })
+            })
+        })
         .unwrap_or(false);
 
     // Detect if a BLS supported configuration is on this filesystem.
