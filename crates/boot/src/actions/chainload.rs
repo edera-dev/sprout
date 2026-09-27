@@ -32,11 +32,6 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
     // It will determine if the image needs to be loaded via the shim or can be loaded directly.
     let image = ImageLoader::load(request)?;
 
-    // Open the LoadedImage protocol of the image to chainload.
-    let mut loaded_image_protocol =
-        uefi::boot::open_protocol_exclusive::<LoadedImage>(*image.handle())
-            .context("unable to open loaded image protocol")?;
-
     // Stamp and combine the options to pass to the image.
     let options = combine_options(context.stamp_iter(configuration.options.iter()));
 
@@ -54,12 +49,21 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
         bail!("chainloader options too large");
     }
 
-    // SAFETY: option size is checked to validate it is safe to pass.
-    // Additionally, the pointer is allocated and retained on heap, which makes
-    // passing the `options` pointer safe to the next image.
-    unsafe {
-        loaded_image_protocol
-            .set_load_options(options.as_ptr() as *const u8, options.num_bytes() as u32);
+    // Open the LoadedImage protocol of the image to chainload to pass the load options.
+    // This is done in a block to release the protocol before the image is started, as the
+    // image may itself need to open its LoadedImage protocol exclusively.
+    {
+        let mut loaded_image_protocol =
+            uefi::boot::open_protocol_exclusive::<LoadedImage>(*image.handle())
+                .context("unable to open loaded image protocol")?;
+
+        // SAFETY: option size is checked to validate it is safe to pass.
+        // Additionally, the pointer is allocated and retained on heap, which makes
+        // passing the `options` pointer safe to the next image.
+        unsafe {
+            loaded_image_protocol
+                .set_load_options(options.as_ptr() as *const u8, options.num_bytes() as u32);
+        }
     }
 
     // Stamp the initrd path, if provided.
