@@ -15,10 +15,12 @@ as an argument to boot.sh to boot the specified architecture.
 
 Sprout is split into multiple crates:
 
-- `edera-sprout-boot` as `crates/boot`: Bootloader entrypoint for Sprout.
+- `edera-sprout-boot` at `crates/boot`: Bootloader entrypoint for Sprout.
+- `edera-sprout-bls` at `crates/bls`: Parsing and sorting of Boot Loader Specification entries.
 - `edera-sprout-build` at `crates/build`: Build logic for Sprout.
 - `edera-sprout-config` at `crates/config`: Serialization structures for the Sprout configuration file.
 - `edera-sprout-eficore` at `crates/eficore`: Core library for Sprout EFI code.
+- `edera-sprout-parsing` at `crates/parsing`: Value stamping and other parsing helpers for Sprout.
 
 It is intended that overtime Sprout will be split into even more crates.
 
