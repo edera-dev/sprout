@@ -206,7 +206,9 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         // Pin the entry name to prevent prefixing.
         // This is needed as the bootloader interface requires the name to be
         // the same as the entry file name, minus the .conf extension.
-        boot.mark_pin_name();
+        if bls.pin_names {
+            boot.mark_pin_name();
+        }
 
         // Add the BLS entry to the list, along with the bootable entry.
         entries.push((entry, boot));

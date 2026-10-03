@@ -2,6 +2,7 @@ use crate::context::SproutContext;
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
 use edera_sprout_config::entries::EntryDeclaration;
+use edera_sprout_parsing::glob_match;
 
 /// Represents an entry that is stamped and ready to be booted.
 #[derive(Clone)]
@@ -105,18 +106,29 @@ impl BootableEntry {
     }
 
     /// Determine if this entry matches `needle` by comparing to the name or title of the entry.
-    /// If `needle` ends with *, we will match a partial match.
+    /// The `needle` is a glob pattern, where `*` matches any sequence of characters.
+    /// A `needle` without any `*` must equal the name or title exactly.
     pub fn is_match(&self, needle: &str) -> bool {
-        // If the needle ends with '*', we will accept a partial match.
-        if needle.ends_with("*") {
-            // Strip off any '*' at the end.
-            let partial = needle.trim_end_matches("*");
-            // Check if the name or title start with the partial match.
-            return self.name.starts_with(partial) || self.title.starts_with(partial);
-        }
+        glob_match(needle, &self.name) || glob_match(needle, &self.title)
+    }
 
-        // Standard quality matching rules.
-        self.name == needle || self.title == needle
+    /// Create a variant of this entry, with the name suffixed by `suffix` and using `context`.
+    /// The actions of the entry are stamped with `context`, the same as the list generator.
+    /// Variants of the same entry keep the sort key of this entry, so they stay grouped
+    /// together in the order they were created in.
+    pub fn variant(&self, suffix: &str, context: Rc<SproutContext>) -> Self {
+        let mut entry = self.clone();
+        entry.name.push_str(suffix);
+        entry.declaration.actions = context
+            .stamp_iter(entry.declaration.actions.iter())
+            .collect();
+        // Without any sort key, the name is used to sort, which differs between variants.
+        // Pin the sort key to the name of this entry to keep the variants together.
+        if entry.sort_key.is_none() && entry.declaration.sort_key.is_none() {
+            entry.sort_key = Some(self.name.clone());
+        }
+        entry.context = context;
+        entry
     }
 
     /// Set the sort key of the entry. This is used to sort entries via version comparison.

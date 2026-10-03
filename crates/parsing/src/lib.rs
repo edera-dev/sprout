@@ -172,6 +172,97 @@ pub fn initramfs_candidates(
     candidates.into_iter()
 }
 
+/// Matches `text` against a glob `pattern` where `*` matches any sequence of characters,
+/// including an empty one. Every other character matches itself exactly.
+/// A pattern without any `*` only matches `text` when they are equal.
+pub fn glob_match(pattern: &str, text: &str) -> bool {
+    let pattern = pattern.as_bytes();
+    let text = text.as_bytes();
+
+    // The current position in the pattern and the text.
+    let (mut p, mut t) = (0, 0);
+    // The position of the last `*` in the pattern and the text position it was tried at.
+    let mut backtrack: Option<(usize, usize)> = None;
+
+    while t < text.len() {
+        if p < pattern.len() && pattern[p] == b'*' {
+            // Try matching the `*` against nothing first, remembering where to resume.
+            backtrack = Some((p, t));
+            p += 1;
+        } else if p < pattern.len() && pattern[p] == text[t] {
+            p += 1;
+            t += 1;
+        } else if let Some((star, star_text)) = backtrack {
+            // Let the last `*` consume one more character and try again.
+            p = star + 1;
+            t = star_text + 1;
+            backtrack = Some((star, star_text + 1));
+        } else {
+            return false;
+        }
+    }
+
+    // Any remaining pattern must be made of `*` only.
+    pattern[p..].iter().all(|item| *item == b'*')
+}
+
+/// Determines whether every key in `rule` is present in `values` with a value
+/// that matches the glob pattern from `rule`. An empty rule never matches,
+/// so that an empty rule cannot accidentally match everything.
+pub fn rule_matches(rule: &BTreeMap<String, String>, values: &BTreeMap<String, String>) -> bool {
+    !rule.is_empty()
+        && rule.iter().all(|(key, pattern)| {
+            values
+                .get(key)
+                .is_some_and(|value| glob_match(pattern, value))
+        })
+}
+
+/// A single combination of variant choices produced by [build_variants].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VariantCombination {
+    /// The names of the chosen choices, in axis order.
+    pub names: Vec<String>,
+    /// The values to insert into the context for this combination.
+    /// Each axis name is set to the name of its chosen choice, and then
+    /// the values of each chosen choice are inserted.
+    pub values: BTreeMap<String, String>,
+}
+
+/// A variant axis, which is a name and a list of choices.
+/// Each choice is a name and the values it inserts.
+pub type VariantAxis = (String, Vec<(String, BTreeMap<String, String>)>);
+
+/// Builds every combination of the variant `axes`.
+/// Each axis is a name and a list of choices, where each choice is a name and a set of values.
+/// Combinations are produced in axis order, with the last axis varying fastest, and the
+/// choices of each axis in the order they are declared.
+/// No axes produce a single empty combination. An axis without any choices produces nothing.
+pub fn build_variants(axes: &[VariantAxis]) -> Vec<VariantCombination> {
+    let mut result = alloc::vec![VariantCombination {
+        names: Vec::new(),
+        values: BTreeMap::new(),
+    }];
+
+    for (axis, choices) in axes {
+        let mut next = Vec::new();
+        for combination in &result {
+            for (name, values) in choices {
+                let mut combination = combination.clone();
+                combination.names.push(name.clone());
+                combination.values.insert(axis.clone(), name.clone());
+                combination
+                    .values
+                    .extend(values.iter().map(|(k, v)| (k.clone(), v.clone())));
+                next.push(combination);
+            }
+        }
+        result = next;
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -483,5 +574,122 @@ mod tests {
     fn initramfs_candidates_empty_prefixes() {
         let candidates: Vec<_> = initramfs_candidates("-6.1.0", &[]).collect();
         assert!(candidates.is_empty());
+    }
+
+    #[test]
+    fn glob_without_star_is_exact() {
+        assert!(glob_match("abc", "abc"));
+        assert!(!glob_match("abc", "abcd"));
+        assert!(!glob_match("abc", "ab"));
+        assert!(glob_match("", ""));
+        assert!(!glob_match("", "a"));
+    }
+
+    #[test]
+    fn glob_trailing_star_is_prefix() {
+        assert!(glob_match("fedora-*", "fedora-6.1"));
+        assert!(glob_match("fedora-*", "fedora-"));
+        assert!(!glob_match("fedora-*", "linux-fedora-6.1"));
+    }
+
+    #[test]
+    fn glob_star_anywhere() {
+        assert!(glob_match(
+            "linux-*-graphics-debug",
+            "linux-abc-6.1-graphics-debug"
+        ));
+        assert!(!glob_match(
+            "linux-*-graphics-debug",
+            "linux-abc-6.1-serial-debug"
+        ));
+        assert!(glob_match("*rescue*", "0-rescue-abc"));
+        assert!(glob_match("*", ""));
+        assert!(glob_match("a**b", "ab"));
+        assert!(glob_match("*a*a*", "banana"));
+        assert!(!glob_match("*a*a*a*a*", "banana"));
+    }
+
+    #[test]
+    fn rule_requires_all_keys() {
+        let values = map(&[("console", "graphics"), ("mode", "debug")]);
+        assert!(rule_matches(
+            &map(&[("console", "graphics"), ("mode", "deb*")]),
+            &values
+        ));
+        assert!(!rule_matches(
+            &map(&[("console", "graphics"), ("mode", "normal")]),
+            &values
+        ));
+        assert!(!rule_matches(&map(&[("missing", "*")]), &values));
+        assert!(!rule_matches(&BTreeMap::new(), &values));
+    }
+
+    fn axis(name: &str, choices: &[(&str, &[(&str, &str)])]) -> VariantAxis {
+        (
+            name.to_string(),
+            choices
+                .iter()
+                .map(|(choice, values)| (choice.to_string(), map(values)))
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn variants_without_axes_produce_one_empty_combination() {
+        let result = build_variants(&[]);
+        assert_eq!(result.len(), 1);
+        assert!(result[0].names.is_empty());
+        assert!(result[0].values.is_empty());
+    }
+
+    #[test]
+    fn variants_with_empty_axis_produce_nothing() {
+        let result = build_variants(&[axis("a", &[("x", &[])]), axis("b", &[])]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn variants_are_ordered_and_set_values() {
+        let result = build_variants(&[
+            axis(
+                "console",
+                &[
+                    ("serial", &[("console-title", "Serial")]),
+                    ("graphics", &[("console-title", "Graphics")]),
+                ],
+            ),
+            axis(
+                "mode",
+                &[("normal", &[]), ("debug", &[("mode-title", " Debug")])],
+            ),
+        ]);
+        let names: Vec<String> = result.iter().map(|c| c.names.join("-")).collect();
+        assert_eq!(
+            names,
+            [
+                "serial-normal",
+                "serial-debug",
+                "graphics-normal",
+                "graphics-debug"
+            ]
+        );
+        assert_eq!(
+            result[3].values,
+            map(&[
+                ("console", "graphics"),
+                ("console-title", "Graphics"),
+                ("mode", "debug"),
+                ("mode-title", " Debug")
+            ])
+        );
+    }
+
+    #[test]
+    fn variant_choice_values_override_axis_name() {
+        let result = build_variants(&[axis("console", &[("serial", &[("console", "custom")])])]);
+        assert_eq!(
+            result[0].values.get("console").map(String::as_str),
+            Some("custom")
+        );
     }
 }
