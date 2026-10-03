@@ -411,23 +411,19 @@ fn run() -> Result<()> {
     }
 
     // Entries that have no boot counter tries left are never picked automatically.
-    // If every entry is bad, the default stays as it is so that the system still boots.
-    if entries
-        .iter()
-        .any(|entry| entry.is_default() && entry.is_bad())
-        && let Some(good) = entries.iter().position(|entry| !entry.is_bad())
-    {
-        for entry in &mut entries {
+    // If no entries are the default, pick the first usable entry as the default entry.
+    let default_flags = edera_sprout_bls::resolve_default_flags(
+        &entries
+            .iter()
+            .map(|entry| (entry.is_default(), entry.is_bad()))
+            .collect::<Vec<_>>(),
+    );
+    for (entry, default) in entries.iter_mut().zip(default_flags) {
+        if default {
+            entry.mark_default();
+        } else {
             entry.unmark_default();
         }
-        entries[good].mark_default();
-    }
-
-    // If no entries were the default, pick the first entry as the default entry.
-    if entries.iter().all(|entry| !entry.is_default())
-        && let Some(entry) = entries.first_mut()
-    {
-        entry.mark_default();
     }
 
     // Convert the menu timeout to a duration.

@@ -248,6 +248,29 @@ impl BootCounter {
     }
 }
 
+/// Decides which entries are the default. Each item of `entries` is `(is_default, is_bad)`,
+/// and the result says whether each entry is the default afterwards.
+/// Bad entries, which have no boot counter tries left, are never the default while a good entry
+/// exists. If no entry is a default, the first good entry is picked, or the first entry if every
+/// entry is bad, so that there is always something to boot.
+pub fn resolve_default_flags(entries: &[(bool, bool)]) -> Vec<bool> {
+    let any_good = entries.iter().any(|(_, bad)| !bad);
+    let mut flags: Vec<bool> = entries
+        .iter()
+        .map(|(default, bad)| *default && !(any_good && *bad))
+        .collect();
+    if !flags.iter().any(|default| *default) {
+        let pick = entries
+            .iter()
+            .position(|(_, bad)| !bad)
+            .or_else(|| (!entries.is_empty()).then_some(0));
+        if let Some(index) = pick {
+            flags[index] = true;
+        }
+    }
+    flags
+}
+
 /// Parses `value` as a number made only of ASCII digits.
 fn parse_digits(value: &str) -> Option<u32> {
     if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {
@@ -554,6 +577,43 @@ mod tests {
         let entry: BlsEntry = "linux /vmlinuz\n".parse().unwrap();
         assert!(entry.boot_counter.is_none());
         assert!(!entry.is_bad());
+    }
+
+    #[test]
+    fn default_flags_keep_a_good_default() {
+        // The second entry is bad and also matched the default pattern.
+        let flags = resolve_default_flags(&[(true, false), (true, true), (false, false)]);
+        assert_eq!(flags, [true, false, false]);
+    }
+
+    #[test]
+    fn default_flags_replace_a_bad_default_with_the_first_good_entry() {
+        let flags = resolve_default_flags(&[(false, false), (true, true), (false, false)]);
+        assert_eq!(flags, [true, false, false]);
+    }
+
+    #[test]
+    fn default_flags_fallback_skips_bad_entries() {
+        let flags = resolve_default_flags(&[(false, true), (false, false)]);
+        assert_eq!(flags, [false, true]);
+    }
+
+    #[test]
+    fn default_flags_when_every_entry_is_bad() {
+        // A configured default stays, otherwise the first entry is the default.
+        assert_eq!(
+            resolve_default_flags(&[(false, true), (true, true)]),
+            [false, true]
+        );
+        assert_eq!(
+            resolve_default_flags(&[(false, true), (false, true)]),
+            [true, false]
+        );
+    }
+
+    #[test]
+    fn default_flags_of_no_entries_are_empty() {
+        assert!(resolve_default_flags(&[]).is_empty());
     }
 
     #[test]
