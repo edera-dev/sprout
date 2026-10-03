@@ -17,7 +17,9 @@ pub struct BlsConfiguration {
     pub path: String,
     /// Whether generated entries keep the name of the BLS entry file as-is.
     /// When enabled, the generator name is not prepended, so the entry names match
-    /// the BLS entry ids used by tools like `bootctl set-default`. Two BLS generators
+    /// the BLS entry ids used by tools like `bootctl set-default`. Variants still append
+    /// their choice names, so entries of a generator with variants never match the ids
+    /// exactly, and are best selected with a pattern like `<id>-*`. Two BLS generators
     /// that read the same BLS directory will produce entries with the same names, so
     /// generators that reuse a BLS directory should disable this.
     #[serde(default = "default_pin_names", rename = "pin-names")]
