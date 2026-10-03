@@ -81,6 +81,7 @@ pub fn scan(
             ..Default::default()
         },
         path: format!("{}\\loader", root),
+        pin_names: true,
     };
 
     // Generate a unique name for the BLS generator and insert the generator into the configuration.
