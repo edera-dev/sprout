@@ -1,6 +1,7 @@
 #![no_std]
 extern crate alloc;
 
+use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use anyhow::{Error, Result};
@@ -181,6 +182,69 @@ impl BlsEntry {
     pub fn machine_id(&self) -> Option<String> {
         self.machine_id.clone()
     }
+}
+
+/// The boot counter of a BLS entry, encoded in the entry file name as `+<left>[-<done>]`.
+/// Reference: <https://uapi-group.org/specifications/specs/boot_loader_specification/#boot-counting>
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BootCounter {
+    /// The number of boot attempts left.
+    pub tries_left: u32,
+    /// The number of boot attempts already made.
+    pub tries_done: u32,
+}
+
+impl BootCounter {
+    /// Splits the entry file name `stem` (without `.conf`) into the entry id and its boot
+    /// counter. A stem without a valid counter is returned whole, with no counter.
+    pub fn parse(stem: &str) -> (&str, Option<Self>) {
+        Self::try_parse(stem).map_or((stem, None), |(id, counter)| (id, Some(counter)))
+    }
+
+    fn try_parse(stem: &str) -> Option<(&str, Self)> {
+        let (id, suffix) = stem.rsplit_once('+')?;
+        if id.is_empty() {
+            return None;
+        }
+        let (left, done) = suffix.split_once('-').unwrap_or((suffix, "0"));
+        Some((
+            id,
+            Self {
+                tries_left: parse_digits(left)?,
+                tries_done: parse_digits(done)?,
+            },
+        ))
+    }
+
+    /// Produces the counter after one more boot attempt.
+    pub fn decremented(&self) -> Self {
+        Self {
+            tries_left: self.tries_left.saturating_sub(1),
+            tries_done: self.tries_done.saturating_add(1),
+        }
+    }
+
+    /// Renders the entry file name stem for the entry `id` with this counter.
+    pub fn render(&self, id: &str) -> String {
+        if self.tries_done == 0 {
+            format!("{}+{}", id, self.tries_left)
+        } else {
+            format!("{}+{}-{}", id, self.tries_left, self.tries_done)
+        }
+    }
+
+    /// Whether the entry has run out of tries.
+    pub fn is_bad(&self) -> bool {
+        self.tries_left == 0
+    }
+}
+
+/// Parses `value` as a number made only of ASCII digits.
+fn parse_digits(value: &str) -> Option<u32> {
+    if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    value.parse().ok()
 }
 
 /// Sorts two BLS entries according to the BLS sort system.
@@ -437,6 +501,95 @@ mod tests {
             version: version.map(|s| s.to_string()),
             linux: Some("/vmlinuz".to_string()),
             ..BlsEntry::default()
+        }
+    }
+
+    #[test]
+    fn boot_counter_parse_without_suffix() {
+        assert_eq!(BootCounter::parse("foo"), ("foo", None));
+    }
+
+    #[test]
+    fn boot_counter_parse_tries_left_only() {
+        let (id, counter) = BootCounter::parse("foo+3");
+        assert_eq!(id, "foo");
+        assert_eq!(
+            counter,
+            Some(BootCounter {
+                tries_left: 3,
+                tries_done: 0
+            })
+        );
+    }
+
+    #[test]
+    fn boot_counter_parse_left_and_done() {
+        let (id, counter) = BootCounter::parse("fedora-6.5+2-1");
+        assert_eq!(id, "fedora-6.5");
+        assert_eq!(
+            counter,
+            Some(BootCounter {
+                tries_left: 2,
+                tries_done: 1
+            })
+        );
+    }
+
+    #[test]
+    fn boot_counter_parse_zero_tries_left() {
+        let (_, counter) = BootCounter::parse("foo+0-3");
+        assert!(counter.unwrap().is_bad());
+    }
+
+    #[test]
+    fn boot_counter_parse_rejects_malformed_suffixes() {
+        for stem in ["foo+", "foo+3-", "foo+a", "foo+3-x", "+3", "foo+-1"] {
+            assert_eq!(BootCounter::parse(stem), (stem, None), "{stem}");
+        }
+    }
+
+    #[test]
+    fn boot_counter_parse_rejects_overflow() {
+        let stem = "foo+99999999999";
+        assert_eq!(BootCounter::parse(stem), (stem, None));
+    }
+
+    #[test]
+    fn boot_counter_uses_the_last_plus() {
+        let (id, counter) = BootCounter::parse("a+b+2");
+        assert_eq!(id, "a+b");
+        assert_eq!(counter.unwrap().tries_left, 2);
+    }
+
+    #[test]
+    fn boot_counter_decremented_moves_a_try_to_done() {
+        let counter = BootCounter {
+            tries_left: 3,
+            tries_done: 0,
+        };
+        assert_eq!(
+            counter.decremented(),
+            BootCounter {
+                tries_left: 2,
+                tries_done: 1
+            }
+        );
+    }
+
+    #[test]
+    fn boot_counter_decremented_saturates_at_zero() {
+        let counter = BootCounter {
+            tries_left: 0,
+            tries_done: 3,
+        };
+        assert_eq!(counter.decremented().tries_left, 0);
+    }
+
+    #[test]
+    fn boot_counter_render_round_trips() {
+        for stem in ["foo+3", "foo+2-1", "foo+0-3"] {
+            let (id, counter) = BootCounter::parse(stem);
+            assert_eq!(counter.unwrap().render(id), stem);
         }
     }
 
