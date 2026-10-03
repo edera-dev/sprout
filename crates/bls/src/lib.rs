@@ -27,6 +27,9 @@ pub struct BlsEntry {
     pub version: Option<String>,
     /// The machine id of the entry.
     pub machine_id: Option<String>,
+    /// The boot counter of the entry, taken from the entry file name.
+    /// This is never set by parsing the file content.
+    pub boot_counter: Option<BootCounter>,
 }
 
 /// Parser for a BLS entry.
@@ -129,6 +132,7 @@ impl FromStr for BlsEntry {
             sort_key,
             version,
             machine_id,
+            boot_counter: None,
         })
     }
 }
@@ -181,6 +185,11 @@ impl BlsEntry {
     /// Fetches the machine id of the entry, if any.
     pub fn machine_id(&self) -> Option<String> {
         self.machine_id.clone()
+    }
+
+    /// Whether the entry has a boot counter with no tries left.
+    pub fn is_bad(&self) -> bool {
+        self.boot_counter.is_some_and(|counter| counter.is_bad())
     }
 }
 
@@ -272,6 +281,9 @@ pub fn sort_bls(a_bls: &BlsEntry, a_name: &str, b_bls: &BlsEntry, b_name: &str) 
         (None, Some(_)) => Ordering::Greater,
         (None, None) => Ordering::Equal,
     };
+
+    // Entries with no boot counter tries left sort after every other entry.
+    let ordering = a_bls.is_bad().cmp(&b_bls.is_bad()).then(ordering);
 
     // If all else is equal, compare the file names of both entries, sorting newer entries first.
     ordering.then_with(|| compare_versions(a_name, b_name).reverse())
@@ -502,6 +514,46 @@ mod tests {
             linux: Some("/vmlinuz".to_string()),
             ..BlsEntry::default()
         }
+    }
+
+    fn counted_entry(sort_key: &str, tries_left: u32) -> BlsEntry {
+        BlsEntry {
+            boot_counter: Some(BootCounter {
+                tries_left,
+                tries_done: 0,
+            }),
+            ..sort_entry(Some(sort_key), None, None)
+        }
+    }
+
+    #[test]
+    fn bad_entries_sort_after_good_entries() {
+        // "a" would normally sort first, but it has no tries left.
+        let bad = counted_entry("a", 0);
+        let good = counted_entry("z", 2);
+        assert_eq!(sort_bls(&bad, "bad", &good, "good"), Ordering::Greater);
+        assert_eq!(sort_bls(&good, "good", &bad, "bad"), Ordering::Less);
+    }
+
+    #[test]
+    fn bad_entries_sort_after_entries_without_counters() {
+        let bad = counted_entry("a", 0);
+        let plain = sort_entry(Some("z"), None, None);
+        assert_eq!(sort_bls(&bad, "bad", &plain, "plain"), Ordering::Greater);
+    }
+
+    #[test]
+    fn bad_entries_use_normal_order_among_themselves() {
+        let a = counted_entry("a", 0);
+        let b = counted_entry("b", 0);
+        assert_eq!(sort_bls(&a, "a", &b, "b"), Ordering::Less);
+    }
+
+    #[test]
+    fn parsed_entries_have_no_counter() {
+        let entry: BlsEntry = "linux /vmlinuz\n".parse().unwrap();
+        assert!(entry.boot_counter.is_none());
+        assert!(!entry.is_bad());
     }
 
     #[test]
