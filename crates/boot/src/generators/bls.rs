@@ -1,3 +1,4 @@
+use crate::boot_counter::BootCounterTarget;
 use crate::context::SproutContext;
 use crate::entries::BootableEntry;
 use alloc::{
@@ -8,7 +9,7 @@ use alloc::{
 };
 use anyhow::{Context, Result};
 use core::{cmp::Ordering, str::FromStr};
-use edera_sprout_bls::{BlsEntry, sort_bls};
+use edera_sprout_bls::{BlsEntry, BootCounter, sort_bls};
 use edera_sprout_config::generators::bls::BlsConfiguration;
 use log::warn;
 use uefi::{
@@ -108,6 +109,15 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
             continue;
         }
 
+        // Split the boot counter off the file name. The entry id never includes the counter, so
+        // that it stays the same as tries are consumed.
+        let file_name = entry.file_name().to_string();
+        let (id, boot_counter) = {
+            let (id, counter) = BootCounter::parse(&name);
+            (id.to_string(), counter)
+        };
+        let name = id;
+
         // Create a mutable path so we can append the file name to produce the full path.
         let mut full_entry_path = entries_path.to_path_buf();
         full_entry_path.push(entry.file_name());
@@ -133,13 +143,14 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         };
 
         // Parse the entry file as a BLS entry.
-        let entry = match BlsEntry::from_str(&content) {
+        let mut entry = match BlsEntry::from_str(&content) {
             Ok(entry) => entry,
             Err(error) => {
                 warn!("unable to parse bls entry {}: {}", name, error);
                 continue;
             }
         };
+        entry.boot_counter = boot_counter;
 
         // Ignore entries that are not valid for Sprout.
         if !entry.is_valid() {
@@ -195,6 +206,9 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         context.set("version", version);
         context.set("machine-id", machine_id);
 
+        // Keep the id for the boot counter, as the name is moved into the bootable entry.
+        let boot_id = name.clone();
+
         // Produce a new bootable entry.
         let mut boot = BootableEntry::new(
             name,
@@ -208,6 +222,17 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         // the same as the entry file name, minus the .conf extension.
         if bls.pin_names {
             boot.mark_pin_name();
+        }
+
+        // Record where the boot counter lives so a try can be consumed when this entry boots.
+        if let Some(counter) = boot_counter {
+            boot.set_boot_counter(BootCounterTarget {
+                counter,
+                filesystem: bls_resolved.filesystem_handle,
+                directory: entries_path.clone(),
+                id: boot_id,
+                file_name,
+            });
         }
 
         // Add the BLS entry to the list, along with the bootable entry.

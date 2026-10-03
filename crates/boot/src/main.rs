@@ -36,6 +36,9 @@ pub mod actions;
 /// autoconfigure: Autoconfigure Sprout based on the detected environment.
 pub mod autoconfigure;
 
+/// boot_counter: Consume the boot counter tries of BLS entries.
+pub mod boot_counter;
+
 /// config: Sprout configuration mechanism.
 pub mod config;
 
