@@ -10,3 +10,6 @@ edition.workspace = true
 [lib]
 name = "edera_sprout_build"
 path = "src/lib.rs"
+
+[dependencies]
+png.workspace = true

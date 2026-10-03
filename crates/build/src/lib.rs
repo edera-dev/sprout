@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::io::BufReader;
 use std::path::PathBuf;
 use std::{env, fs};
 
@@ -6,6 +8,12 @@ const SBAT_BLOCK_SIZE: usize = 512;
 
 /// Template contents for the sbat.generated.rs file.
 const SBAT_RS_TEMPLATE: &str = include_str!("sbat.template.rs");
+
+/// Template contents for the logo.generated.rs file.
+const LOGO_RS_TEMPLATE: &str = include_str!("logo.template.rs");
+
+/// The factor that the logo is shrunk by, as the source image is larger than the menu needs.
+const LOGO_DOWNSCALE: usize = 2;
 
 /// Pad with zeros the given `data` to a multiple of `block_size`.
 fn block_pad(data: &mut Vec<u8>, block_size: usize) {
@@ -73,4 +81,78 @@ pub fn generate_sbat_module() {
 
     // Write the sbat.generated.rs file to the output directory.
     fs::write(&rs_file, sbat_rs).expect("unable to write sbat.generated.rs");
+}
+
+/// Generate a logo module from the Sprout logo in the assets directory of the workspace.
+/// The logo is shrunk by averaging blocks of pixels and is stored as RGBA with premultiplied
+/// alpha, which keeps the work done at boot to blending the pixels onto the framebuffer.
+/// The output is included by a generated logo.generated.rs file.
+pub fn generate_logo_module() {
+    // The output directory to place the logo files into.
+    let output_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR not set"));
+
+    // The path to the root of the crate.
+    let crate_root =
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"));
+
+    // The logo is in the assets directory at the root of the workspace.
+    let logo_file = crate_root.join("../../assets/logo-small.png");
+
+    // Notify Cargo that if the logo changes, we need to regenerate the logo files.
+    println!(
+        "cargo:rerun-if-changed={}",
+        logo_file
+            .to_str()
+            .expect("unable to convert logo path file to a string")
+    );
+
+    // Decode the logo as 8-bit RGBA, which is how the logo is stored.
+    let decoder = png::Decoder::new(BufReader::new(
+        File::open(&logo_file).expect("unable to open logo"),
+    ));
+    let mut reader = decoder.read_info().expect("unable to read logo");
+    let mut source = vec![0; reader.output_buffer_size().expect("logo is too large")];
+    let info = reader
+        .next_frame(&mut source)
+        .expect("unable to decode logo");
+    assert_eq!(info.color_type, png::ColorType::Rgba, "logo is not RGBA");
+    assert_eq!(info.bit_depth, png::BitDepth::Eight, "logo is not 8-bit");
+
+    // Any pixels on the right and bottom that don't fill a block are dropped.
+    let width = info.width as usize / LOGO_DOWNSCALE;
+    let height = info.height as usize / LOGO_DOWNSCALE;
+    let block = (LOGO_DOWNSCALE * LOGO_DOWNSCALE) as u32;
+
+    let mut pixels = Vec::with_capacity(width * height * 4);
+    for y in 0..height {
+        for x in 0..width {
+            // Sum the premultiplied channels of every pixel in the block.
+            let mut sum = [0u32; 4];
+            for by in 0..LOGO_DOWNSCALE {
+                for bx in 0..LOGO_DOWNSCALE {
+                    let index =
+                        ((y * LOGO_DOWNSCALE + by) * info.width as usize + x * LOGO_DOWNSCALE + bx)
+                            * 4;
+                    let alpha = source[index + 3] as u32;
+                    for channel in 0..3 {
+                        sum[channel] += source[index + channel] as u32 * alpha / 255;
+                    }
+                    sum[3] += alpha;
+                }
+            }
+            pixels.extend(sum.map(|channel| (channel / block) as u8));
+        }
+    }
+
+    // Write the logo.rgba file to the output directory.
+    fs::write(output_dir.join("logo.rgba"), &pixels).expect("unable to write logo.rgba");
+
+    // Generate the contents of the logo.generated.rs file.
+    let logo_rs = LOGO_RS_TEMPLATE
+        .replace("{width}", &width.to_string())
+        .replace("{height}", &height.to_string());
+
+    // Write the logo.generated.rs file to the output directory.
+    fs::write(output_dir.join("logo.generated.rs"), logo_rs)
+        .expect("unable to write logo.generated.rs");
 }

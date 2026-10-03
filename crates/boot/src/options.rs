@@ -75,7 +75,7 @@ impl SproutOptions {
             Opt::value(ArgID::MenuTimeout, &["--menu-timeout"], "TIMEOUT")
                 .help_text("Boot menu timeout, in seconds"),
             Opt::value(ArgID::MenuStyle, &["--menu-style"], "STYLE")
-                .help_text("Boot menu style, basic or simple"),
+                .help_text("Boot menu style, basic, simple or graphical"),
             Opt::flag(ArgID::RetainBootConsole, &["--retain-boot-console"])
                 .help_text("Retain boot console before boot"),
         ]);
@@ -130,8 +130,9 @@ impl SproutOptions {
                             match value {
                                 "basic" => result.menu_style = Some(MenuStyle::Basic),
                                 "simple" => result.menu_style = Some(MenuStyle::Simple),
+                                "graphical" => result.menu_style = Some(MenuStyle::Graphical),
                                 _ => warn!(
-                                    "ignoring invalid {} value '{}': expected basic or simple",
+                                    "ignoring invalid {} value '{}': expected basic, simple or graphical",
                                     name, value
                                 ),
                             }

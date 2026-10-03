@@ -131,6 +131,9 @@ pub enum MenuStyle {
     #[default]
     #[serde(rename = "simple")]
     Simple,
+    /// A graphical menu that selects entries with the keyboard or the mouse.
+    #[serde(rename = "graphical")]
+    Graphical,
 }
 
 /// Get the latest version of the Sprout configuration format.

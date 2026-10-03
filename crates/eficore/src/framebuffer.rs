@@ -31,6 +31,27 @@ impl Framebuffer {
         })
     }
 
+    /// The width of the framebuffer in pixels.
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    /// The height of the framebuffer in pixels.
+    pub fn height(&self) -> usize {
+        self.height
+    }
+
+    /// Fill the rectangle at `x` and `y` of `width` and `height` with `color`.
+    /// The parts of the rectangle outside of the framebuffer are not drawn.
+    pub fn fill_rect(&mut self, x: usize, y: usize, width: usize, height: usize, color: BltPixel) {
+        let end_x = x.saturating_add(width).min(self.width);
+        let end_y = y.saturating_add(height).min(self.height);
+        for row in y..end_y {
+            // The row is in bounds, so its range is within the pixels.
+            self.pixels[row * self.width + x..row * self.width + end_x].fill(color);
+        }
+    }
+
     /// Mutably acquires a pixel of the framebuffer at the specified `x` and `y` coordinate.
     pub fn pixel(&mut self, x: usize, y: usize) -> Option<&mut BltPixel> {
         // Verify that the coordinates are within the bounds of the framebuffer.
