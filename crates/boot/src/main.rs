@@ -410,6 +410,19 @@ fn run() -> Result<()> {
         force_boot_entry = Some(bootloader_interface_oneshot_entry.clone());
     }
 
+    // Entries that have no boot counter tries left are never picked automatically.
+    // If every entry is bad, the default stays as it is so that the system still boots.
+    if entries
+        .iter()
+        .any(|entry| entry.is_default() && entry.is_bad())
+        && let Some(good) = entries.iter().position(|entry| !entry.is_bad())
+    {
+        for entry in &mut entries {
+            entry.unmark_default();
+        }
+        entries[good].mark_default();
+    }
+
     // If no entries were the default, pick the first entry as the default entry.
     if entries.iter().all(|entry| !entry.is_default())
         && let Some(entry) = entries.first_mut()
@@ -467,6 +480,21 @@ fn run() -> Result<()> {
 
     // Execute the late phase, now that the entry is chosen but before its actions are executed.
     phase(context.clone(), &config.phases.late).context("unable to execute late phase")?;
+
+    // Consume a try from the boot counter of the selected entry.
+    // Failing to do so must not prevent the entry from booting.
+    if let Some(target) = entry.boot_counter()
+        && !target.counter.is_bad()
+    {
+        match target.consume() {
+            Ok(path) => info!("updated boot counter of entry {}: {}", entry.name(), path),
+            Err(error) => warn!(
+                "unable to update boot counter of entry {}: {:#}",
+                entry.name(),
+                error
+            ),
+        }
+    }
 
     // Execute all the actions for the selected entry.
     for action in &entry.declaration().actions {
