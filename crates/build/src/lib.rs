@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::BufReader;
 use std::path::PathBuf;
 use std::{env, fs};
 
@@ -10,9 +8,11 @@ const SBAT_BLOCK_SIZE: usize = 512;
 const SBAT_RS_TEMPLATE: &str = include_str!("sbat.template.rs");
 
 /// Template contents for the logo.generated.rs file.
+#[cfg(not(target_os = "uefi"))]
 const LOGO_RS_TEMPLATE: &str = include_str!("logo.template.rs");
 
 /// The factor that the logo is shrunk by, as the source image is larger than the menu needs.
+#[cfg(not(target_os = "uefi"))]
 const LOGO_DOWNSCALE: usize = 2;
 
 /// Pad with zeros the given `data` to a multiple of `block_size`.
@@ -87,7 +87,11 @@ pub fn generate_sbat_module() {
 /// The logo is shrunk by averaging blocks of pixels and is stored as RGBA with premultiplied
 /// alpha, which keeps the work done at boot to blending the pixels onto the framebuffer.
 /// The output is included by a generated logo.generated.rs file.
+#[cfg(not(target_os = "uefi"))]
 pub fn generate_logo_module() {
+    use std::fs::File;
+    use std::io::BufReader;
+
     // The output directory to place the logo files into.
     let output_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR not set"));
 
