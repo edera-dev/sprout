@@ -10,3 +10,7 @@ edition.workspace = true
 [lib]
 name = "edera_sprout_build"
 path = "src/lib.rs"
+
+# The logo is only converted on the host, and png does not build for UEFI.
+[target.'cfg(not(target_os = "uefi"))'.dependencies]
+png.workspace = true

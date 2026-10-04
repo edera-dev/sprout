@@ -122,6 +122,8 @@ $ sprout.efi --boot="Boot Xen"
 $ sprout.efi --autoconfigure
 # Use the basic boot menu instead of the simple one.
 $ sprout.efi --menu-style=basic
+# Use the graphical boot menu, which can be used with the mouse.
+$ sprout.efi --menu-style=graphical
 ```
 
 ### Boot Linux from ESP

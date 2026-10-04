@@ -1,13 +1,16 @@
 use crate::entries::BootableEntry;
 use crate::menu::basic::BasicMenu;
+use crate::menu::graphical::GraphicalMenu;
 use crate::menu::simple::SimpleMenu;
 use alloc::vec;
+use alloc::vec::Vec;
 use anyhow::{Context, Result};
 use core::time::Duration;
 use edera_sprout_config::MenuStyle;
 use eficore::bootloader_interface::BootloaderInterface;
 use eficore::platform::timer::PlatformTimer;
 use log::warn;
+use uefi::Event;
 use uefi::ResultExt;
 use uefi::boot::TimerTrigger;
 use uefi::proto::console::text::{Input, Key};
@@ -15,6 +18,15 @@ use uefi_raw::table::boot::{EventType, Tpl};
 
 /// basic: A menu that prints the entries and selects them by number.
 pub mod basic;
+
+/// font: The bitmap font that the graphical menu draws text with.
+mod font;
+
+/// graphical: A menu drawn on the graphics output that is used with the keyboard or the mouse.
+pub mod graphical;
+
+/// logo: The Sprout logo that the graphical menu draws in a corner.
+mod logo;
 
 /// simple: A full-screen menu that selects entries with the arrow keys.
 pub mod simple;
@@ -108,6 +120,52 @@ pub fn read_key(input: &mut Input, timeout: Option<Duration>) -> Result<Option<K
     result
 }
 
+/// Wait until one of `events` is signaled, giving up once `timeout` passes.
+/// If `timeout` is [None], this waits for an event indefinitely.
+/// Returns the index of the event that was signaled, or [None] if the timeout passed.
+pub fn wait_for_events(events: &[Event], timeout: Option<Duration>) -> Result<Option<usize>> {
+    // Timer event for timeout.
+    // SAFETY: The timer event creation allocated a timer pointer on the UEFI heap.
+    // This is validated safe as long as we are in boot services.
+    let timer_event = unsafe {
+        uefi::boot::create_event_ex(EventType::TIMER, Tpl::CALLBACK, None, None, None)
+            .context("unable to create timer event")?
+    };
+
+    // The timer is the last event so the indexes of the events that were passed are kept.
+    // The events are only borrowed, so the timer is the only one that is closed.
+    // SAFETY: The cloned event is only used to wait, and is not closed.
+    let mut all: Vec<Event> = events
+        .iter()
+        .map(|event| unsafe { event.unsafe_clone() })
+        .collect();
+    all.push(unsafe { timer_event.unsafe_clone() });
+
+    let result = (|| {
+        // Without a timeout, the timer is never set, so it never triggers.
+        if let Some(timeout) = timeout {
+            let trigger = TimerTrigger::Relative(timeout.min(MAX_TIMER_DURATION));
+            uefi::boot::set_timer(&timer_event, trigger).context("unable to set timeout timer")?;
+        }
+
+        let index = uefi::boot::wait_for_event(&all)
+            .discard_errdata()
+            .context("unable to wait for event")?;
+        Ok((index != events.len()).then_some(index))
+    })();
+
+    // Close the timer event that we acquired, without masking an error from waiting.
+    if let Err(error) = uefi::boot::close_event(timer_event) {
+        if result.is_err() {
+            warn!("unable to close timer event: {}", error);
+        } else {
+            return Err(error).context("unable to close timer event");
+        }
+    }
+
+    result
+}
+
 /// Shows a boot menu of the specified `style` to select a bootable entry to boot.
 /// See [BootMenu::select] for how `timeout` is handled.
 pub fn select<'live>(
@@ -129,14 +187,30 @@ pub fn select<'live>(
     match style {
         MenuStyle::Basic => BasicMenu.select(timeout, entries),
 
-        // The simple menu needs a console that can move the cursor and set colors, which
-        // not every console supports. If it fails, the basic menu is used instead.
-        MenuStyle::Simple => SimpleMenu.select(timeout, entries).or_else(|error| {
+        // The graphical menu needs a graphics output, which not every machine has.
+        // If it fails, the simple menu is used instead, which falls back to the basic menu.
+        MenuStyle::Graphical => GraphicalMenu.select(timeout, entries).or_else(|error| {
             warn!(
-                "unable to show the simple boot menu, using the basic menu: {:#}",
+                "unable to show the graphical boot menu, using the simple menu: {:#}",
                 error
             );
-            BasicMenu.select(timeout, entries)
+            select_simple(timeout, entries)
         }),
+
+        // The simple menu needs a console that can move the cursor and set colors, which
+        // not every console supports. If it fails, the basic menu is used instead.
+        MenuStyle::Simple => select_simple(timeout, entries),
     }
+}
+
+/// Shows the simple boot menu, or the basic boot menu if the console does not support it.
+/// See [BootMenu::select] for how `timeout` is handled.
+fn select_simple(timeout: Option<Duration>, entries: &[BootableEntry]) -> Result<&BootableEntry> {
+    SimpleMenu.select(timeout, entries).or_else(|error| {
+        warn!(
+            "unable to show the simple boot menu, using the basic menu: {:#}",
+            error
+        );
+        BasicMenu.select(timeout, entries)
+    })
 }
