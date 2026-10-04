@@ -206,6 +206,103 @@ pub fn glob_match(pattern: &str, text: &str) -> bool {
     pattern[p..].iter().all(|item| *item == b'*')
 }
 
+/// One piece of a pattern for [fnmatch_ignore_case].
+enum FnmatchToken {
+    /// A byte that matches itself, already lowercased.
+    Literal(u8),
+    /// `?`, which matches any one byte.
+    Any,
+    /// `*`, which matches any sequence of bytes.
+    Star,
+    /// `[...]`, which matches a byte in any of the inclusive ranges, already lowercased.
+    Class(Vec<(u8, u8)>),
+}
+
+/// Splits `pattern` into tokens. An unterminated `[` matches itself.
+fn fnmatch_tokens(pattern: &[u8]) -> Vec<FnmatchToken> {
+    let mut tokens = Vec::new();
+    let mut index = 0;
+    while index < pattern.len() {
+        let byte = pattern[index];
+        index += 1;
+        match byte {
+            b'*' => tokens.push(FnmatchToken::Star),
+            b'?' => tokens.push(FnmatchToken::Any),
+            b'\\' if index < pattern.len() => {
+                tokens.push(FnmatchToken::Literal(pattern[index].to_ascii_lowercase()));
+                index += 1;
+            }
+            b'[' => match pattern[index..].iter().position(|item| *item == b']') {
+                Some(length) if length > 0 => {
+                    let class = &pattern[index..index + length];
+                    let mut ranges = Vec::new();
+                    let mut position = 0;
+                    while position < class.len() {
+                        let low = class[position].to_ascii_lowercase();
+                        if position + 2 < class.len() && class[position + 1] == b'-' {
+                            ranges.push((low, class[position + 2].to_ascii_lowercase()));
+                            position += 3;
+                        } else {
+                            ranges.push((low, low));
+                            position += 1;
+                        }
+                    }
+                    tokens.push(FnmatchToken::Class(ranges));
+                    index += length + 1;
+                }
+                _ => tokens.push(FnmatchToken::Literal(b'[')),
+            },
+            other => tokens.push(FnmatchToken::Literal(other.to_ascii_lowercase())),
+        }
+    }
+    tokens
+}
+
+/// Matches `text` against `pattern` the way systemd-boot matches entry ids: ignoring ASCII case,
+/// with `*` for any sequence, `?` for any one character, `[a-z]` sets and ranges, and `\` to
+/// escape the next character. Unlike [glob_match], this is for names that come from outside of
+/// the Sprout configuration, such as EFI variables and loader.conf.
+pub fn fnmatch_ignore_case(pattern: &str, text: &str) -> bool {
+    let tokens = fnmatch_tokens(pattern.as_bytes());
+    let text = text.as_bytes();
+
+    let (mut t, mut p) = (0, 0);
+    let mut backtrack: Option<(usize, usize)> = None;
+    while t < text.len() {
+        let byte = text[t].to_ascii_lowercase();
+        let matched = match tokens.get(p) {
+            Some(FnmatchToken::Literal(literal)) => *literal == byte,
+            Some(FnmatchToken::Any) => true,
+            Some(FnmatchToken::Class(ranges)) => ranges
+                .iter()
+                .any(|(low, high)| (*low..=*high).contains(&byte)),
+            Some(FnmatchToken::Star) => {
+                // Try matching the `*` against nothing first, remembering where to resume.
+                backtrack = Some((p, t));
+                p += 1;
+                continue;
+            }
+            None => false,
+        };
+        if matched {
+            p += 1;
+            t += 1;
+        } else if let Some((star, star_text)) = backtrack {
+            // Let the last `*` consume one more character and try again.
+            p = star + 1;
+            t = star_text + 1;
+            backtrack = Some((star, star_text + 1));
+        } else {
+            return false;
+        }
+    }
+
+    // Any remaining pattern must be made of `*` only.
+    tokens[p..]
+        .iter()
+        .all(|token| matches!(token, FnmatchToken::Star))
+}
+
 /// Determines whether every key in `rule` is present in `values` with a value
 /// that matches the glob pattern from `rule`. An empty rule never matches,
 /// so that an empty rule cannot accidentally match everything.
@@ -574,6 +671,55 @@ mod tests {
     fn initramfs_candidates_empty_prefixes() {
         let candidates: Vec<_> = initramfs_candidates("-6.1.0", &[]).collect();
         assert!(candidates.is_empty());
+    }
+
+    #[test]
+    fn fnmatch_ignores_ascii_case() {
+        assert!(fnmatch_ignore_case("Foo.CONF", "foo.conf"));
+        assert!(fnmatch_ignore_case("fedora-*", "Fedora-6.5.conf"));
+        assert!(!fnmatch_ignore_case("fedora", "fedora.conf"));
+    }
+
+    #[test]
+    fn fnmatch_question_mark_matches_one_character() {
+        assert!(fnmatch_ignore_case("a?c", "abc"));
+        assert!(!fnmatch_ignore_case("a?c", "ac"));
+        assert!(!fnmatch_ignore_case("a?c", "abbc"));
+    }
+
+    #[test]
+    fn fnmatch_brackets_match_sets_and_ranges() {
+        assert!(fnmatch_ignore_case("linux-[0-9].conf", "linux-7.conf"));
+        assert!(!fnmatch_ignore_case("linux-[0-9].conf", "linux-x.conf"));
+        assert!(fnmatch_ignore_case("[ab]c", "bc"));
+        assert!(!fnmatch_ignore_case("[ab]c", "cc"));
+        assert!(fnmatch_ignore_case("[A-C]x", "bx"));
+    }
+
+    #[test]
+    fn fnmatch_backslash_escapes_the_next_character() {
+        assert!(fnmatch_ignore_case("a\\*b", "a*b"));
+        assert!(!fnmatch_ignore_case("a\\*b", "aXb"));
+        assert!(fnmatch_ignore_case("a\\?", "a?"));
+    }
+
+    #[test]
+    fn fnmatch_star_backtracks() {
+        assert!(fnmatch_ignore_case("*-*-1.conf", "a-b-c-1.conf"));
+        assert!(fnmatch_ignore_case("*", ""));
+        assert!(!fnmatch_ignore_case("*x", "abc"));
+    }
+
+    #[test]
+    fn fnmatch_unterminated_bracket_is_a_literal() {
+        assert!(fnmatch_ignore_case("a[b", "a[b"));
+        assert!(!fnmatch_ignore_case("a[b", "ab"));
+    }
+
+    #[test]
+    fn fnmatch_empty_pattern_only_matches_empty_text() {
+        assert!(fnmatch_ignore_case("", ""));
+        assert!(!fnmatch_ignore_case("", "a"));
     }
 
     #[test]
