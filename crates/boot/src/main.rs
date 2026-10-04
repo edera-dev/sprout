@@ -426,11 +426,16 @@ fn run() -> Result<()> {
 
     // The loader.conf default entry, where @saved selects the entry of the previous boot.
     let use_saved_entry = loader_conf.default.as_deref() == Some("@saved");
-    let loader_conf_default_entry = if use_saved_entry {
+    let saved_entry = if use_saved_entry {
         advisory(
             BootloaderInterface::get_last_booted_entry()
                 .context("unable to get last booted entry from bootloader interface"),
         )
+    } else {
+        None
+    };
+    let loader_conf_default_entry = if use_saved_entry {
+        saved_entry.clone()
     } else {
         loader_conf.default.clone()
     };
@@ -457,7 +462,13 @@ fn run() -> Result<()> {
                 entry.is_match(&pattern)
             }
         };
-        if entries.iter().any(matches) {
+        // A source that only matches entries with no boot counter tries left is skipped while
+        // another source could pick a usable entry, unless every entry is bad.
+        let any_usable = entries.iter().any(|entry| !entry.is_bad());
+        if entries
+            .iter()
+            .any(|entry| matches(entry) && (!any_usable || !entry.is_bad()))
+        {
             // Mark the matching entries as the default and unmark all the others.
             for entry in &mut entries {
                 if matches(entry) {
@@ -545,7 +556,8 @@ fn run() -> Result<()> {
     );
 
     // Save the selected entry for the next boot when loader.conf asks for it.
-    if use_saved_entry {
+    // A forced boot, such as a one-shot entry, is not saved, and neither is an unchanged value.
+    if use_saved_entry && forced_entry.is_none() && saved_entry.as_deref() != Some(entry.name()) {
         advisory(
             BootloaderInterface::set_last_booted_entry(entry.name())
                 .context("unable to save last booted entry in bootloader interface"),
