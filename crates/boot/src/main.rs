@@ -333,6 +333,12 @@ fn run() -> Result<()> {
             .context("unable to set entries in bootloader interface"),
     );
 
+    // Load the loader.conf of the partition Sprout was loaded from.
+    let loader_conf = load_loader_conf(&context).context("unable to load loader.conf")?;
+    for warning in &loader_conf.warnings {
+        warn!("{}", warning);
+    }
+
     // Acquire the timeouts from the bootloader interface.
     let bootloader_interface_timeouts = advisory(
         BootloaderInterface::get_timeouts().context("unable to get bootloader interface timeouts"),
@@ -349,12 +355,6 @@ fn run() -> Result<()> {
         BootloaderInterface::get_oneshot_entry()
             .context("unable to get bootloader interface oneshot entry"),
     );
-
-    // Load the loader.conf of the partition Sprout was loaded from.
-    let loader_conf = load_loader_conf(&context).context("unable to load loader.conf")?;
-    for warning in &loader_conf.warnings {
-        warn!("{}", warning);
-    }
 
     // If --boot is specified, boot that entry immediately.
     let mut force_boot_entry = context.root().options().boot.clone();
@@ -576,10 +576,7 @@ fn run() -> Result<()> {
             Ok(path) => {
                 info!("updated boot counter of entry {}: {}", entry.name(), path);
                 // Tell the system where the counter is, so it can mark the boot as good.
-                let path = format!(
-                    "/{}",
-                    path.to_string().replace('\\', "/").trim_start_matches('/')
-                );
+                let path = edera_sprout_bls::boot_path(&path.to_string());
                 advisory(
                     BootloaderInterface::set_boot_count_path(&path)
                         .context("unable to set boot count path in bootloader interface"),
