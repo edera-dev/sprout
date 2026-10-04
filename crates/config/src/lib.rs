@@ -111,12 +111,37 @@ pub struct MenuStylesConfiguration {
 }
 
 /// Settings for the graphical boot menu.
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GraphicalMenuConfiguration {
     /// Enables selecting entries with the mouse, and shows the cursor. When disabled, or when
     /// the firmware has no pointing device, entries are selected with the keyboard only.
     #[serde(rename = "enable-mouse", default)]
     pub enable_mouse: bool,
+
+    /// Shows the Sprout logo next to the name above the entries. When disabled, only the name is
+    /// shown.
+    #[serde(rename = "enable-logo", default = "default_true")]
+    pub enable_logo: bool,
+
+    /// Animates the logo, which bounces. When disabled, the logo stays still.
+    #[serde(rename = "enable-animation", default = "default_true")]
+    pub enable_animation: bool,
+}
+
+/// The default graphical menu settings, which match an empty graphical section.
+impl Default for GraphicalMenuConfiguration {
+    fn default() -> Self {
+        Self {
+            enable_mouse: false,
+            enable_logo: true,
+            enable_animation: true,
+        }
+    }
+}
+
+/// The default for settings that are on unless they are turned off.
+fn default_true() -> bool {
+    true
 }
 
 /// The default configuration, which matches an empty configuration file.
@@ -201,6 +226,16 @@ mod tests {
                 .enable_mouse
         );
         assert!(!empty().menu_styles.graphical.enable_mouse);
+    }
+
+    #[test]
+    fn graphical_logo_and_animation_are_on_by_default() {
+        let graphical = RootConfiguration::default().menu_styles.graphical;
+        assert!(graphical.enable_logo);
+        assert!(graphical.enable_animation);
+        let graphical = empty().menu_styles.graphical;
+        assert!(graphical.enable_logo);
+        assert!(graphical.enable_animation);
     }
 
     #[test]

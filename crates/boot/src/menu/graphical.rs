@@ -94,6 +94,10 @@ const CURSOR: [&str; 16] = [
 pub struct GraphicalMenu {
     /// Whether the mouse is used when the firmware has a pointing device.
     pub enable_mouse: bool,
+    /// Whether the logo is drawn next to the name.
+    pub enable_logo: bool,
+    /// Whether the logo bounces.
+    pub enable_animation: bool,
 }
 
 /// The pointing devices of the firmware.
@@ -231,8 +235,8 @@ struct Layout {
     columns: usize,
     /// The row of the line between the entries and the status line.
     footer: usize,
-    /// The column, row, width and height of the logo when it is on the ground.
-    logo: (usize, usize, usize, usize),
+    /// The column, row, width and height of the logo when it is on the ground, if it is shown.
+    logo: Option<(usize, usize, usize, usize)>,
     /// How many pixels the logo rises while it bounces.
     bounce: usize,
     /// The column, row and scale of the name, if there is room for it.
@@ -243,7 +247,7 @@ struct Layout {
 
 impl Layout {
     /// Calculate the layout of `entries` on a framebuffer of `screen` width and height.
-    fn new(screen: (usize, usize), entries: &[BootableEntry]) -> Self {
+    fn new(screen: (usize, usize), entries: &[BootableEntry], logo: bool, animate: bool) -> Self {
         let (width, height) = screen;
 
         // Large screens get larger text so that it stays readable, but not so large that the
@@ -286,16 +290,18 @@ impl Layout {
             (header, visible) = fit(logo_height);
         }
         let logo_width = logo_height * LOGO_WIDTH / LOGO_HEIGHT;
-        let bounce = logo_height / 16;
+        let bounce = if animate { logo_height / 16 } else { 0 };
 
         // The name is next to the logo, if the two fit together.
         let title_scale = (logo_height / 32).clamp(scale, scale * 3);
         let title_width = TITLE.len() * GLYPH_SIZE * title_scale;
-        let fits = logo_width + cell + title_width <= width.saturating_sub(margin * 2);
-        let group = if fits {
-            logo_width + cell + title_width
-        } else {
-            logo_width
+        // Without the logo, the name is alone and takes the place of the group.
+        let shown = if logo { logo_width + cell } else { 0 };
+        let fits = shown + title_width <= width.saturating_sub(margin * 2);
+        let group = match (logo, fits) {
+            (true, true) => shown + title_width,
+            (true, false) => logo_width,
+            (false, _) => title_width,
         };
         let group_x = width.saturating_sub(group) / 2;
 
@@ -325,10 +331,10 @@ impl Layout {
             text_x: panel_x + padding + cell,
             columns: list_width.saturating_sub(cell * 2) / cell,
             footer: list_y + list + cell,
-            logo: (group_x, top + bounce, logo_width, logo_height),
+            logo: logo.then_some((group_x, top + bounce, logo_width, logo_height)),
             bounce,
             title: fits.then_some((
-                group_x + logo_width + cell,
+                group_x + shown,
                 top + bounce + logo_height.saturating_sub(GLYPH_SIZE * title_scale) / 2,
                 title_scale,
             )),
@@ -375,7 +381,11 @@ impl Screen {
     /// Open every display that the firmware has, or fail if it has none.
     /// The console splitter has a graphics output that draws to every display. It has no device
     /// path, so it is only used if there are no outputs for the displays themselves.
-    fn open_all(entries: &[BootableEntry]) -> Result<Vec<Self>> {
+    fn open_all(
+        entries: &[BootableEntry],
+        enable_logo: bool,
+        enable_animation: bool,
+    ) -> Result<Vec<Self>> {
         let handles = uefi::boot::find_handles::<GraphicsOutput>()
             .context("unable to find a graphics output")?;
         let has_device_path = |handle: &Handle| {
@@ -412,7 +422,7 @@ impl Screen {
             ) else {
                 continue;
             };
-            let layout = Layout::new((width, height), entries);
+            let layout = Layout::new((width, height), entries, enable_logo, enable_animation);
             render_base(&mut base, &layout);
             screens.push(Self {
                 gop,
@@ -604,7 +614,9 @@ fn draw_centered(
 
 /// Draw the logo above the entries, bouncing a little with each of `ticks`.
 fn draw_logo(fb: &mut Framebuffer, layout: &Layout, ticks: usize) {
-    let (x, floor, width, height) = layout.logo;
+    let Some((x, floor, width, height)) = layout.logo else {
+        return;
+    };
 
     // The logo rises and falls by up to `bounce` pixels.
     let phase = ticks % BOUNCE_TICKS;
@@ -930,7 +942,7 @@ impl BootMenu for GraphicalMenu {
             return Ok(&entries[default]);
         }
 
-        let mut screens = Screen::open_all(entries)?;
+        let mut screens = Screen::open_all(entries, self.enable_logo, self.enable_animation)?;
         let mut mouse = self.enable_mouse.then(Mouse::open).flatten();
 
         let result = uefi::system::with_stdin(|input| {
