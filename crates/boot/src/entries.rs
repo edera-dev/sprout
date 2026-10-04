@@ -1,3 +1,4 @@
+use crate::boot_counter::BootCounterTarget;
 use crate::context::SproutContext;
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
@@ -14,6 +15,7 @@ pub struct BootableEntry {
     default: bool,
     pin_name: bool,
     sort_key: Option<String>,
+    boot_counter: Option<BootCounterTarget>,
 }
 
 impl BootableEntry {
@@ -32,6 +34,7 @@ impl BootableEntry {
             default: false,
             pin_name: false,
             sort_key: None,
+            boot_counter: None,
         }
     }
 
@@ -98,6 +101,23 @@ impl BootableEntry {
     /// Mark this entry as being pinned, which prevents prefixing.
     pub fn mark_pin_name(&mut self) {
         self.pin_name = true;
+    }
+
+    /// Record where the boot counter of this entry is stored.
+    pub fn set_boot_counter(&mut self, target: BootCounterTarget) {
+        self.boot_counter = Some(target);
+    }
+
+    /// Fetch where the boot counter of this entry is stored, if it has one.
+    pub fn boot_counter(&self) -> Option<&BootCounterTarget> {
+        self.boot_counter.as_ref()
+    }
+
+    /// Fetch whether the entry has a boot counter with no tries left.
+    pub fn is_bad(&self) -> bool {
+        self.boot_counter
+            .as_ref()
+            .is_some_and(|target| target.counter.is_bad())
     }
 
     /// Prepend the name of the entry with `prefix`.

@@ -1,6 +1,7 @@
 #![no_std]
 extern crate alloc;
 
+use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use anyhow::{Error, Result};
@@ -26,6 +27,9 @@ pub struct BlsEntry {
     pub version: Option<String>,
     /// The machine id of the entry.
     pub machine_id: Option<String>,
+    /// The boot counter of the entry, taken from the entry file name.
+    /// This is never set by parsing the file content.
+    pub boot_counter: Option<BootCounter>,
 }
 
 /// Parser for a BLS entry.
@@ -128,6 +132,7 @@ impl FromStr for BlsEntry {
             sort_key,
             version,
             machine_id,
+            boot_counter: None,
         })
     }
 }
@@ -181,6 +186,97 @@ impl BlsEntry {
     pub fn machine_id(&self) -> Option<String> {
         self.machine_id.clone()
     }
+
+    /// Whether the entry has a boot counter with no tries left.
+    pub fn is_bad(&self) -> bool {
+        self.boot_counter.is_some_and(|counter| counter.is_bad())
+    }
+}
+
+/// The boot counter of a BLS entry, encoded in the entry file name as `+<left>[-<done>]`.
+/// Reference: <https://uapi-group.org/specifications/specs/boot_loader_specification/#boot-counting>
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BootCounter {
+    /// The number of boot attempts left.
+    pub tries_left: u32,
+    /// The number of boot attempts already made.
+    pub tries_done: u32,
+}
+
+impl BootCounter {
+    /// Splits the entry file name `stem` (without `.conf`) into the entry id and its boot
+    /// counter. A stem without a valid counter is returned whole, with no counter.
+    pub fn parse(stem: &str) -> (&str, Option<Self>) {
+        Self::try_parse(stem).map_or((stem, None), |(id, counter)| (id, Some(counter)))
+    }
+
+    fn try_parse(stem: &str) -> Option<(&str, Self)> {
+        let (id, suffix) = stem.rsplit_once('+')?;
+        if id.is_empty() {
+            return None;
+        }
+        let (left, done) = suffix.split_once('-').unwrap_or((suffix, "0"));
+        Some((
+            id,
+            Self {
+                tries_left: parse_digits(left)?,
+                tries_done: parse_digits(done)?,
+            },
+        ))
+    }
+
+    /// Produces the counter after one more boot attempt.
+    pub fn decremented(&self) -> Self {
+        Self {
+            tries_left: self.tries_left.saturating_sub(1),
+            tries_done: self.tries_done.saturating_add(1),
+        }
+    }
+
+    /// Renders the entry file name stem for the entry `id` with this counter.
+    pub fn render(&self, id: &str) -> String {
+        if self.tries_done == 0 {
+            format!("{}+{}", id, self.tries_left)
+        } else {
+            format!("{}+{}-{}", id, self.tries_left, self.tries_done)
+        }
+    }
+
+    /// Whether the entry has run out of tries.
+    pub fn is_bad(&self) -> bool {
+        self.tries_left == 0
+    }
+}
+
+/// Decides which entries are the default. Each item of `entries` is `(is_default, is_bad)`,
+/// and the result says whether each entry is the default afterwards.
+/// Bad entries, which have no boot counter tries left, are never the default while a good entry
+/// exists. If no entry is a default, the first good entry is picked, or the first entry if every
+/// entry is bad, so that there is always something to boot.
+pub fn resolve_default_flags(entries: &[(bool, bool)]) -> Vec<bool> {
+    let any_good = entries.iter().any(|(_, bad)| !bad);
+    let mut flags: Vec<bool> = entries
+        .iter()
+        .map(|(default, bad)| *default && !(any_good && *bad))
+        .collect();
+    if !flags.iter().any(|default| *default) {
+        let pick = entries
+            .iter()
+            .position(|(_, bad)| !bad)
+            .or_else(|| (!entries.is_empty()).then_some(0));
+        if let Some(index) = pick {
+            flags[index] = true;
+        }
+    }
+    flags
+}
+
+/// Parses `value` as a number made only of ASCII digits.
+fn parse_digits(value: &str) -> Option<u32> {
+    if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    value.parse().ok()
 }
 
 /// Sorts two BLS entries according to the BLS sort system.
@@ -208,6 +304,9 @@ pub fn sort_bls(a_bls: &BlsEntry, a_name: &str, b_bls: &BlsEntry, b_name: &str) 
         (None, Some(_)) => Ordering::Greater,
         (None, None) => Ordering::Equal,
     };
+
+    // Entries with no boot counter tries left sort after every other entry.
+    let ordering = a_bls.is_bad().cmp(&b_bls.is_bad()).then(ordering);
 
     // If all else is equal, compare the file names of both entries, sorting newer entries first.
     ordering.then_with(|| compare_versions(a_name, b_name).reverse())
@@ -437,6 +536,172 @@ mod tests {
             version: version.map(|s| s.to_string()),
             linux: Some("/vmlinuz".to_string()),
             ..BlsEntry::default()
+        }
+    }
+
+    fn counted_entry(sort_key: &str, tries_left: u32) -> BlsEntry {
+        BlsEntry {
+            boot_counter: Some(BootCounter {
+                tries_left,
+                tries_done: 0,
+            }),
+            ..sort_entry(Some(sort_key), None, None)
+        }
+    }
+
+    #[test]
+    fn bad_entries_sort_after_good_entries() {
+        // "a" would normally sort first, but it has no tries left.
+        let bad = counted_entry("a", 0);
+        let good = counted_entry("z", 2);
+        assert_eq!(sort_bls(&bad, "bad", &good, "good"), Ordering::Greater);
+        assert_eq!(sort_bls(&good, "good", &bad, "bad"), Ordering::Less);
+    }
+
+    #[test]
+    fn bad_entries_sort_after_entries_without_counters() {
+        let bad = counted_entry("a", 0);
+        let plain = sort_entry(Some("z"), None, None);
+        assert_eq!(sort_bls(&bad, "bad", &plain, "plain"), Ordering::Greater);
+    }
+
+    #[test]
+    fn bad_entries_use_normal_order_among_themselves() {
+        let a = counted_entry("a", 0);
+        let b = counted_entry("b", 0);
+        assert_eq!(sort_bls(&a, "a", &b, "b"), Ordering::Less);
+    }
+
+    #[test]
+    fn parsed_entries_have_no_counter() {
+        let entry: BlsEntry = "linux /vmlinuz\n".parse().unwrap();
+        assert!(entry.boot_counter.is_none());
+        assert!(!entry.is_bad());
+    }
+
+    #[test]
+    fn default_flags_keep_a_good_default() {
+        // The second entry is bad and also matched the default pattern.
+        let flags = resolve_default_flags(&[(true, false), (true, true), (false, false)]);
+        assert_eq!(flags, [true, false, false]);
+    }
+
+    #[test]
+    fn default_flags_replace_a_bad_default_with_the_first_good_entry() {
+        let flags = resolve_default_flags(&[(false, false), (true, true), (false, false)]);
+        assert_eq!(flags, [true, false, false]);
+    }
+
+    #[test]
+    fn default_flags_fallback_skips_bad_entries() {
+        let flags = resolve_default_flags(&[(false, true), (false, false)]);
+        assert_eq!(flags, [false, true]);
+    }
+
+    #[test]
+    fn default_flags_when_every_entry_is_bad() {
+        // A configured default stays, otherwise the first entry is the default.
+        assert_eq!(
+            resolve_default_flags(&[(false, true), (true, true)]),
+            [false, true]
+        );
+        assert_eq!(
+            resolve_default_flags(&[(false, true), (false, true)]),
+            [true, false]
+        );
+    }
+
+    #[test]
+    fn default_flags_of_no_entries_are_empty() {
+        assert!(resolve_default_flags(&[]).is_empty());
+    }
+
+    #[test]
+    fn boot_counter_parse_without_suffix() {
+        assert_eq!(BootCounter::parse("foo"), ("foo", None));
+    }
+
+    #[test]
+    fn boot_counter_parse_tries_left_only() {
+        let (id, counter) = BootCounter::parse("foo+3");
+        assert_eq!(id, "foo");
+        assert_eq!(
+            counter,
+            Some(BootCounter {
+                tries_left: 3,
+                tries_done: 0
+            })
+        );
+    }
+
+    #[test]
+    fn boot_counter_parse_left_and_done() {
+        let (id, counter) = BootCounter::parse("fedora-6.5+2-1");
+        assert_eq!(id, "fedora-6.5");
+        assert_eq!(
+            counter,
+            Some(BootCounter {
+                tries_left: 2,
+                tries_done: 1
+            })
+        );
+    }
+
+    #[test]
+    fn boot_counter_parse_zero_tries_left() {
+        let (_, counter) = BootCounter::parse("foo+0-3");
+        assert!(counter.unwrap().is_bad());
+    }
+
+    #[test]
+    fn boot_counter_parse_rejects_malformed_suffixes() {
+        for stem in ["foo+", "foo+3-", "foo+a", "foo+3-x", "+3", "foo+-1"] {
+            assert_eq!(BootCounter::parse(stem), (stem, None), "{stem}");
+        }
+    }
+
+    #[test]
+    fn boot_counter_parse_rejects_overflow() {
+        let stem = "foo+99999999999";
+        assert_eq!(BootCounter::parse(stem), (stem, None));
+    }
+
+    #[test]
+    fn boot_counter_uses_the_last_plus() {
+        let (id, counter) = BootCounter::parse("a+b+2");
+        assert_eq!(id, "a+b");
+        assert_eq!(counter.unwrap().tries_left, 2);
+    }
+
+    #[test]
+    fn boot_counter_decremented_moves_a_try_to_done() {
+        let counter = BootCounter {
+            tries_left: 3,
+            tries_done: 0,
+        };
+        assert_eq!(
+            counter.decremented(),
+            BootCounter {
+                tries_left: 2,
+                tries_done: 1
+            }
+        );
+    }
+
+    #[test]
+    fn boot_counter_decremented_saturates_at_zero() {
+        let counter = BootCounter {
+            tries_left: 0,
+            tries_done: 3,
+        };
+        assert_eq!(counter.decremented().tries_left, 0);
+    }
+
+    #[test]
+    fn boot_counter_render_round_trips() {
+        for stem in ["foo+3", "foo+2-1", "foo+0-3"] {
+            let (id, counter) = BootCounter::parse(stem);
+            assert_eq!(counter.unwrap().render(id), stem);
         }
     }
 
