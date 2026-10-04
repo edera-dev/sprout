@@ -97,7 +97,7 @@ pub struct OptionsConfiguration {
     /// Makes Sprout follow the Boot Loader Specification and systemd-boot exactly where it
     /// otherwise differs for convenience or safety. For example, the extended boot loader
     /// partition is always read, a one-shot entry only sets the default entry, and entries with
-    /// missing files are hidden. See the README for everything it changes.
+    /// missing files are hidden. See CONFIG.md for everything it changes.
     #[serde(rename = "bls-strict-mode", default)]
     pub bls_strict_mode: bool,
 }
