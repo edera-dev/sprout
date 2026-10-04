@@ -218,11 +218,25 @@ pub struct BootCounter {
     pub tries_left: u32,
     /// The number of boot attempts already made.
     pub tries_done: u32,
+    /// The number of digits the tries left counter is written with, including leading zeros.
+    left_width: usize,
+    /// The number of digits the tries done counter is written with, including leading zeros.
+    done_width: usize,
 }
 
 impl BootCounter {
-    /// Splits the entry file name `stem` (without `.conf`) into the entry id and its boot
-    /// counter. A stem without a valid counter is returned whole, with no counter.
+    /// Creates a counter whose digit widths are those of the values written plainly.
+    pub fn new(tries_left: u32, tries_done: u32) -> Self {
+        Self {
+            tries_left,
+            tries_done,
+            left_width: decimal_width(tries_left),
+            done_width: decimal_width(tries_done),
+        }
+    }
+
+    /// Splits the entry file name `stem` (without `.conf`) into the entry id and its boot counter.
+    /// A stem without a valid counter is returned whole, with no counter.
     pub fn parse(stem: &str) -> (&str, Option<Self>) {
         Self::try_parse(stem).map_or((stem, None), |(id, counter)| (id, Some(counter)))
     }
@@ -238,24 +252,38 @@ impl BootCounter {
             Self {
                 tries_left: parse_digits(left)?,
                 tries_done: parse_digits(done)?,
+                left_width: left.len(),
+                done_width: done.len(),
             },
         ))
     }
 
-    /// Produces the counter after one more boot attempt.
+    /// Produces the counter after one more boot attempt. The digit widths are kept, so the
+    /// tries done counter stops at the largest number that fits in its width.
     pub fn decremented(&self) -> Self {
+        let done_limit = 10u32
+            .checked_pow(self.done_width as u32)
+            .map_or(u32::MAX, |limit| limit - 1);
         Self {
             tries_left: self.tries_left.saturating_sub(1),
-            tries_done: self.tries_done.saturating_add(1),
+            tries_done: self.tries_done.saturating_add(1).min(done_limit),
+            ..*self
         }
     }
 
     /// Renders the entry file name stem for the entry `id` with this counter.
     pub fn render(&self, id: &str) -> String {
         if self.tries_done == 0 {
-            format!("{}+{}", id, self.tries_left)
+            format!("{}+{:0left$}", id, self.tries_left, left = self.left_width)
         } else {
-            format!("{}+{}-{}", id, self.tries_left, self.tries_done)
+            format!(
+                "{}+{:0left$}-{:0done$}",
+                id,
+                self.tries_left,
+                self.tries_done,
+                left = self.left_width,
+                done = self.done_width
+            )
         }
     }
 
@@ -263,6 +291,36 @@ impl BootCounter {
     pub fn is_bad(&self) -> bool {
         self.tries_left == 0
     }
+}
+
+/// The number of digits needed to write `value`.
+fn decimal_width(value: u32) -> usize {
+    value
+        .checked_ilog10()
+        .map_or(1, |digits| digits as usize + 1)
+}
+
+/// Decides which entries are the default. Each item of `entries` is `(is_default, is_bad)`,
+/// and the result says whether each entry is the default afterwards.
+/// Bad entries, which have no boot counter tries left, are never the default while a good entry
+/// exists. If no entry is a default, the first good entry is picked, or the first entry if every
+/// entry is bad, so that there is always something to boot.
+pub fn resolve_default_flags(entries: &[(bool, bool)]) -> Vec<bool> {
+    let any_good = entries.iter().any(|(_, bad)| !bad);
+    let mut flags: Vec<bool> = entries
+        .iter()
+        .map(|(default, bad)| *default && !(any_good && *bad))
+        .collect();
+    if !flags.iter().any(|default| *default) {
+        let pick = entries
+            .iter()
+            .position(|(_, bad)| !bad)
+            .or_else(|| (!entries.is_empty()).then_some(0));
+        if let Some(index) = pick {
+            flags[index] = true;
+        }
+    }
+    flags
 }
 
 /// Splits the `extension` off the end of the file `name`, ignoring case.
@@ -287,29 +345,6 @@ pub fn boot_path(path: &str) -> String {
         result.push('/');
     }
     result
-}
-
-/// Decides which entries are the default. Each item of `entries` is `(is_default, is_bad)`,
-/// and the result says whether each entry is the default afterwards.
-/// Bad entries, which have no boot counter tries left, are never the default while a good entry
-/// exists. If no entry is a default, the first good entry is picked, or the first entry if every
-/// entry is bad, so that there is always something to boot.
-pub fn resolve_default_flags(entries: &[(bool, bool)]) -> Vec<bool> {
-    let any_good = entries.iter().any(|(_, bad)| !bad);
-    let mut flags: Vec<bool> = entries
-        .iter()
-        .map(|(default, bad)| *default && !(any_good && *bad))
-        .collect();
-    if !flags.iter().any(|default| *default) {
-        let pick = entries
-            .iter()
-            .position(|(_, bad)| !bad)
-            .or_else(|| (!entries.is_empty()).then_some(0));
-        if let Some(index) = pick {
-            flags[index] = true;
-        }
-    }
-    flags
 }
 
 /// Parses `value` as a number made only of ASCII digits.
@@ -350,7 +385,20 @@ pub fn sort_bls(a_bls: &BlsEntry, a_name: &str, b_bls: &BlsEntry, b_name: &str) 
     let ordering = a_bls.is_bad().cmp(&b_bls.is_bad()).then(ordering);
 
     // If all else is equal, compare the file names of both entries, sorting newer entries first.
-    ordering.then_with(|| compare_versions(a_name, b_name).reverse())
+    // Entries that are still equal, such as one file in the middle of being renamed, sort by
+    // the boot counter: more tries left first, then fewer tries done.
+    ordering
+        .then_with(|| compare_versions(a_name, b_name).reverse())
+        .then_with(|| {
+            let tries = |entry: &BlsEntry| {
+                entry
+                    .boot_counter
+                    .map_or((0, 0), |counter| (counter.tries_left, counter.tries_done))
+            };
+            let (a_left, a_done) = tries(a_bls);
+            let (b_left, b_done) = tries(b_bls);
+            b_left.cmp(&a_left).then(a_done.cmp(&b_done))
+        })
 }
 
 /// Handles single character advancement and comparison.
@@ -584,10 +632,7 @@ mod tests {
 
     fn counted_entry(sort_key: &str, tries_left: u32) -> BlsEntry {
         BlsEntry {
-            boot_counter: Some(BootCounter {
-                tries_left,
-                tries_done: 0,
-            }),
+            boot_counter: Some(BootCounter::new(tries_left, 0)),
             ..sort_entry(Some(sort_key), None, None)
         }
     }
@@ -988,26 +1033,14 @@ mod tests {
     fn boot_counter_parse_tries_left_only() {
         let (id, counter) = BootCounter::parse("foo+3");
         assert_eq!(id, "foo");
-        assert_eq!(
-            counter,
-            Some(BootCounter {
-                tries_left: 3,
-                tries_done: 0
-            })
-        );
+        assert_eq!(counter, Some(BootCounter::new(3, 0)));
     }
 
     #[test]
     fn boot_counter_parse_left_and_done() {
         let (id, counter) = BootCounter::parse("fedora-6.5+2-1");
         assert_eq!(id, "fedora-6.5");
-        assert_eq!(
-            counter,
-            Some(BootCounter {
-                tries_left: 2,
-                tries_done: 1
-            })
-        );
+        assert_eq!(counter, Some(BootCounter::new(2, 1)));
     }
 
     #[test]
@@ -1038,26 +1071,45 @@ mod tests {
 
     #[test]
     fn boot_counter_decremented_moves_a_try_to_done() {
-        let counter = BootCounter {
-            tries_left: 3,
-            tries_done: 0,
-        };
-        assert_eq!(
-            counter.decremented(),
-            BootCounter {
-                tries_left: 2,
-                tries_done: 1
-            }
-        );
+        let counter = BootCounter::new(3, 0);
+        assert_eq!(counter.decremented(), BootCounter::new(2, 1));
     }
 
     #[test]
     fn boot_counter_decremented_saturates_at_zero() {
-        let counter = BootCounter {
-            tries_left: 0,
-            tries_done: 3,
-        };
+        let counter = BootCounter::new(0, 3);
         assert_eq!(counter.decremented().tries_left, 0);
+    }
+
+    #[test]
+    fn boot_counter_keeps_the_width_of_the_left_counter() {
+        let (id, counter) = BootCounter::parse("foo+10");
+        assert_eq!(counter.unwrap().decremented().render(id), "foo+09-1");
+    }
+
+    #[test]
+    fn boot_counter_pads_and_caps_the_done_counter() {
+        for (stem, expected) in [
+            ("foo+5-08", "foo+4-09"),
+            ("foo+5-99", "foo+4-99"),
+            ("foo+5-9", "foo+4-9"),
+            ("foo+0-3", "foo+0-4"),
+        ] {
+            let (id, counter) = BootCounter::parse(stem);
+            assert_eq!(
+                counter.unwrap().decremented().render(id),
+                expected,
+                "{stem}"
+            );
+        }
+    }
+
+    #[test]
+    fn entries_with_more_tries_left_sort_first_when_otherwise_equal() {
+        let more = counted_entry("a", 3);
+        let fewer = counted_entry("a", 1);
+        assert_eq!(sort_bls(&more, "x", &fewer, "x"), Ordering::Less);
+        assert_eq!(sort_bls(&fewer, "x", &more, "x"), Ordering::Greater);
     }
 
     #[test]
