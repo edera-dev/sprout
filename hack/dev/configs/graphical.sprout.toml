@@ -1,0 +1,32 @@
+version = 1
+
+[options]
+default-entry = "kernel"
+menu-style = "graphical"
+menu-timeout = 120
+
+[extractors.boot.filesystem-device-match]
+has-item = "\\vmlinuz"
+
+[actions.chainload-kernel]
+chainload.path = "$boot\\vmlinuz"
+chainload.options = ["console=hvc0", "overlaytmpfs=yes"]
+chainload.linux-initrd = "$boot\\initramfs"
+
+[entries.kernel]
+title = "Boot Linux"
+actions = ["chainload-kernel"]
+
+[actions.chainload-shell]
+chainload.path = "$boot\\EFI\\BOOT\\shell.efi"
+
+[entries.shell]
+title = "Boot Shell"
+actions = ["chainload-shell"]
+
+[actions.chainload-xen]
+chainload.path = "$boot\\EFI\\BOOT\\xen.efi"
+
+[entries.xen]
+title = "Boot Xen"
+actions = ["chainload-xen"]

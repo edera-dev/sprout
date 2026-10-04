@@ -9,7 +9,7 @@ if [ "${SKIP_BUILD}" != "1" ]; then
 	./hack/dev/build.sh "${TARGET_ARCH}" "${RUST_PROFILE}"
 fi
 
-clear
+[ -t 1 ] && clear
 
 set --
 if [ "${TARGET_ARCH}" = "x86_64" ]; then
@@ -40,7 +40,7 @@ set -- "${@}" -nodefaults -smp 2 -m 4096
 if [ "${NO_GRAPHICAL}" = "1" ]; then
 	set -- "${@}" -nographic
 else
-	if [ "${GRAPHICAL_ONLY}" != "1" ]; then
+	if [ "${GRAPHICAL_ONLY}" != "1" ] && [ "${QEMU_HEADLESS}" != "1" ]; then
 		if [ "${QEMU_LEGACY_SERIAL}" = "1" ]; then
 			set -- "${@}" -serial stdio
 		else
@@ -49,6 +49,17 @@ else
 				-chardev 'stdio,id=stdio0,signal=off' \
 				-device 'virtconsole,chardev=stdio0,id=console0,name=alpine'
 		fi
+	fi
+
+	# Headless keeps the virtual GPU, so screenshots still work, but shows no window. The firmware
+	# console and the Linux console go to files, as there is no terminal to attach to.
+	if [ "${QEMU_HEADLESS}" = "1" ]; then
+		set -- "${@}" \
+			-display none \
+			-serial "file:${QEMU_SERIAL_FILE:-/dev/null}" \
+			-device 'virtio-serial-pci,id=vs0' \
+			-chardev "file,id=file0,path=${QEMU_CONSOLE_FILE:-/dev/null}" \
+			-device 'virtconsole,chardev=file0,id=console0,name=alpine'
 	fi
 
 	if [ "${QEMU_LEGACY_VGA}" = "1" ]; then
@@ -95,5 +106,12 @@ set -- "${@}" \
 	-drive "if=none,file=${FINAL_DIR}/sprout.img,format=raw,id=disk1,readonly=on"
 
 set -- "${@}" -name "sprout ${TARGET_ARCH}"
+
+if [ -n "${QEMU_QMP}" ]; then
+	set -- "${@}" -qmp "unix:${QEMU_QMP},server=on,wait=off"
+fi
+
+# shellcheck disable=SC2086
+set -- "${@}" ${QEMU_EXTRA_ARGS}
 
 exec "${@}"

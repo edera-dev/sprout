@@ -58,3 +58,19 @@ Build Sprout as OCI images using Docker, including a kernel, initramfs, xen, and
 
 Boot Sprout's dev environment using QEMU for testing. This will let you test your changes in a real environment booting
 Alpine Linux with an initramfs.
+
+### ./hack/dev/run
+
+Scripts to drive the dev environment without a terminal or a window, which suits automation and
+coding agents. QEMU runs in the background with a QMP socket, and its consoles are written to
+`target/run/<arch>/`. Only one run per architecture at a time, and the scripts need `python3` or `socat`.
+
+- `start.sh [arch]`: Builds and starts QEMU headless. `SPROUT_CONFIG_NAME` defaults to `graphical`.
+- `screenshot.sh [out.png]`: Saves a PNG of the display (QEMU 7.1 or newer) and prints the path.
+- `key.sh <qcode>...`: Presses keys such as `down`, `up`, `ret` or `ctrl+alt+delete`.
+- `wait-serial.sh <regex> [seconds]`: Waits for text on the firmware or Linux console.
+- `qmp.sh <json>...`: Sends raw QMP commands.
+- `status.sh` and `stop.sh`: Show the state of QEMU, and stop it.
+- `smoke.sh [arch]`: Starts, drives the graphical menu, waits for the Linux shell and stops.
+
+`boot.sh` supports this with `QEMU_HEADLESS`, `QEMU_QMP`, `QEMU_SERIAL_FILE`, `QEMU_CONSOLE_FILE` and `QEMU_EXTRA_ARGS`.
