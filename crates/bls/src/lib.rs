@@ -847,6 +847,27 @@ mod tests {
     }
 
     #[test]
+    fn loader_conf_reads_preferred() {
+        let conf = LoaderConf::parse("preferred fedora-*\n");
+        assert_eq!(conf.preferred.as_deref(), Some("fedora-*"));
+        assert!(conf.warnings.is_empty());
+    }
+
+    #[test]
+    fn loader_conf_strips_matching_quotes() {
+        let conf = LoaderConf::parse("default \"foo*\"\npreferred 'bar'\ntimeout \"3\"\n");
+        assert_eq!(conf.default.as_deref(), Some("foo*"));
+        assert_eq!(conf.preferred.as_deref(), Some("bar"));
+        assert_eq!(conf.timeout, Some(LoaderTimeout::Seconds(3)));
+    }
+
+    #[test]
+    fn loader_conf_keeps_unmatched_quotes() {
+        let conf = LoaderConf::parse("default \"foo\n");
+        assert_eq!(conf.default.as_deref(), Some("\"foo"));
+    }
+
+    #[test]
     fn loader_conf_empty_has_no_settings() {
         let conf = LoaderConf::parse("");
         assert_eq!(conf, LoaderConf::default());
