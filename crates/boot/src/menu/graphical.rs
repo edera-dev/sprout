@@ -626,8 +626,10 @@ impl BootMenu for GraphicalMenu {
 
         let handle = uefi::boot::get_handle_for_protocol::<GraphicsOutput>()
             .context("unable to find a graphics output")?;
-        let mut gop = uefi::boot::open_protocol_exclusive::<GraphicsOutput>(handle)
-            .context("unable to open the graphics output")?;
+        // Opening it exclusively would disconnect the firmware's text console from the display,
+        // and anything printed after the menu may not show up.
+        let mut gop =
+            open_shared::<GraphicsOutput>(handle).context("unable to open the graphics output")?;
         let (width, height) = gop.current_mode_info().resolution();
         let mut fb = Framebuffer::new(width, height)?;
         let mut mouse = Mouse::open();
