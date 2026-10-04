@@ -359,6 +359,12 @@ struct Screen {
     gop: ScopedProtocol<GraphicsOutput>,
     /// What is drawn before it is blitted to the display.
     fb: Framebuffer,
+    /// What was last blitted to the display, which only has to be updated where it differs.
+    shown: Framebuffer,
+    /// The parts of the menu that never change, which each frame starts from.
+    base: Framebuffer,
+    /// Whether the display has had a frame blitted to it.
+    drawn: bool,
     /// Where the entries are on this display.
     layout: Layout,
     /// The index of the first entry that is on this display.
@@ -399,13 +405,21 @@ impl Screen {
                 continue;
             };
             let (width, height) = gop.current_mode_info().resolution();
-            let Ok(fb) = Framebuffer::new(width, height) else {
+            let (Ok(fb), Ok(shown), Ok(mut base)) = (
+                Framebuffer::new(width, height),
+                Framebuffer::new(width, height),
+                Framebuffer::new(width, height),
+            ) else {
                 continue;
             };
             let layout = Layout::new((width, height), entries);
+            render_base(&mut base, &layout);
             screens.push(Self {
                 gop,
                 fb,
+                shown,
+                base,
+                drawn: false,
                 layout,
                 offset: 0,
             });
@@ -598,9 +612,9 @@ fn draw_logo(fb: &mut Framebuffer, layout: &Layout, ticks: usize) {
     let y = floor - rise;
 
     for row in 0..height {
+        let source_row = row * LOGO_HEIGHT / height * LOGO_WIDTH;
         for column in 0..width {
-            let source =
-                ((row * LOGO_HEIGHT / height) * LOGO_WIDTH + column * LOGO_WIDTH / width) * 4;
+            let source = (source_row + column * LOGO_WIDTH / width) * 4;
             let [red, green, blue, alpha] = LOGO[source..source + 4] else {
                 continue;
             };
@@ -657,16 +671,9 @@ fn draw_cursor(fb: &mut Framebuffer, scale: usize, position: (usize, usize)) {
     }
 }
 
-/// Draw the whole menu to the framebuffer.
-fn render(
-    fb: &mut Framebuffer,
-    layout: &Layout,
-    scene: &Scene,
-    offset: usize,
-    cursor: Option<(usize, usize)>,
-) {
+/// Draw the parts of the menu that never change to the framebuffer.
+fn render_base(fb: &mut Framebuffer, layout: &Layout) {
     draw_background(fb, BACKGROUND_TOP, BACKGROUND_BOTTOM);
-    draw_logo(fb, layout, scene.ticks);
     if let Some((x, y, scale)) = layout.title {
         draw_text(fb, x, y, scale, TITLE.len(), TITLE, ACCENT);
     }
@@ -692,6 +699,23 @@ fn render(
         PANEL,
     );
 
+    // The line between the entries and the status line.
+    let inner = panel_width.saturating_sub(layout.cell * 3);
+    let inner_x = panel_x + layout.cell * 3 / 2;
+    fb.fill_rect(inner_x, layout.footer, inner, layout.scale, PANEL_EDGE);
+}
+
+/// Draw the whole menu to the framebuffer, which already has the [render_base] drawn.
+fn render(
+    fb: &mut Framebuffer,
+    layout: &Layout,
+    scene: &Scene,
+    offset: usize,
+    cursor: Option<(usize, usize)>,
+) {
+    draw_logo(fb, layout, scene.ticks);
+
+    let (panel_x, _, panel_width, _) = layout.panel;
     for (slot, (index, entry)) in scene
         .entries
         .iter()
@@ -739,10 +763,9 @@ fn render(
         draw_scrollbar(fb, layout, offset, scene.entries.len());
     }
 
-    // The status line is below a line across the panel, with the position when it scrolls.
+    // The status line is below the line across the panel, with the position when it scrolls.
     let inner = panel_width.saturating_sub(layout.cell * 3);
     let inner_x = panel_x + layout.cell * 3 / 2;
-    fb.fill_rect(inner_x, layout.footer, inner, layout.scale, PANEL_EDGE);
     let status_row = layout.footer + layout.scale + layout.cell / 2;
     // The position is at the right edge, so the status keeps clear of it on both sides.
     let keep_clear = if layout.scrolls { layout.cell * 8 } else { 0 };
@@ -818,6 +841,7 @@ fn run(
         for screen in screens.iter_mut() {
             screen.scroll_to(scene.selected);
             let cursor = cursor.map(|position| screen.locate(position, bounds));
+            screen.fb.copy_from(&screen.base);
             render(
                 &mut screen.fb,
                 &screen.layout,
@@ -825,7 +849,14 @@ fn run(
                 screen.offset,
                 cursor,
             );
-            screen.fb.blit(&mut screen.gop)?;
+            // Only the first frame has to fill the display, the rest only change parts of it.
+            if screen.drawn {
+                screen.fb.blit_changes(&screen.shown, &mut screen.gop)?;
+            } else {
+                screen.fb.blit(&mut screen.gop)?;
+                screen.drawn = true;
+            }
+            core::mem::swap(&mut screen.fb, &mut screen.shown);
         }
 
         // Wake up every tick to move the logo and update the countdown.
