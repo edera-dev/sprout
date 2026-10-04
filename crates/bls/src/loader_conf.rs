@@ -36,10 +36,26 @@ impl LoaderTimeout {
 pub struct LoaderConf {
     /// A glob pattern that selects the default entry, or `@saved`.
     pub default: Option<String>,
+    /// A glob pattern that selects the preferred entry, or `@saved`. Unlike `default`, an entry
+    /// with no boot counter tries left is not used.
+    pub preferred: Option<String>,
     /// How long to show the boot menu.
     pub timeout: Option<LoaderTimeout>,
     /// Problems found while parsing, such as keys that are not supported.
     pub warnings: Vec<String>,
+}
+
+/// Removes one pair of matching single or double quotes around `value`.
+fn unquote(value: &str) -> &str {
+    for quote in ['"', '\''] {
+        if let Some(inner) = value
+            .strip_prefix(quote)
+            .and_then(|rest| rest.strip_suffix(quote))
+        {
+            return inner;
+        }
+    }
+    value
 }
 
 impl LoaderConf {
@@ -59,21 +75,22 @@ impl LoaderConf {
             }
 
             let (key, value) = match line.split_once(char::is_whitespace) {
-                Some((key, value)) => (key, value.trim()),
+                Some((key, value)) => (key, unquote(value.trim())),
                 None => (line, ""),
             };
 
             match key {
                 "default" if !value.is_empty() => conf.default = Some(value.to_string()),
+                "preferred" if !value.is_empty() => conf.preferred = Some(value.to_string()),
                 "timeout" => match LoaderTimeout::parse(value) {
                     Some(timeout) => conf.timeout = Some(timeout),
                     None => conf
                         .warnings
                         .push(format!("ignoring invalid loader.conf timeout '{}'", value)),
                 },
-                "default" => conf
+                "default" | "preferred" => conf
                     .warnings
-                    .push("ignoring loader.conf default without a value".to_string()),
+                    .push(format!("ignoring loader.conf {} without a value", key)),
                 _ => conf
                     .warnings
                     .push(format!("ignoring unsupported loader.conf key '{}'", key)),
