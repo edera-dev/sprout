@@ -14,6 +14,8 @@ use uefi_raw::table::runtime::{VariableAttributes, VariableVendor};
 pub enum VariableClass {
     /// The variable is available in Boot Services and Runtime Services and is not persistent.
     BootAndRuntimeTemporary,
+    /// The variable is available in Boot Services and Runtime Services and is persistent.
+    BootAndRuntimePersistent,
 }
 
 impl VariableClass {
@@ -22,6 +24,11 @@ impl VariableClass {
         match self {
             VariableClass::BootAndRuntimeTemporary => {
                 VariableAttributes::BOOTSERVICE_ACCESS | VariableAttributes::RUNTIME_ACCESS
+            }
+            VariableClass::BootAndRuntimePersistent => {
+                VariableAttributes::BOOTSERVICE_ACCESS
+                    | VariableAttributes::RUNTIME_ACCESS
+                    | VariableAttributes::NON_VOLATILE
             }
         }
     }

@@ -1,5 +1,6 @@
 use crate::boot_counter::BootCounterTarget;
 use crate::context::SproutContext;
+use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
 use edera_sprout_config::entries::EntryDeclaration;
@@ -130,6 +131,13 @@ impl BootableEntry {
     /// A `needle` without any `*` must equal the name or title exactly.
     pub fn is_match(&self, needle: &str) -> bool {
         glob_match(needle, &self.name) || glob_match(needle, &self.title)
+    }
+
+    /// Determine if this entry matches `needle` by comparing to the id of the entry, which is
+    /// the name with or without the `.conf` suffix. This is how loader.conf selects entries.
+    /// The `needle` is a glob pattern, where `*` matches any sequence of characters.
+    pub fn is_match_id(&self, needle: &str) -> bool {
+        glob_match(needle, &self.name) || glob_match(needle, &format!("{}.conf", self.name))
     }
 
     /// Create a variant of this entry, with the name suffixed by `suffix` and using `context`.
