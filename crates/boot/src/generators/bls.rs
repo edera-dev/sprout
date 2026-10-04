@@ -278,13 +278,13 @@ fn generate_type1(
         {
             if strict {
                 warn!(
-                    "hiding bls entry {} as its file {} does not exist",
+                    "hiding bls entry {} as its file '\\{}' does not exist",
                     name, target
                 );
                 continue;
             }
             warn!(
-                "bls entry {} refers to the file {}, which does not exist (strict mode hides it)",
+                "bls entry {} refers to the file '\\{}', which does not exist (strict mode hides it)",
                 name, target
             );
         }
