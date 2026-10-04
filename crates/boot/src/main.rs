@@ -477,7 +477,7 @@ fn run() -> Result<()> {
     // no entry, such as when the entry was removed, is ignored so that the next source is used.
     // The preferred entry sources never use an entry with no boot counter tries left.
     // Each source has whether it matches by id, and whether it skips bad entries.
-    for (source, pattern, by_id, skip_bad) in [
+    for (source, value, by_id, skip_bad) in [
         (
             "configuration",
             config.options.default_entry.clone(),
@@ -486,29 +486,31 @@ fn run() -> Result<()> {
         ),
         (
             "bootloader interface preferred",
-            entry_pattern(bootloader_interface_preferred_entry),
+            bootloader_interface_preferred_entry.clone(),
             true,
             true,
         ),
         (
             "loader.conf preferred",
-            entry_pattern(loader_conf.preferred.clone()),
+            loader_conf.preferred.clone(),
             true,
             true,
         ),
         (
             "bootloader interface default",
-            entry_pattern(bootloader_interface_default_entry.clone()),
+            bootloader_interface_default_entry.clone(),
             true,
             false,
         ),
         (
             "loader.conf default",
-            entry_pattern(loader_conf.default.clone()),
+            loader_conf.default.clone(),
             true,
             false,
         ),
     ] {
+        // The configuration is a pattern as it is. The other sources can be `@saved`.
+        let pattern = if by_id { entry_pattern(value) } else { value };
         let Some(pattern) = pattern else {
             continue;
         };
@@ -618,7 +620,10 @@ fn run() -> Result<()> {
     if forced_entry.is_none() {
         let id = entry.id();
         if use_saved_entry {
-            if last_booted_entry.as_deref() != Some(id.as_str()) {
+            if !last_booted_entry
+                .as_deref()
+                .is_some_and(|saved| saved.eq_ignore_ascii_case(&id))
+            {
                 advisory(
                     BootloaderInterface::set_last_booted_entry(&id)
                         .context("unable to save last booted entry in bootloader interface"),

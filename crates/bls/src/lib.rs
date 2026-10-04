@@ -203,7 +203,13 @@ impl BlsEntry {
     /// Fetches the load options to pass to the image that is chainloaded.
     /// A unified kernel image with a profile gets `@<profile>` first, which selects the profile.
     pub fn chainload_options(&self) -> Option<String> {
-        match (self.is_uki_only(), self.profile.as_deref(), self.options()) {
+        // Only a profile that is a number above zero selects a profile, as in systemd-boot.
+        let profile = self
+            .profile
+            .as_deref()
+            .and_then(parse_digits)
+            .filter(|profile| *profile > 0);
+        match (self.is_uki_only(), profile, self.options()) {
             (true, Some(profile), Some(options)) => Some(format!("@{} {}", profile, options)),
             (true, Some(profile), None) => Some(format!("@{}", profile)),
             (_, _, options) => options,
@@ -273,20 +279,14 @@ pub struct BootCounter {
     pub tries_left: u32,
     /// The number of boot attempts already made.
     pub tries_done: u32,
-    /// The number of digits the tries left counter is written with, including leading zeros.
-    left_width: usize,
-    /// The number of digits the tries done counter is written with, including leading zeros.
-    done_width: usize,
 }
 
 impl BootCounter {
-    /// Creates a counter whose digit widths are those of the values written plainly.
+    /// Creates a counter with the given number of tries left and tries done.
     pub fn new(tries_left: u32, tries_done: u32) -> Self {
         Self {
             tries_left,
             tries_done,
-            left_width: decimal_width(tries_left),
-            done_width: decimal_width(tries_done),
         }
     }
 
@@ -302,43 +302,25 @@ impl BootCounter {
             return None;
         }
         let (left, done) = suffix.split_once('-').unwrap_or((suffix, "0"));
-        Some((
-            id,
-            Self {
-                tries_left: parse_digits(left)?,
-                tries_done: parse_digits(done)?,
-                left_width: left.len(),
-                done_width: done.len(),
-            },
-        ))
+        Some((id, Self::new(parse_digits(left)?, parse_digits(done)?)))
     }
 
-    /// Produces the counter after one more boot attempt. The digit widths are kept, so the
-    /// tries done counter stops at the largest number that fits in its width.
+    /// Produces the counter after one more boot attempt.
     pub fn decremented(&self) -> Self {
-        let done_limit = 10u32
-            .checked_pow(self.done_width as u32)
-            .map_or(u32::MAX, |limit| limit - 1);
-        Self {
-            tries_left: self.tries_left.saturating_sub(1),
-            tries_done: self.tries_done.saturating_add(1).min(done_limit),
-            ..*self
-        }
+        Self::new(
+            self.tries_left.saturating_sub(1),
+            self.tries_done.saturating_add(1),
+        )
     }
 
     /// Renders the entry file name stem for the entry `id` with this counter.
+    /// The counters are plain decimals, without leading zeros, as systemd-boot writes them and
+    /// as systemd-bless-boot can read them.
     pub fn render(&self, id: &str) -> String {
         if self.tries_done == 0 {
-            format!("{}+{:0left$}", id, self.tries_left, left = self.left_width)
+            format!("{}+{}", id, self.tries_left)
         } else {
-            format!(
-                "{}+{:0left$}-{:0done$}",
-                id,
-                self.tries_left,
-                self.tries_done,
-                left = self.left_width,
-                done = self.done_width
-            )
+            format!("{}+{}-{}", id, self.tries_left, self.tries_done)
         }
     }
 
@@ -346,13 +328,6 @@ impl BootCounter {
     pub fn is_bad(&self) -> bool {
         self.tries_left == 0
     }
-}
-
-/// The number of digits needed to write `value`.
-fn decimal_width(value: u32) -> usize {
-    value
-        .checked_ilog10()
-        .map_or(1, |digits| digits as usize + 1)
 }
 
 /// Decides which entries are the default. Each item of `entries` is `(is_default, is_bad)`,
@@ -386,6 +361,13 @@ pub fn strip_extension<'a>(name: &'a str, extension: &str) -> Option<(&'a str, &
         return None;
     }
     Some(name.split_at(split))
+}
+
+/// Whether the entry file `name` is reserved for the entries that the boot loader makes itself,
+/// which are named with `auto-`. Such files are not entries.
+pub fn is_reserved_entry_name(name: &str) -> bool {
+    name.get(..5)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("auto-"))
 }
 
 /// Converts an EFI `path` to the form used by the bootloader interface: separated by forward
@@ -835,6 +817,15 @@ mod tests {
     }
 
     #[test]
+    fn auto_names_are_reserved_ignoring_case() {
+        assert!(is_reserved_entry_name("auto-windows.conf"));
+        assert!(is_reserved_entry_name("AUTO-x.efi"));
+        assert!(!is_reserved_entry_name("autox.conf"));
+        assert!(!is_reserved_entry_name("fedora-auto-1.conf"));
+        assert!(!is_reserved_entry_name("aut"));
+    }
+
+    #[test]
     fn strip_extension_ignores_case_and_keeps_the_original_extension() {
         assert_eq!(
             strip_extension("foo+3.conf", ".conf"),
@@ -1116,6 +1107,20 @@ mod tests {
     }
 
     #[test]
+    fn uki_profile_zero_and_invalid_profiles_add_no_prefix() {
+        for profile in ["0", "x", "-1", "2x", ""] {
+            let entry: BlsEntry = format!("uki /a.efi\nprofile {profile}\noptions quiet\n")
+                .parse()
+                .unwrap();
+            assert_eq!(
+                entry.chainload_options().as_deref(),
+                Some("quiet"),
+                "{profile}"
+            );
+        }
+    }
+
+    #[test]
     fn uki_profile_prefixes_the_load_options() {
         let entry: BlsEntry = "uki /a.efi\nprofile 2\noptions quiet\n".parse().unwrap();
         assert_eq!(entry.chainload_options().as_deref(), Some("@2 quiet"));
@@ -1185,18 +1190,14 @@ mod tests {
     }
 
     #[test]
-    fn boot_counter_keeps_the_width_of_the_left_counter() {
-        let (id, counter) = BootCounter::parse("foo+10");
-        assert_eq!(counter.unwrap().decremented().render(id), "foo+09-1");
-    }
-
-    #[test]
-    fn boot_counter_pads_and_caps_the_done_counter() {
+    fn boot_counter_renders_plain_decimals_that_systemd_can_parse() {
+        // Leading zeros would be read as octal by systemd-bless-boot, so they are never written.
         for (stem, expected) in [
-            ("foo+5-08", "foo+4-09"),
-            ("foo+5-99", "foo+4-99"),
-            ("foo+5-9", "foo+4-9"),
+            ("foo+10", "foo+9-1"),
+            ("foo+5-08", "foo+4-9"),
+            ("foo+5-9", "foo+4-10"),
             ("foo+0-3", "foo+0-4"),
+            ("foo+3", "foo+2-1"),
         ] {
             let (id, counter) = BootCounter::parse(stem);
             assert_eq!(

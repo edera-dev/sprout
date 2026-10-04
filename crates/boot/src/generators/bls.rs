@@ -9,7 +9,7 @@ use alloc::{
 };
 use anyhow::{Context, Result};
 use core::{cmp::Ordering, str::FromStr};
-use edera_sprout_bls::{BlsEntry, BootCounter, sort_bls, strip_extension};
+use edera_sprout_bls::{BlsEntry, BootCounter, is_reserved_entry_name, sort_bls, strip_extension};
 use edera_sprout_config::generators::bls::BlsConfiguration;
 use log::{info, warn};
 use uefi::{
@@ -187,7 +187,7 @@ fn generate_type1(
             continue;
         }
         // Names that start with auto- are reserved for entries the boot loader makes itself.
-        if file_name.starts_with("auto-") {
+        if is_reserved_entry_name(&file_name) {
             continue;
         }
         let extension = extension.to_string();
@@ -315,6 +315,9 @@ fn generate_type2(
 
         // The id is the file name without the extension and the boot counter.
         let file_name = image.file_name;
+        if is_reserved_entry_name(&file_name) {
+            continue;
+        }
         let Some((stem, extension)) = strip_extension(&file_name, ".efi") else {
             continue;
         };
