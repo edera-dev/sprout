@@ -1,16 +1,19 @@
 use crate::context::SproutContext;
 use crate::phases::before_handoff;
 use alloc::boxed::Box;
+use alloc::format;
 use alloc::rc::Rc;
 use alloc::vec::Vec;
 use anyhow::{Context, Result, bail};
 use edera_sprout_config::actions::chainload::ChainloadConfiguration;
 use edera_sprout_parsing::{append_initrd, combine_options, empty_is_none};
 use eficore::bootloader_interface::BootloaderInterface;
+use eficore::devicetree::DeviceTree;
 use eficore::loader::source::ImageSource;
 use eficore::loader::{ImageLoadRequest, ImageLoader};
 use eficore::media_loader::MediaLoaderHandle;
 use eficore::media_loader::constants::linux::LINUX_EFI_INITRD_MEDIA_GUID;
+use eficore::secure::SecureBoot;
 use log::warn;
 use uefi::proto::loaded_image::LoadedImage;
 use uefi::{CString16, Handle};
@@ -18,19 +21,31 @@ use uefi::{CString16, Handle};
 /// Read the initrd at the stamped `path` relative to the sprout image.
 /// Provides [None] if the path refers to the root of a filesystem rather than a file.
 pub fn read_initrd(context: &Rc<SproutContext>, path: &str) -> Result<Option<Vec<u8>>> {
-    let resolved = eficore::path::resolve_path(Some(context.root().loaded_image_path()?), path)
-        .context("unable to resolve initrd path")?;
+    read_optional_file(context, path, "initrd")
+}
 
-    // A path without a file component refers to the root of the filesystem, not an initrd.
+/// Read the `what` at the stamped `path` relative to the sprout image.
+/// Provides [None] if the path refers to the root of a filesystem rather than a file.
+fn read_optional_file(
+    context: &Rc<SproutContext>,
+    path: &str,
+    what: &str,
+) -> Result<Option<Vec<u8>>> {
+    let resolved = eficore::path::resolve_path(Some(context.root().loaded_image_path()?), path)
+        .with_context(|| format!("unable to resolve {} path", what))?;
+
+    // A path without a file component refers to the root of the filesystem, not a file.
     // This happens when a path template like "$root\\$initrd-0" is stamped with an empty
-    // initrd value, such as a BLS entry without an initrd or an unused BLS initrd slot.
+    // value, such as a BLS entry without an initrd or an unused BLS initrd slot.
     let subpath = eficore::path::device_path_subpath(&resolved.full_path)
-        .context("unable to get initrd subpath")?;
+        .with_context(|| format!("unable to get {} subpath", what))?;
     if subpath.trim_matches('\\').is_empty() {
         return Ok(None);
     }
 
-    let content = resolved.read_file().context("unable to read initrd")?;
+    let content = resolved
+        .read_file()
+        .with_context(|| format!("unable to read {}", what))?;
     Ok(Some(content))
 }
 
@@ -143,6 +158,24 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
         initrd_handle = Some(handle);
     }
 
+    // Install the devicetree, if there is one, for the image to find. It is restored when it is
+    // dropped, which is once the image has returned or failed to start. A devicetree is not
+    // verified, so it is not used when Secure Boot is enabled, or when that can't be told.
+    let mut devicetree = None;
+    if let Some(path) = empty_is_none(
+        configuration
+            .devicetree
+            .as_ref()
+            .map(|path| context.stamp(path)),
+    ) {
+        if SecureBoot::enabled().unwrap_or(true) {
+            warn!("ignoring the devicetree, as Secure Boot is enabled");
+        } else if let Some(content) = read_optional_file(&context, &path, "devicetree")? {
+            devicetree =
+                Some(DeviceTree::install(&content).context("unable to install the devicetree")?);
+        }
+    }
+
     // Mark execution of an entry in the bootloader interface.
     // This is only informational, so it should not prevent booting.
     if let Err(error) = BootloaderInterface::mark_exec(context.root().timer()) {
@@ -174,6 +207,9 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
 
     // Explicitly drop the initrd handle to clarify when it should be unregistered.
     drop(initrd_handle);
+
+    // Explicitly drop the devicetree to clarify when the original is restored.
+    drop(devicetree);
 
     // Return control to sprout.
     Ok(())

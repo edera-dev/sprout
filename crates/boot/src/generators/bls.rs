@@ -88,6 +88,7 @@ fn bootable_entry(
     context.set("options", options);
     // The command line and kernel version embedded in a unified kernel image.
     context.set("cmdline", entry.cmdline.clone().unwrap_or_default());
+    context.set("devicetree", entry.devicetree_path().unwrap_or_default());
     context.set("uname", entry.uname.clone().unwrap_or_default());
     // The initrd value keeps the last initrd, which is what it held before
     // multiple initrds were supported.

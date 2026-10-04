@@ -132,6 +132,7 @@ pub fn edera(context: Rc<SproutContext>, configuration: &EderaConfiguration) -> 
             options: vec![],
             linux_initrd: None,
             linux_initrd_chain: vec![],
+            devicetree: None,
         },
     )
     .context("unable to chainload to xen");
