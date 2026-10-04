@@ -29,7 +29,8 @@ pub struct BlsConfiguration {
     /// Whether to also read the Extended Boot Loader Partition, which is the partition with the
     /// XBOOTLDR type on the same disk as the partition Sprout was loaded from. Its entries are
     /// sorted with the others, and their paths are on that partition, so an action has to use
-    /// the `$entry-root` value to find them, such as `$entry-root\\$chainload`.
+    /// the `$entry-root` value to find them, such as `$entry-root\\$chainload`. Its unified kernel
+    /// images are always in `\\EFI\\Linux`.
     #[serde(default)]
     pub xbootldr: bool,
     /// Whether generated entries keep the name of the BLS entry file as-is.

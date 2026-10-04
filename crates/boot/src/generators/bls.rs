@@ -266,6 +266,9 @@ fn generate_type1(
 
         let mut boot = bootable_entry(context, bls, &name, &entry, &initrds, entry_root);
         boot.set_id_suffix(&extension);
+        if entry.profile_number() > 0 {
+            boot.mark_extra_profile();
+        }
 
         // Record where the boot counter lives so a try can be consumed when this entry boots.
         if let Some(counter) = boot_counter {
@@ -458,13 +461,21 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
     let path = context.stamp(&bls.path);
 
     let uki_path = bls.uki_path_for(&path);
-    let mut entries = generate_partition(
+    // A problem with this partition only stops the generator when there is no other partition.
+    let mut entries = match generate_partition(
         &context,
         bls,
         &path,
         uki_path.as_deref(),
         BlsConfiguration::root_of(&path),
-    )?;
+    ) {
+        Ok(entries) => entries,
+        Err(error) if bls.xbootldr => {
+            warn!("unable to generate bls entries: {:#}", error);
+            Vec::new()
+        }
+        Err(error) => return Err(error),
+    };
 
     // Add the entries of the Extended Boot Loader Partition, which are sorted together with the
     // others. A problem with it should not prevent booting from the entries that are found.

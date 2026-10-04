@@ -67,8 +67,8 @@ impl DeviceTree {
         if magic != FDT_MAGIC {
             bail!("the file is not a flattened devicetree");
         }
-        if total > dtb.len() {
-            bail!("the devicetree is truncated");
+        if total < FDT_HEADER_SIZE || total > dtb.len() {
+            bail!("the devicetree has an invalid size");
         }
         Ok(())
     }
@@ -127,8 +127,11 @@ impl DeviceTree {
         let Some(handle) = find_handle(&DT_FIXUP_GUID)? else {
             return Ok(());
         };
-        let mut protocol = uefi::boot::open_protocol_exclusive::<DtFixupProtocol>(handle)
-            .context("unable to open the devicetree fixup protocol")?;
+        // Without the protocol the devicetree is used as it is, as in systemd-boot.
+        let Ok(mut protocol) = crate::handle::open_shared::<DtFixupProtocol>(handle) else {
+            warn!("unable to open the devicetree fixup protocol, skipping the fixup");
+            return Ok(());
+        };
         let fixup = protocol.fixup;
         let this: *mut DtFixupProtocol = &mut *protocol;
         let flags = DT_APPLY_FIXUPS | DT_RESERVE_MEMORY;

@@ -72,7 +72,7 @@ We recommend running Sprout without Secure Boot for development, and with Secure
 - [x] [Bootloader specification (BLS)](https://uapi-group.org/specifications/specs/boot_loader_specification/) support:
   Type #1 entries, Type #2 unified kernel images, and the extended boot loader partition
 - [x] [UKI support](https://github.com/edera-dev/sprout/issues/6): beta, including images with multiple profiles
-- [x] Boot counting and automatic boot assessment
+- [x] Boot counting, so `systemd-bless-boot` can assess a boot
 - [x] `loader.conf` support
 - [x] Chainload support
 - [x] Linux boot support via EFI stub
@@ -209,9 +209,16 @@ bls.entry.actions = ["boot-bls"]
 chainload.path = "$entry-root\\$chainload"
 chainload.options = ["$options"]
 chainload.devicetree = "$entry-root\\$devicetree"
+# an entry can have up to eight initrds. unused ones are skipped.
 chainload.linux-initrd-chain = [
   "$entry-root\\$initrd-0",
   "$entry-root\\$initrd-1",
+  "$entry-root\\$initrd-2",
+  "$entry-root\\$initrd-3",
+  "$entry-root\\$initrd-4",
+  "$entry-root\\$initrd-5",
+  "$entry-root\\$initrd-6",
+  "$entry-root\\$initrd-7",
 ]
 ```
 
@@ -224,8 +231,9 @@ An entry file named like `fedora+3.conf` or `fedora+3.efi` has three tries. Each
 file is renamed, such as to `fedora+2-1.conf`, and the new path is given to the system in
 `LoaderBootCountPath` so `systemd-bless-boot` can remove the counter once the boot works.
 Entries that have no tries left are sorted last and are not picked as the default entry, but they can still be
-booted by hand. If an entry with tries left fails to start, the machine resets, so the next boot can use
-the next try or another entry. This is set by `reboot-on-error` in `loader.conf`.
+booted by hand. By default, if an entry fails to start after a try was used up and it had tries left, the machine
+resets, so the next boot can use the next try or another entry. This is the `reboot-on-error` setting
+in `loader.conf`. Without boot counting, a failure to start returns to the firmware.
 
 #### loader.conf
 
