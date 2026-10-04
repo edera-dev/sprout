@@ -32,6 +32,12 @@ pub struct BlsEntry {
     pub initrd: Vec<String>,
     /// The path to an EFI image.
     pub efi: Option<String>,
+    /// The path to a unified kernel image.
+    pub uki: Option<String>,
+    /// The profile of the unified kernel image to boot.
+    pub profile: Option<String>,
+    /// The architecture the entry is for, such as `x64` or `aa64`.
+    pub architecture: Option<String>,
     /// The sort key for the entry.
     pub sort_key: Option<String>,
     /// The version of the entry.
@@ -60,6 +66,9 @@ impl FromStr for BlsEntry {
         let mut linux: Option<String> = None;
         let mut initrd: Vec<String> = Vec::new();
         let mut efi: Option<String> = None;
+        let mut uki: Option<String> = None;
+        let mut profile: Option<String> = None;
+        let mut architecture: Option<String> = None;
         let mut sort_key: Option<String> = None;
         let mut version: Option<String> = None;
         let mut machine_id: Option<String> = None;
@@ -118,6 +127,21 @@ impl FromStr for BlsEntry {
                     efi = Some(value.trim().to_string());
                 }
 
+                // The path to a unified kernel image.
+                "uki" => {
+                    uki = Some(value.trim().to_string());
+                }
+
+                // The profile of the unified kernel image to boot.
+                "profile" => {
+                    profile = Some(value.trim().to_string());
+                }
+
+                // The architecture the entry is for.
+                "architecture" => {
+                    architecture = Some(value.trim().to_string());
+                }
+
                 "sort-key" => {
                     sort_key = Some(value.trim().to_string());
                 }
@@ -144,6 +168,9 @@ impl FromStr for BlsEntry {
             linux,
             initrd,
             efi,
+            uki,
+            profile,
+            architecture,
             sort_key,
             version,
             machine_id,
@@ -157,22 +184,50 @@ impl FromStr for BlsEntry {
 impl BlsEntry {
     /// Checks if this BLS entry is something we can actually boot in Sprout.
     pub fn is_valid(&self) -> bool {
-        self.linux.is_some() || self.efi.is_some()
+        self.linux.is_some() || self.efi.is_some() || self.uki.is_some()
+    }
+
+    /// Whether the entry only boots a unified kernel image, which carries its own initrd.
+    fn is_uki_only(&self) -> bool {
+        self.linux.is_none() && self.efi.is_none() && self.uki.is_some()
+    }
+
+    /// Whether the entry is for the architecture named `machine`, such as `x64`.
+    /// An entry without an architecture is for every architecture.
+    pub fn matches_architecture(&self, machine: &str) -> bool {
+        self.architecture
+            .as_deref()
+            .is_none_or(|architecture| architecture.eq_ignore_ascii_case(machine))
+    }
+
+    /// Fetches the load options to pass to the image that is chainloaded.
+    /// A unified kernel image with a profile gets `@<profile>` first, which selects the profile.
+    pub fn chainload_options(&self) -> Option<String> {
+        match (self.is_uki_only(), self.profile.as_deref(), self.options()) {
+            (true, Some(profile), Some(options)) => Some(format!("@{} {}", profile, options)),
+            (true, Some(profile), None) => Some(format!("@{}", profile)),
+            (_, _, options) => options,
+        }
     }
 
     /// Fetches the path to an EFI bootable image to boot, if any.
-    /// This prioritizes the linux field over efi.
+    /// This prioritizes the linux field over efi, and efi over uki.
     /// It also converts / to \\ to match EFI path style.
     pub fn chainload_path(&self) -> Option<String> {
         self.linux
             .clone()
             .or(self.efi.clone())
+            .or(self.uki.clone())
             .map(|path| path.replace('/', "\\").trim_start_matches('\\').to_string())
     }
 
     /// Fetches the paths to the initrds to pass to the kernel, in order.
     /// It also converts / to \\ to match EFI path style.
     pub fn initrd_paths(&self) -> Vec<String> {
+        // A unified kernel image has its initrd built in.
+        if self.is_uki_only() {
+            return Vec::new();
+        }
         self.initrd
             .iter()
             .map(|path| path.replace('/', "\\").trim_start_matches('\\').to_string())
@@ -1022,6 +1077,54 @@ mod tests {
     #[test]
     fn default_flags_of_no_entries_are_empty() {
         assert!(resolve_default_flags(&[]).is_empty());
+    }
+
+    #[test]
+    fn parse_architecture_uki_and_profile() {
+        let entry: BlsEntry = "uki /EFI/Linux/a.efi\narchitecture x64\nprofile 2\n"
+            .parse()
+            .unwrap();
+        assert_eq!(entry.uki.as_deref(), Some("/EFI/Linux/a.efi"));
+        assert_eq!(entry.architecture.as_deref(), Some("x64"));
+        assert_eq!(entry.profile.as_deref(), Some("2"));
+        assert!(entry.is_valid());
+    }
+
+    #[test]
+    fn uki_is_used_last_for_chainloading() {
+        let entry: BlsEntry = "uki /a.efi\nefi /b.efi\n".parse().unwrap();
+        assert_eq!(entry.chainload_path().as_deref(), Some("b.efi"));
+        let entry: BlsEntry = "uki /EFI/Linux/a.efi\n".parse().unwrap();
+        assert_eq!(entry.chainload_path().as_deref(), Some("EFI\\Linux\\a.efi"));
+    }
+
+    #[test]
+    fn uki_entries_have_no_initrds() {
+        let entry: BlsEntry = "uki /a.efi\ninitrd /initrd\n".parse().unwrap();
+        assert!(entry.initrd_paths().is_empty());
+        let entry: BlsEntry = "linux /vmlinuz\ninitrd /initrd\n".parse().unwrap();
+        assert_eq!(entry.initrd_paths(), ["initrd"]);
+    }
+
+    #[test]
+    fn architecture_must_match_ignoring_case() {
+        let entry: BlsEntry = "linux /v\narchitecture X64\n".parse().unwrap();
+        assert!(entry.matches_architecture("x64"));
+        assert!(!entry.matches_architecture("aa64"));
+        let entry: BlsEntry = "linux /v\n".parse().unwrap();
+        assert!(entry.matches_architecture("aa64"));
+    }
+
+    #[test]
+    fn uki_profile_prefixes_the_load_options() {
+        let entry: BlsEntry = "uki /a.efi\nprofile 2\noptions quiet\n".parse().unwrap();
+        assert_eq!(entry.chainload_options().as_deref(), Some("@2 quiet"));
+        let entry: BlsEntry = "uki /a.efi\nprofile 2\n".parse().unwrap();
+        assert_eq!(entry.chainload_options().as_deref(), Some("@2"));
+        let entry: BlsEntry = "linux /v\nprofile 2\noptions quiet\n".parse().unwrap();
+        assert_eq!(entry.chainload_options().as_deref(), Some("quiet"));
+        let entry: BlsEntry = "linux /v\n".parse().unwrap();
+        assert_eq!(entry.chainload_options(), None);
     }
 
     #[test]
