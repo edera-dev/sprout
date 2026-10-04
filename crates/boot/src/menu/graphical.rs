@@ -29,7 +29,10 @@ const PIXELS_PER_MILLIMETER: i64 = 8;
 const TITLE: &str = "sprout";
 
 /// The hint shown once the countdown has been stopped.
-const HINT: &str = "Pick an entry with the arrow keys or the mouse.";
+const HINT: &str = "Pick an entry with the arrow keys.";
+
+/// The hint shown instead of [HINT] when the mouse is in use.
+const HINT_MOUSE: &str = "Pick an entry with the arrow keys or the mouse.";
 
 /// The color of the top of the background, which fades into [BACKGROUND_BOTTOM].
 const BACKGROUND_TOP: (u8, u8, u8) = (0x3a, 0x1c, 0x4e);
@@ -87,8 +90,11 @@ const CURSOR: [&str; 16] = [
     "     XXXX  ",
 ];
 
-/// A graphical boot menu that selects entries with the keyboard or the mouse.
-pub struct GraphicalMenu;
+/// A graphical boot menu that selects entries with the keyboard, or the mouse if enabled.
+pub struct GraphicalMenu {
+    /// Whether the mouse is used when the firmware has a pointing device.
+    pub enable_mouse: bool,
+}
 
 /// The pointing devices of the firmware.
 /// Firmware commonly has both kinds of protocol, even if one has no device behind it.
@@ -258,7 +264,7 @@ impl Layout {
             .map(|entry| entry.title().chars().count())
             .max()
             .unwrap_or(0);
-        let status = HINT.len().max(STATUS_WIDEST.len());
+        let status = HINT.len().max(HINT_MOUSE.len()).max(STATUS_WIDEST.len());
         let panel_width = ((longest + 4) * cell + padding * 2)
             .max(40 * cell)
             .max((status + 8) * cell)
@@ -806,6 +812,7 @@ fn run(
     loop {
         scene.status = match remaining {
             Some(remaining) => format!("Boot in {} s.", remaining.as_millis().div_ceil(1000)),
+            None if mouse.is_some() => String::from(HINT_MOUSE),
             None => String::from(HINT),
         };
         for screen in screens.iter_mut() {
@@ -901,7 +908,7 @@ impl BootMenu for GraphicalMenu {
         }
 
         let mut screens = Screen::open_all(entries)?;
-        let mut mouse = Mouse::open();
+        let mut mouse = self.enable_mouse.then(Mouse::open).flatten();
 
         let result = uefi::system::with_stdin(|input| {
             run(input, mouse.take(), &mut screens, timeout, entries, default)

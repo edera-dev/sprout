@@ -8,6 +8,7 @@ sits next to it. For installing Sprout, see the [setup guides](./docs/setup).
 - [The file at a glance](#the-file-at-a-glance)
 - [Values](#values)
 - [`options`](#options)
+- [`menu-styles`](#menu-styles)
 - [`drivers`](#drivers)
 - [`extractors`](#extractors)
 - [`actions`](#actions)
@@ -58,6 +59,7 @@ Every section is optional. An empty file is a valid configuration that has no en
 version = 1
 
 [options]       # settings for Sprout itself
+[menu-styles.x] # settings for a style of menu
 [values]        # named strings for use anywhere with $name
 [drivers.x]     # EFI drivers to load
 [extractors.x]  # values worked out at boot
@@ -126,12 +128,25 @@ bls-strict-mode = false
 |-------------------|---------|----------|-------------------------------------------------------------------------|
 | `default-entry`   | string  | none     | The entry that is selected first, and booted when the timeout ends. Without it, the first entry in the menu is. |
 | `menu-timeout`    | integer | see below | Seconds to show the menu before booting the default entry.             |
-| `menu-style`      | string  | `simple` | `basic` prints entries and takes a number. `simple` is a full-screen list moved with the arrow keys. `graphical` also takes the mouse. |
+| `menu-style`      | string  | `simple` | `basic` prints entries and takes a number. `simple` is a full-screen list moved with the arrow keys. `graphical` is a menu drawn on the screen (the mouse is off unless you enable it, see [`menu-styles`](#menu-styles)). |
 | `autoconfigure`   | boolean | `false`  | Add entries for what Sprout finds. See [autoconfiguration](#autoconfiguration). |
 | `bls-strict-mode` | boolean | `false`  | See [strict mode](#strict-mode).                                        |
 
 When `menu-timeout` is not set anywhere, the menu shows for 10 seconds, or is hidden in strict mode. The
 sources are ranked in [The bootloader interface](#the-bootloader-interface).
+
+## `menu-styles`
+
+Settings for a particular menu style. Only the graphical menu has any.
+
+```toml
+[menu-styles.graphical]
+enable-mouse = true
+```
+
+| Key            | Type    | Default | Meaning                                                              |
+|----------------|---------|---------|----------------------------------------------------------------------|
+| `enable-mouse` | boolean | `false` | Select entries with the mouse and show the cursor. Without it, or when the firmware has no pointing device, the menu takes the keyboard only. |
 
 ## `drivers`
 
