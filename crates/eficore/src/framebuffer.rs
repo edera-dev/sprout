@@ -46,8 +46,11 @@ impl Framebuffer {
     pub fn fill_rect(&mut self, x: usize, y: usize, width: usize, height: usize, color: BltPixel) {
         let end_x = x.saturating_add(width).min(self.width);
         let end_y = y.saturating_add(height).min(self.height);
+        if x >= end_x {
+            return;
+        }
         for row in y..end_y {
-            // The row is in bounds, so its range is within the pixels.
+            // The row and columns are in bounds, so its range is within the pixels.
             self.pixels[row * self.width + x..row * self.width + end_x].fill(color);
         }
     }
