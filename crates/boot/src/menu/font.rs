@@ -7,9 +7,6 @@ pub type Glyph = [u8; GLYPH_SIZE];
 /// Three dots, which are drawn where a title is cut off.
 pub const ELLIPSIS: Glyph = [0x00, 0x00, 0x00, 0x00, 0x00, 0xDB, 0xDB, 0x00];
 
-/// A heart, which is drawn next to the selected entry.
-pub const HEART: Glyph = [0x00, 0x66, 0xFF, 0xFF, 0xFF, 0x7E, 0x3C, 0x18];
-
 /// The glyphs for the printable ASCII characters from space to tilde.
 /// This is the public domain 8x8 font that is commonly used by hobby operating systems.
 const GLYPHS: [Glyph; 95] = [

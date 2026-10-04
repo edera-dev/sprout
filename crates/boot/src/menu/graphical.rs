@@ -1,5 +1,5 @@
 use crate::entries::BootableEntry;
-use crate::menu::font::{self, ELLIPSIS, GLYPH_SIZE, Glyph, HEART};
+use crate::menu::font::{self, ELLIPSIS, GLYPH_SIZE, Glyph};
 use crate::menu::logo::{LOGO, LOGO_HEIGHT, LOGO_WIDTH};
 use crate::menu::{BootMenu, wait_for_events};
 use alloc::format;
@@ -52,7 +52,7 @@ const PANEL_EDGE: BltPixel = BltPixel::new(0x4a, 0x2e, 0x66);
 /// The color of the pill behind the selected entry, taken from the Sprout logo.
 const PILL_SELECTED: BltPixel = BltPixel::new(0xff, 0x7a, 0xb8);
 
-/// The color of the title and the heart.
+/// The color of the title.
 const ACCENT: BltPixel = BltPixel::new(0xff, 0xa6, 0xd0);
 
 /// The color of entries that aren't selected.
@@ -265,10 +265,10 @@ impl Layout {
             .max()
             .unwrap_or(0);
         let status = HINT.len().max(HINT_MOUSE.len()).max(STATUS_WIDEST.len());
-        let panel_width = ((longest + 4) * cell + padding * 2)
+        let panel_width = ((longest + 3) * cell + padding * 2)
             .max(40 * cell)
             .max((status + 8) * cell)
-            .min(width.saturating_sub(margin * 2).min(width * 3 / 5));
+            .min(width.saturating_sub(margin * 2).min(width * 4 / 5));
 
         // The header is as tall as the logo, and the logo needs room to bounce.
         let fit = |logo: usize| {
@@ -322,8 +322,8 @@ impl Layout {
             visible,
             panel: (panel_x, panel_y, panel_width, panel_height),
             radius: cell,
-            text_x: panel_x + padding + cell * 3,
-            columns: list_width.saturating_sub(cell * 4) / cell,
+            text_x: panel_x + padding + cell,
+            columns: list_width.saturating_sub(cell * 2) / cell,
             footer: list_y + list + cell,
             logo: (group_x, top + bounce, logo_width, logo_height),
             bounce,
@@ -711,14 +711,6 @@ fn render(
                 layout.width,
                 layout.height,
                 PILL_SELECTED,
-            );
-            draw_glyph(
-                fb,
-                layout.x + layout.cell,
-                text_row,
-                layout.scale,
-                &HEART,
-                TEXT_SELECTED,
             );
             TEXT_SELECTED
         } else {
