@@ -13,8 +13,8 @@ use uefi_raw::table::runtime::VariableVendor;
 /// bitflags: LoaderFeatures bitflags.
 mod bitflags;
 
-/// The name of the bootloader to tell the system.
-const LOADER_NAME: &str = "Sprout";
+/// The name and version of the bootloader to tell the system.
+const LOADER_NAME: &str = concat!("Sprout ", env!("CARGO_PKG_VERSION"));
 
 /// Represents the configured timeout for the bootloader interface.
 #[derive(Default)]
@@ -56,7 +56,6 @@ impl BootloaderInterface {
     /// The feature we support in Sprout.
     fn features() -> LoaderFeatures {
         LoaderFeatures::Xbootldr
-            | LoaderFeatures::LoadDriver
             | LoaderFeatures::Tpm2ActivePcrBanks
             | LoaderFeatures::RetainShim
             | LoaderFeatures::ConfigTimeout
@@ -66,6 +65,8 @@ impl BootloaderInterface {
             | LoaderFeatures::EntryOneShot
             | LoaderFeatures::BootCounting
             | LoaderFeatures::SavedEntry
+            | LoaderFeatures::EntryPreferred
+            | LoaderFeatures::SortKey
     }
 
     /// Tell the system that Sprout was initialized at the current time.
@@ -345,6 +346,21 @@ impl BootloaderInterface {
             .get_cstr16("LoaderEntryDefault")
             .context("unable to get default entry from bootloader interface")?
             .filter(|value| !value.is_empty()))
+    }
+
+    /// Get the preferred entry set by the bootloader interface.
+    /// Unlike the default entry, an entry with no boot counter tries left is not used.
+    pub fn get_preferred_entry() -> Result<Option<String>> {
+        // An empty value is treated as if the preferred entry was not set.
+        Ok(Self::VENDOR
+            .get_cstr16("LoaderEntryPreferred")
+            .context("unable to get preferred entry from bootloader interface")?
+            .filter(|value| !value.is_empty()))
+    }
+
+    /// Remove the entry that was saved by a previous boot.
+    pub fn remove_last_booted_entry() -> Result<()> {
+        Self::VENDOR.remove("LoaderEntryLastBooted")
     }
 
     /// Get the oneshot entry set by the bootloader interface.

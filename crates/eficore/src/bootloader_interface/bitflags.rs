@@ -42,5 +42,11 @@ bitflags! {
         const Type1UkiUrl = 1 << 17;
         /// Bootloader indicates TPM2 active PCR banks.
         const Tpm2ActivePcrBanks = 1 << 18;
+        /// Bootloader supports LoaderEntryPreferred.
+        const EntryPreferred = 1 << 19;
+        /// Bootloader supports the keyboard layout.
+        const KeyboardLayout = 1 << 20;
+        /// Bootloader measures SMBIOS data.
+        const SmbiosMeasured = 1 << 21;
     }
 }
