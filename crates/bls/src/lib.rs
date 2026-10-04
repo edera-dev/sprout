@@ -9,9 +9,11 @@ use core::{cmp::Ordering, iter::Peekable, str::FromStr};
 
 mod loader_conf;
 mod pe;
+mod uki;
 
 pub use loader_conf::{LoaderConf, LoaderTimeout};
 pub use pe::{MAX_SECTION_SIZE, ReadAt, read_sections};
+pub use uki::{OsRelease, UKI_SECTIONS};
 
 /// Represents a parsed BLS entry.
 /// Fields unrelated to Sprout are not included.
@@ -33,6 +35,10 @@ pub struct BlsEntry {
     pub version: Option<String>,
     /// The machine id of the entry.
     pub machine_id: Option<String>,
+    /// The command line embedded in a unified kernel image.
+    pub cmdline: Option<String>,
+    /// The kernel version embedded in a unified kernel image.
+    pub uname: Option<String>,
     /// The boot counter of the entry, taken from the entry file name.
     /// This is never set by parsing the file content.
     pub boot_counter: Option<BootCounter>,
@@ -138,6 +144,8 @@ impl FromStr for BlsEntry {
             sort_key,
             version,
             machine_id,
+            cmdline: None,
+            uname: None,
             boot_counter: None,
         })
     }
@@ -543,6 +551,7 @@ fn compare_alphabetic<I: Iterator<Item = char>>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::collections::BTreeMap;
     use alloc::vec;
     use core::cmp::Ordering;
 
@@ -623,6 +632,79 @@ mod tests {
             offset += raw_size;
         }
         image
+    }
+
+    fn uki_sections(items: &[(&str, &str)]) -> BTreeMap<String, Vec<u8>> {
+        items
+            .iter()
+            .map(|(name, data)| (name.to_string(), data.as_bytes().to_vec()))
+            .collect()
+    }
+
+    #[test]
+    fn os_release_parses_plain_quoted_and_commented_lines() {
+        let os_release = OsRelease::parse(
+            "# comment\nID=arch\nPRETTY_NAME=\"Arch Linux\"\nNAME='Arch'\n\nBAD LINE\n",
+        );
+        assert_eq!(os_release.get("ID"), Some("arch"));
+        assert_eq!(os_release.get("PRETTY_NAME"), Some("Arch Linux"));
+        assert_eq!(os_release.get("NAME"), Some("Arch"));
+        assert_eq!(os_release.get("MISSING"), None);
+    }
+
+    #[test]
+    fn os_release_unescapes_quoted_values_and_last_value_wins() {
+        let os_release = OsRelease::parse("A=\"say \\\"hi\\\" \\\\ \\$x\"\nB=1\nB=2\n");
+        assert_eq!(os_release.get("A"), Some("say \"hi\" \\ $x"));
+        assert_eq!(os_release.get("B"), Some("2"));
+    }
+
+    #[test]
+    fn uki_entry_uses_os_release_title_version_and_sort_key() {
+        let sections = uki_sections(&[
+            (
+                ".osrel",
+                "ID=fedora\nIMAGE_ID=coreos\nPRETTY_NAME=\"Fedora CoreOS\"\nVERSION_ID=40\nIMAGE_VERSION=40.1\n",
+            ),
+            (".uname", "6.5.0\0"),
+        ]);
+        let entry = BlsEntry::from_uki(&sections, "/EFI/Linux/fedora.efi");
+        assert_eq!(entry.title.as_deref(), Some("Fedora CoreOS"));
+        assert_eq!(entry.version.as_deref(), Some("40.1"));
+        assert_eq!(entry.sort_key.as_deref(), Some("coreos"));
+        assert_eq!(entry.uname.as_deref(), Some("6.5.0"));
+        assert_eq!(entry.efi.as_deref(), Some("/EFI/Linux/fedora.efi"));
+        assert!(entry.options.is_none());
+        assert!(entry.is_valid());
+    }
+
+    #[test]
+    fn uki_entry_falls_back_through_the_fields() {
+        let sections = uki_sections(&[(".osrel", "ID=arch\nBUILD_ID=rolling\n")]);
+        let entry = BlsEntry::from_uki(&sections, "/EFI/Linux/a.efi");
+        assert_eq!(entry.title.as_deref(), Some("arch"));
+        assert_eq!(entry.version.as_deref(), Some("rolling"));
+        assert_eq!(entry.sort_key.as_deref(), Some("arch"));
+
+        let sections = uki_sections(&[(".uname", "6.1.2\n")]);
+        let entry = BlsEntry::from_uki(&sections, "/EFI/Linux/a.efi");
+        assert_eq!(entry.title, None);
+        assert_eq!(entry.version.as_deref(), Some("6.1.2"));
+    }
+
+    #[test]
+    fn uki_entry_keeps_the_trimmed_cmdline() {
+        let sections = uki_sections(&[(".cmdline", "root=/dev/sda1 quiet\0\n")]);
+        let entry = BlsEntry::from_uki(&sections, "/EFI/Linux/a.efi");
+        assert_eq!(entry.cmdline.as_deref(), Some("root=/dev/sda1 quiet"));
+    }
+
+    #[test]
+    fn uki_entry_without_sections_is_still_bootable() {
+        let entry = BlsEntry::from_uki(&BTreeMap::new(), "/EFI/Linux/a.efi");
+        assert!(entry.title.is_none());
+        assert!(entry.is_valid());
+        assert_eq!(entry.chainload_path().as_deref(), Some("EFI\\Linux\\a.efi"));
     }
 
     #[test]
