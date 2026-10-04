@@ -5,7 +5,7 @@ use crate::menu::{BootMenu, wait_for_events};
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use core::time::Duration;
 use eficore::framebuffer::Framebuffer;
 use uefi::boot::{OpenProtocolAttributes, OpenProtocolParams, ScopedProtocol};
@@ -13,6 +13,7 @@ use uefi::proto::ProtocolPointer;
 use uefi::proto::console::gop::{BltPixel, GraphicsOutput};
 use uefi::proto::console::pointer::{AbsolutePointer, Pointer};
 use uefi::proto::console::text::{Input, Key, ScanCode};
+use uefi::proto::device_path::DevicePath;
 use uefi::{Event, Handle};
 
 /// How often the countdown and the logo are updated.
@@ -278,18 +279,105 @@ impl Layout {
     }
 }
 
+/// A display that the menu is drawn to.
+struct Screen {
+    /// The graphics output of the display.
+    gop: ScopedProtocol<GraphicsOutput>,
+    /// What is drawn before it is blitted to the display.
+    fb: Framebuffer,
+    /// Where the entries are on this display.
+    layout: Layout,
+    /// The index of the first entry that is on this display.
+    offset: usize,
+}
+
+impl Screen {
+    /// Open every display that the firmware has, or fail if it has none.
+    /// The console splitter has a graphics output that draws to every display. It has no device
+    /// path, so it is only used if there are no outputs for the displays themselves.
+    fn open_all(entries: &[BootableEntry]) -> Result<Vec<Self>> {
+        let handles = uefi::boot::find_handles::<GraphicsOutput>()
+            .context("unable to find a graphics output")?;
+        let has_device_path = |handle: &Handle| {
+            uefi::boot::test_protocol::<DevicePath>(OpenProtocolParams {
+                handle: *handle,
+                agent: uefi::boot::image_handle(),
+                controller: None,
+            })
+            .unwrap_or(false)
+        };
+        let displays = handles
+            .iter()
+            .copied()
+            .filter(has_device_path)
+            .collect::<Vec<_>>();
+        let handles = if displays.is_empty() {
+            handles
+        } else {
+            displays
+        };
+
+        let mut screens = Vec::new();
+        for handle in handles {
+            // Opening it exclusively would disconnect the firmware's text console from the
+            // display, and anything printed after the menu may not show up.
+            let Ok(gop) = open_shared::<GraphicsOutput>(handle) else {
+                continue;
+            };
+            let (width, height) = gop.current_mode_info().resolution();
+            let Ok(fb) = Framebuffer::new(width, height) else {
+                continue;
+            };
+            let layout = Layout::new((width, height), entries);
+            screens.push(Self {
+                gop,
+                fb,
+                layout,
+                offset: 0,
+            });
+        }
+
+        if screens.is_empty() {
+            bail!("unable to open a graphics output");
+        }
+        Ok(screens)
+    }
+
+    /// The size of the display in pixels.
+    fn size(&self) -> (usize, usize) {
+        (self.fb.width(), self.fb.height())
+    }
+
+    /// Where `position` on a display of size `from` is on this display, keeping its place
+    /// relative to the edges.
+    fn locate(&self, position: (usize, usize), from: (usize, usize)) -> (usize, usize) {
+        let scale = |value: usize, to: usize, from: usize| {
+            (value * to / from.max(1)).min(to.saturating_sub(1))
+        };
+        (
+            scale(position.0, self.fb.width(), from.0),
+            scale(position.1, self.fb.height(), from.1),
+        )
+    }
+
+    /// Scroll so that the `selected` entry is visible.
+    fn scroll_to(&mut self, selected: usize) {
+        if selected < self.offset {
+            self.offset = selected;
+        } else if selected >= self.offset + self.layout.visible {
+            self.offset = selected + 1 - self.layout.visible;
+        }
+    }
+}
+
 /// What is shown on the framebuffer.
 struct Scene<'a> {
     /// The entries that can be chosen.
     entries: &'a [BootableEntry],
     /// The index of the selected entry.
     selected: usize,
-    /// The index of the first entry that is on the screen.
-    offset: usize,
     /// The status line at the bottom of the screen.
     status: String,
-    /// Where the cursor is, if there is a pointing device.
-    cursor: Option<(usize, usize)>,
     /// The number of ticks since the menu was shown, which moves the logo.
     ticks: usize,
 }
@@ -451,7 +539,13 @@ fn draw_cursor(fb: &mut Framebuffer, scale: usize, position: (usize, usize)) {
 }
 
 /// Draw the whole menu to the framebuffer.
-fn render(fb: &mut Framebuffer, layout: &Layout, scene: &Scene) {
+fn render(
+    fb: &mut Framebuffer,
+    layout: &Layout,
+    scene: &Scene,
+    offset: usize,
+    cursor: Option<(usize, usize)>,
+) {
     draw_background(fb, BACKGROUND_TOP, BACKGROUND_BOTTOM);
     draw_centered(fb, layout.cell * 2, layout.scale * 2, TITLE, ACCENT);
 
@@ -459,7 +553,7 @@ fn render(fb: &mut Framebuffer, layout: &Layout, scene: &Scene) {
         .entries
         .iter()
         .enumerate()
-        .skip(scene.offset)
+        .skip(offset)
         .take(layout.visible)
         .enumerate()
     {
@@ -497,7 +591,7 @@ fn render(fb: &mut Framebuffer, layout: &Layout, scene: &Scene) {
     let status_row = fb.height().saturating_sub(layout.cell * 2);
     draw_centered(fb, status_row, layout.scale, &scene.status, TEXT_MUTED);
     draw_logo(fb, layout, scene.ticks);
-    if let Some(position) = scene.cursor {
+    if let Some(position) = cursor {
         draw_cursor(fb, layout.scale, position);
     }
 }
@@ -508,13 +602,14 @@ fn render(fb: &mut Framebuffer, layout: &Layout, scene: &Scene) {
 fn run(
     input: &mut Input,
     mut mouse: Option<Mouse>,
-    gop: &mut GraphicsOutput,
-    fb: &mut Framebuffer,
+    screens: &mut [Screen],
     timeout: Option<Duration>,
     entries: &[BootableEntry],
     selected: usize,
 ) -> Result<usize> {
-    let layout = Layout::new((fb.width(), fb.height()), entries);
+    // The cursor moves within the first screen, and is shown at the same place on the others.
+    let bounds = screens[0].size();
+    let page = screens[0].layout.visible;
     let last = entries.len() - 1;
 
     // The events that wake the menu up, which are keys and pointer input.
@@ -528,29 +623,31 @@ fn run(
     let mut scene = Scene {
         entries,
         selected,
-        offset: 0,
         status: String::new(),
-        cursor: mouse.as_ref().map(|_| (fb.width() / 2, fb.height() / 2)),
         ticks: 0,
     };
+    let mut cursor = mouse.as_ref().map(|_| (bounds.0 / 2, bounds.1 / 2));
     // The time left before booting, or None once input stops the countdown.
     let mut remaining = timeout;
     let mut button_down = false;
 
     loop {
-        // Scroll so that the selected entry is visible.
-        if scene.selected < scene.offset {
-            scene.offset = scene.selected;
-        } else if scene.selected >= scene.offset + layout.visible {
-            scene.offset = scene.selected + 1 - layout.visible;
-        }
-
         scene.status = match remaining {
             Some(remaining) => format!("Boot in {} s.", remaining.as_millis().div_ceil(1000)),
             None => String::from(HINT),
         };
-        render(fb, &layout, &scene);
-        fb.blit(gop)?;
+        for screen in screens.iter_mut() {
+            screen.scroll_to(scene.selected);
+            let cursor = cursor.map(|position| screen.locate(position, bounds));
+            render(
+                &mut screen.fb,
+                &screen.layout,
+                &scene,
+                screen.offset,
+                cursor,
+            );
+            screen.fb.blit(&mut screen.gop)?;
+        }
 
         // Wake up every tick to move the logo and update the countdown.
         if wait_for_events(&events, Some(TICK))?.is_none() {
@@ -574,10 +671,10 @@ fn run(
                 Key::Special(ScanCode::HOME) => scene.selected = 0,
                 Key::Special(ScanCode::END) => scene.selected = last,
                 Key::Special(ScanCode::PAGE_UP) => {
-                    scene.selected = scene.selected.saturating_sub(layout.visible)
+                    scene.selected = scene.selected.saturating_sub(page)
                 }
                 Key::Special(ScanCode::PAGE_DOWN) => {
-                    scene.selected = (scene.selected + layout.visible).min(last)
+                    scene.selected = (scene.selected + page).min(last)
                 }
 
                 // Serial consoles may send a line feed instead of a carriage return.
@@ -589,14 +686,21 @@ fn run(
             }
         }
 
-        if let (Some(mouse), Some(cursor)) = (mouse.as_mut(), scene.cursor.as_mut())
-            && let Some(down) = mouse.poll(cursor, (fb.width(), fb.height()))?
+        if let (Some(mouse), Some(cursor)) = (mouse.as_mut(), cursor.as_mut())
+            && let Some(down) = mouse.poll(cursor, bounds)?
         {
             remaining = None;
 
             // Hovering over an entry selects it, and pressing the button boots it.
-            if let Some(slot) = layout.slot_at(*cursor) {
-                scene.selected = scene.offset + slot;
+            let hovered = screens.iter().find_map(|screen| {
+                let position = screen.locate(*cursor, bounds);
+                screen
+                    .layout
+                    .slot_at(position)
+                    .map(|slot| screen.offset + slot)
+            });
+            if let Some(entry) = hovered {
+                scene.selected = entry;
                 if down && !button_down {
                     return Ok(scene.selected);
                 }
@@ -608,7 +712,7 @@ fn run(
 
 impl BootMenu for GraphicalMenu {
     /// Selects an entry using the graphical menu.
-    /// The menu is drawn to the first graphics output, and fails if the firmware has none.
+    /// The menu is drawn to every display, and fails if the firmware has none.
     fn select<'a>(
         &self,
         timeout: Option<Duration>,
@@ -624,26 +728,11 @@ impl BootMenu for GraphicalMenu {
             return Ok(&entries[default]);
         }
 
-        let handle = uefi::boot::get_handle_for_protocol::<GraphicsOutput>()
-            .context("unable to find a graphics output")?;
-        // Opening it exclusively would disconnect the firmware's text console from the display,
-        // and anything printed after the menu may not show up.
-        let mut gop =
-            open_shared::<GraphicsOutput>(handle).context("unable to open the graphics output")?;
-        let (width, height) = gop.current_mode_info().resolution();
-        let mut fb = Framebuffer::new(width, height)?;
+        let mut screens = Screen::open_all(entries)?;
         let mut mouse = Mouse::open();
 
         let result = uefi::system::with_stdin(|input| {
-            run(
-                input,
-                mouse.take(),
-                &mut gop,
-                &mut fb,
-                timeout,
-                entries,
-                default,
-            )
+            run(input, mouse.take(), &mut screens, timeout, entries, default)
         });
 
         // Clear the console so that anything printed after the menu is readable.
