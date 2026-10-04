@@ -7,6 +7,10 @@ use alloc::vec::Vec;
 use anyhow::{Error, Result};
 use core::{cmp::Ordering, iter::Peekable, str::FromStr};
 
+mod loader_conf;
+
+pub use loader_conf::{LoaderConf, LoaderTimeout};
+
 /// Represents a parsed BLS entry.
 /// Fields unrelated to Sprout are not included.
 #[derive(Default, Debug, Clone)]
@@ -577,6 +581,81 @@ mod tests {
         let entry: BlsEntry = "linux /vmlinuz\n".parse().unwrap();
         assert!(entry.boot_counter.is_none());
         assert!(!entry.is_bad());
+    }
+
+    #[test]
+    fn loader_conf_empty_has_no_settings() {
+        let conf = LoaderConf::parse("");
+        assert_eq!(conf, LoaderConf::default());
+        assert!(conf.warnings.is_empty());
+    }
+
+    #[test]
+    fn loader_conf_reads_default_and_timeout() {
+        let conf = LoaderConf::parse("default fedora-*\ntimeout 7\n");
+        assert_eq!(conf.default.as_deref(), Some("fedora-*"));
+        assert_eq!(conf.timeout, Some(LoaderTimeout::Seconds(7)));
+        assert!(conf.warnings.is_empty());
+    }
+
+    #[test]
+    fn loader_conf_skips_comments_blank_lines_and_bom() {
+        let conf = LoaderConf::parse("\u{feff}# a comment\n\n   \n  default   arch.conf  \n");
+        assert_eq!(conf.default.as_deref(), Some("arch.conf"));
+        assert!(conf.warnings.is_empty());
+    }
+
+    #[test]
+    fn loader_conf_last_value_wins() {
+        let conf = LoaderConf::parse("default a\ndefault b\ntimeout 1\ntimeout 2\n");
+        assert_eq!(conf.default.as_deref(), Some("b"));
+        assert_eq!(conf.timeout, Some(LoaderTimeout::Seconds(2)));
+    }
+
+    #[test]
+    fn loader_conf_timeout_words() {
+        for (value, expected) in [
+            ("0", LoaderTimeout::Seconds(0)),
+            ("menu-hidden", LoaderTimeout::Hidden),
+            ("menu-disabled", LoaderTimeout::Disabled),
+            ("menu-force", LoaderTimeout::Force),
+        ] {
+            let conf = LoaderConf::parse(&format!("timeout {value}\n"));
+            assert_eq!(conf.timeout, Some(expected), "{value}");
+        }
+    }
+
+    #[test]
+    fn loader_conf_invalid_timeout_is_ignored_with_a_warning() {
+        for value in ["soon", "-1", "99999999999999999999999"] {
+            let conf = LoaderConf::parse(&format!("timeout {value}\n"));
+            assert_eq!(conf.timeout, None, "{value}");
+            assert_eq!(conf.warnings.len(), 1, "{value}");
+        }
+    }
+
+    #[test]
+    fn loader_conf_keys_without_values_are_ignored_with_a_warning() {
+        let conf = LoaderConf::parse("default\ntimeout\n");
+        assert_eq!(conf.default, None);
+        assert_eq!(conf.timeout, None);
+        assert_eq!(conf.warnings.len(), 2);
+    }
+
+    #[test]
+    fn loader_conf_warns_about_unsupported_keys() {
+        let conf = LoaderConf::parse("editor no\nentry-token machine-id\nconsole-mode max\n");
+        assert_eq!(conf.warnings.len(), 3);
+        assert!(
+            conf.warnings
+                .iter()
+                .any(|warning| warning.contains("editor"))
+        );
+        assert!(
+            conf.warnings
+                .iter()
+                .any(|warning| warning.contains("entry-token"))
+        );
     }
 
     #[test]
