@@ -230,7 +230,12 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
     // If --autoconfigure is specified or the loaded configuration has autoconfigure enabled,
     // trigger the autoconfiguration mechanism.
     if context.root().options().autoconfigure || config.options.autoconfigure {
-        autoconfigure::autoconfigure(&mut config).context("unable to autoconfigure")?;
+        autoconfigure::autoconfigure(
+            &mut config,
+            context.root().options().bls_strict_mode,
+            context.root().loaded_image_path()?,
+        )
+        .context("unable to autoconfigure")?;
     }
 
     // Unload the context so that it can be modified.
