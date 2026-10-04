@@ -80,6 +80,7 @@ We recommend running Sprout without Secure Boot for development, and with Secure
 - [x] Load Linux initrd from disk
 - [x] Devicetree support
 - [x] Basic, simple, and graphical boot menus
+- [x] A strict mode that follows the BLS specification and systemd-boot exactly
 - [x] Generators for BLS entries, lists, and matrices, with variants
 - [x] BLS autoconfiguration support
 - [x] [Secure Boot support](https://github.com/edera-dev/sprout/issues/20): beta
@@ -137,6 +138,8 @@ $ sprout.efi --menu-timeout=10
 $ sprout.efi --force-menu
 # Keep the boot console as it is when an entry is booted.
 $ sprout.efi --retain-boot-console
+# Follow the BLS specification and systemd-boot exactly.
+$ sprout.efi --bls-strict-mode
 ```
 
 ### Boot Linux from ESP
@@ -196,7 +199,7 @@ bls.path = "\\loader"
 # the device of the path. an empty path turns unified kernel images off.
 bls.uki-path = "\\EFI\\Linux"
 # also read the extended boot loader partition (XBOOTLDR) of the same disk,
-# which is sorted with the other entries. its files are on that partition, so
+# which is sorted with the other entries. strict mode always does. its files are on that partition, so
 # the action has to use $entry-root, which is empty for Sprout's own partition.
 bls.xbootldr = false
 # keep the name of the entry file as the name of the entry, so it matches
@@ -209,7 +212,8 @@ bls.entry.actions = ["boot-bls"]
 chainload.path = "$entry-root\\$chainload"
 chainload.options = ["$options"]
 chainload.devicetree = "$entry-root\\$devicetree"
-# an entry can have up to eight initrds. unused ones are skipped.
+# an entry can have up to 32 initrds, as $initrd-0 to $initrd-31. unused ones are skipped.
+# only the first eight are listed here, so add the others to boot an entry with more.
 chainload.linux-initrd-chain = [
   "$entry-root\\$initrd-0",
   "$entry-root\\$initrd-1",
@@ -224,6 +228,7 @@ chainload.linux-initrd-chain = [
 
 An entry that names a `devicetree` boots with that devicetree installed for the image, which is put
 back when the image returns. It is not used when Secure Boot is enabled, as it can't be verified.
+If it can't be installed, Sprout warns and boots without it, unless strict mode is on.
 
 #### Boot counting
 
@@ -262,14 +267,41 @@ Sprout uses the same variables as systemd-boot, so `bootctl`, `systemctl reboot 
 `LoaderEntryPreferred`, `LoaderEntryOneShot`, `LoaderEntryLastBooted`, `LoaderConfigTimeout`,
 and `LoaderConfigTimeoutOneShot`.
 
+The values that tools like `bootctl` set outrank `sprout.toml`, which outranks `loader.conf`.
+
 The default entry comes from the first of these that matches an entry:
 
-1. `default-entry` in `sprout.toml`
-2. `LoaderEntryPreferred`, then `preferred` in `loader.conf`
-3. `LoaderEntryDefault`, then `default` in `loader.conf`
+1. `LoaderEntryPreferred`, then `preferred` in `loader.conf`
+2. `LoaderEntryDefault`
+3. `default-entry` in `sprout.toml`
+4. `default` in `loader.conf`
 
-The menu timeout comes from the first of the one-shot timeout, `--menu-timeout`, `menu-timeout` in
-`sprout.toml`, `LoaderConfigTimeout`, and `loader.conf`.
+The menu timeout comes from the first of the one-shot timeout, `--menu-timeout`, `LoaderConfigTimeout`,
+`menu-timeout` in `sprout.toml`, and `loader.conf`.
+
+#### Strict mode
+
+By default, Sprout differs from systemd-boot in a few places that are friendlier or safer for a bootloader that
+reads the same files. Each of them is logged when it applies. `--bls-strict-mode`, or `bls-strict-mode = true`
+in the options of `sprout.toml`, removes all of them.
+
+| Behavior                                 | By default                                                | In strict mode                                            |
+|------------------------------------------|-----------------------------------------------------------|-----------------------------------------------------------|
+| One-shot entry (`LoaderEntryOneShot`)    | Booted at once, without the menu.                         | Only the default for this boot, so the menu still shows.  |
+| Menu timeout that nothing sets           | The menu is shown for 10 seconds.                         | The menu is hidden.                                       |
+| Default entry with no boot counter tries | Skipped for another entry.                                | Used, as `default` ignores the tries.                     |
+| Entry with more than one of `linux`, `efi`, `uki` | Boots the first of them.                         | Hidden.                                                   |
+| Entry whose file does not exist          | Shown, and it fails when booted.                          | Hidden.                                                   |
+| Unified kernel image without a name      | Named after its file.                                     | Hidden.                                                   |
+| Version of a unified kernel image        | Falls back to the kernel version in `.uname`.             | Only the os-release fields.                               |
+| Boot counter of a plain `efi` entry      | Counted.                                                  | Not counted.                                              |
+| The extended boot loader partition       | Read when `xbootldr` is set on the generator.             | Always read.                                              |
+| Autoconfiguration                        | Reads BLS entries from every disk, one generator each.    | Reads Sprout's partition and the XBOOTLDR of its disk, as one generator. |
+| Boot entry that returns                  | Sprout exits to the firmware.                             | The menu is shown again.                                  |
+| Devicetree that can't be installed       | Warns and boots without it.                               | The entry fails.                                          |
+
+In strict mode, the actions of a hand-written generator have to use `$entry-root` for the files of
+an entry, as entries can come from the extended boot loader partition.
 
 ### Generators
 
