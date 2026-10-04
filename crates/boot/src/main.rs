@@ -372,7 +372,7 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
     );
 
     // Acquire the entry that was saved by the previous boot.
-    let last_booted_entry = advisory(
+    let mut last_booted_entry = advisory(
         BootloaderInterface::get_last_booted_entry()
             .context("unable to get last booted entry from bootloader interface"),
     );
@@ -692,12 +692,14 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
                         BootloaderInterface::set_last_booted_entry(&id)
                             .context("unable to save last booted entry in bootloader interface"),
                     );
+                    last_booted_entry = Some(id.clone());
                 }
             } else if last_booted_entry.is_some() {
                 advisory(
                     BootloaderInterface::remove_last_booted_entry()
                         .context("unable to remove last booted entry in bootloader interface"),
                 );
+                last_booted_entry = None;
             }
         }
 
@@ -710,7 +712,9 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
         // still be marked as good.
         // The tries that were left before this boot used one up, if it did.
         let mut consumed_tries_left = None;
-        if let Some(target) = entry.boot_counter() {
+        if let Some(target) = entry.boot_counter()
+            && target.counting
+        {
             match target.consume() {
                 Ok(path) => {
                     info!("updated boot counter of entry {}: {}", entry.name(), path);

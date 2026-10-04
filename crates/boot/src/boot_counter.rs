@@ -29,6 +29,9 @@ pub struct BootCounterTarget {
     pub file_name: String,
     /// The extension of the file name, such as `.conf`, in its original case.
     pub extension: String,
+    /// Whether booting the entry uses up a try. An entry whose tries are not used up still
+    /// has them, so it can be bad.
+    pub counting: bool,
 }
 
 impl BootCounterTarget {

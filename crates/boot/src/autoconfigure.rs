@@ -140,12 +140,18 @@ pub fn autoconfigure(
     }
 
     // In strict mode, one generator reads both partitions, with the root of Sprout's partition.
-    if strict
-        && strict_found
-        && let Some(root) = own_root
-        && let Err(error) = bls::add_generator(config, &root, true)
-    {
-        warn!("unable to add the bls generator: {:#}", error);
+    if strict && strict_found {
+        match own_root {
+            Some(root) => {
+                if let Err(error) = bls::add_generator(config, &root, true) {
+                    warn!("unable to add the bls generator: {:#}", error);
+                }
+            }
+            None => warn!(
+                "found BLS entries, but not the partition that Sprout was loaded from, \
+                 so none are used in strict mode"
+            ),
+        }
     }
 
     Ok(())
