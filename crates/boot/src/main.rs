@@ -410,6 +410,9 @@ fn run() -> Result<()> {
     // Whether the boot menu should wait for the user, instead of counting down.
     let mut wait_for_user = false;
 
+    // Whether the menu is disabled, so that a key press can't bring it up.
+    let mut menu_disabled = false;
+
     // Apply the chosen timeout.
     match timeout {
         BootloaderInterfaceTimeout::MenuForce => {
@@ -424,9 +427,15 @@ fn run() -> Result<()> {
             menu_timeout = timeout;
         }
 
-        BootloaderInterfaceTimeout::MenuHidden | BootloaderInterfaceTimeout::MenuDisabled => {
+        BootloaderInterfaceTimeout::MenuHidden => {
             // Hide the boot menu by setting the timeout to zero.
             menu_timeout = 0;
+        }
+
+        BootloaderInterfaceTimeout::MenuDisabled => {
+            // Hide the boot menu, and don't let a key press show it.
+            menu_timeout = 0;
+            menu_disabled = true;
         }
 
         BootloaderInterfaceTimeout::Timeout(timeout) => {
@@ -593,7 +602,7 @@ fn run() -> Result<()> {
     let entry = match forced_entry {
         Some(entry) => entry,
         // Delegate to the menu to select an entry to boot.
-        None => menu::select(&timer, menu_timeout, menu_style, &entries)
+        None => menu::select(&timer, menu_timeout, menu_disabled, menu_style, &entries)
             .context("unable to select entry via boot menu")?,
     };
 
