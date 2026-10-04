@@ -130,7 +130,7 @@ $ sprout.efi --boot="Boot Xen"
 $ sprout.efi --autoconfigure
 # Use the basic boot menu instead of the simple one.
 $ sprout.efi --menu-style=basic
-# Use the graphical boot menu, which can be used with the mouse.
+# Use the graphical boot menu.
 $ sprout.efi --menu-style=graphical
 # Show the boot menu for 10 seconds before booting the default entry.
 $ sprout.efi --menu-timeout=10
@@ -140,6 +140,16 @@ $ sprout.efi --force-menu
 $ sprout.efi --retain-boot-console
 # Follow the BLS specification and systemd-boot exactly.
 $ sprout.efi --bls-strict-mode
+```
+
+### Graphical Menu
+
+The graphical menu selects entries with the keyboard. The mouse is off by default. To use it, enable it in
+`sprout.toml`. The cursor is only shown when the mouse is enabled and the firmware has a pointing device.
+
+```toml
+[menu-styles.graphical]
+enable-mouse = true
 ```
 
 ### Boot Linux from ESP

@@ -22,7 +22,7 @@ pub mod basic;
 /// font: The bitmap font that the graphical menu draws text with.
 mod font;
 
-/// graphical: A menu drawn on the graphics output that is used with the keyboard or the mouse.
+/// graphical: A menu drawn on the graphics output that is used with the keyboard, or the mouse if enabled.
 pub mod graphical;
 
 /// logo: The Sprout logo that the graphical menu draws in a corner.
@@ -177,6 +177,7 @@ pub fn select<'live>(
     timeout: Option<Duration>,
     menu_disabled: bool,
     style: MenuStyle,
+    graphical_mouse: bool,
     entries: &'live [BootableEntry],
 ) -> Result<&'live BootableEntry> {
     // A hidden menu gives the user a moment to ask for the menu with a key press.
@@ -208,7 +209,11 @@ pub fn select<'live>(
 
         // The graphical menu needs a graphics output, which not every machine has.
         // If it fails, the simple menu is used instead, which falls back to the basic menu.
-        MenuStyle::Graphical => GraphicalMenu.select(timeout, entries).or_else(|error| {
+        MenuStyle::Graphical => GraphicalMenu {
+            enable_mouse: graphical_mouse,
+        }
+        .select(timeout, entries)
+        .or_else(|error| {
             warn!(
                 "unable to show the graphical boot menu, using the simple menu: {:#}",
                 error
