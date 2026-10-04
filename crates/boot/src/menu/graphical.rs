@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 use anyhow::{Context, Result, bail};
 use core::time::Duration;
 use eficore::framebuffer::Framebuffer;
-use uefi::boot::{OpenProtocolAttributes, OpenProtocolParams, ScopedProtocol};
+use uefi::boot::{OpenProtocolParams, ScopedProtocol};
 use uefi::proto::ProtocolPointer;
 use uefi::proto::console::gop::{BltPixel, GraphicsOutput};
 use uefi::proto::console::pointer::{AbsolutePointer, Pointer};
@@ -99,24 +99,6 @@ struct Mouse {
     absolute: Option<ScopedProtocol<AbsolutePointer>>,
 }
 
-/// Open the protocol `P` on `handle` without taking it from the firmware.
-/// An exclusive open makes the firmware disconnect every driver that is using the protocol,
-/// and on some firmware that never returns.
-fn open_shared<P: ProtocolPointer + ?Sized>(handle: Handle) -> uefi::Result<ScopedProtocol<P>> {
-    // SAFETY: The protocols opened this way are only used from this thread, and the firmware
-    // keeps them installed for as long as the menu is open.
-    unsafe {
-        uefi::boot::open_protocol::<P>(
-            OpenProtocolParams {
-                handle,
-                agent: uefi::boot::image_handle(),
-                controller: None,
-            },
-            OpenProtocolAttributes::GetProtocol,
-        )
-    }
-}
-
 /// Open the pointer protocol `P`, preferring the one on the console input handle.
 /// That one belongs to the console splitter, which combines every device and is never removed.
 /// Otherwise, the first device that has the protocol is used.
@@ -125,10 +107,10 @@ fn open_pointer<P: ProtocolPointer + ?Sized>() -> Option<ScopedProtocol<P>> {
     let console = uefi::table::system_table_raw()
         .and_then(|table| unsafe { Handle::from_ptr(table.as_ref().stdin_handle) });
     console
-        .and_then(|handle| open_shared::<P>(handle).ok())
+        .and_then(|handle| eficore::handle::open_shared::<P>(handle).ok())
         .or_else(|| {
             uefi::boot::get_handle_for_protocol::<P>()
-                .and_then(open_shared::<P>)
+                .and_then(eficore::handle::open_shared::<P>)
                 .ok()
         })
 }
@@ -407,7 +389,7 @@ impl Screen {
         for handle in handles {
             // Opening it exclusively would disconnect the firmware's text console from the
             // display, and anything printed after the menu may not show up.
-            let Ok(gop) = open_shared::<GraphicsOutput>(handle) else {
+            let Ok(gop) = eficore::handle::open_shared::<GraphicsOutput>(handle) else {
                 continue;
             };
             let (width, height) = gop.current_mode_info().resolution();

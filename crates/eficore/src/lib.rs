@@ -27,6 +27,9 @@ pub mod platform;
 /// Secure Boot support.
 pub mod secure;
 
+/// Finding the Extended Boot Loader Partition.
+pub mod xbootldr;
+
 /// Support for the shim loader application that enables Secure Boot.
 pub mod shim;
 
