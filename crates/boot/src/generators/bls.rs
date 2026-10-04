@@ -8,6 +8,7 @@ use alloc::{
     vec::Vec,
 };
 use anyhow::{Context, Result};
+use core::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use core::{cmp::Ordering, str::FromStr};
 use edera_sprout_bls::{
     BlsEntry, BootCounter, is_reserved_entry_name, profile_id_suffix, sort_bls, strip_extension,
@@ -36,6 +37,10 @@ const ARCHITECTURE: &str = "x64";
 /// The name of the architecture of this machine in BLS entries.
 #[cfg(target_arch = "aarch64")]
 const ARCHITECTURE: &str = "aa64";
+
+/// Whether the extended boot loader partition was added by a generator in strict mode, which
+/// does it once, so that more than one generator does not list its entries twice.
+static STRICT_XBOOTLDR_ADDED: AtomicBool = AtomicBool::new(false);
 
 /// The number of initrd slots set on each BLS entry.
 /// Entries set `initrd-0` through `initrd-31`, and slots without an initrd are empty.
@@ -311,9 +316,7 @@ fn generate_type1(
         // systemd-boot only counts the tries of the entries it boots as a kernel or as a unified
         // kernel image, and not those of a plain EFI program.
         let counted = !(strict && entry.linux.is_none() && entry.uki.is_none());
-        if let Some(counter) = boot_counter
-            && counted
-        {
+        if let Some(counter) = boot_counter {
             boot.set_boot_counter(BootCounterTarget {
                 counter,
                 filesystem: bls_resolved.filesystem_handle,
@@ -321,6 +324,7 @@ fn generate_type1(
                 id: name.clone(),
                 file_name,
                 extension,
+                counting: counted,
             });
         }
 
@@ -446,6 +450,7 @@ fn generate_type2(
                     id: id.clone(),
                     file_name: file_name.clone(),
                     extension: extension.clone(),
+                    counting: true,
                 });
             }
             found.push((entry, boot));
@@ -532,7 +537,9 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
 
     // Add the entries of the Extended Boot Loader Partition, which are sorted together with the
     // others. A problem with it should not prevent booting from the entries that are found.
-    if bls.xbootldr || context.root().options().bls_strict_mode {
+    let strict_xbootldr = context.root().options().bls_strict_mode
+        && !STRICT_XBOOTLDR_ADDED.swap(true, AtomicOrdering::Relaxed);
+    if bls.xbootldr || strict_xbootldr {
         match xbootldr_root(&context) {
             Ok(Some(root)) => {
                 let xbootldr_uki = uki_path.as_ref().map(|_| format!("{}\\EFI\\Linux", root));

@@ -1,4 +1,5 @@
 use crate::context::SproutContext;
+use crate::generators::bls::BLS_INITRD_SLOTS;
 use crate::phases::before_handoff;
 use alloc::boxed::Box;
 use alloc::format;
@@ -159,6 +160,24 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
         .iter()
         .chain(configuration.linux_initrd_chain.iter())
         .map(|item| context.stamp(item));
+
+    // A BLS entry can have more initrds than the chain lists. Those would be dropped without a
+    // word, and then the kernel may not find its root, so say so.
+    let chain_length = configuration.linux_initrd_chain.len();
+    if chain_length > 0 {
+        for slot in chain_length..BLS_INITRD_SLOTS {
+            let placeholder = format!("$initrd-{}", slot);
+            let value = context.stamp(&placeholder);
+            if !value.is_empty() && value != placeholder {
+                warn!(
+                    "the entry has an initrd for slot {}, but linux-initrd-chain only lists {}, \
+                     so it is not loaded",
+                    slot, chain_length
+                );
+                break;
+            }
+        }
+    }
 
     // Read each initrd and concatenate the contents in order.
     // Paths that are empty after stamping are skipped.
