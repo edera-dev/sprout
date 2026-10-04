@@ -13,10 +13,13 @@ mod uki;
 
 pub use loader_conf::{LoaderConf, LoaderTimeout, RebootOnError};
 pub use pe::{
-    MAX_SECTION_SIZE, PE_MACHINE_AARCH64, PE_MACHINE_X86_64, PeImage, ReadAt, read_pe,
+    MAX_SECTION_SIZE, PE_MACHINE_AARCH64, PE_MACHINE_X86_64, PeImage, PeSection, ReadAt, read_pe,
     read_sections,
 };
-pub use uki::{OsRelease, UKI_SECTIONS};
+pub use uki::{
+    MAX_PROFILES, OsRelease, ProfileInfo, UKI_SECTIONS, UkiProfile, profile_entry_id,
+    profile_id_suffix, profile_title, uki_profiles,
+};
 
 /// Represents a parsed BLS entry.
 /// Fields unrelated to Sprout are not included.
@@ -282,6 +285,12 @@ impl BlsEntry {
         self.machine_id.clone()
     }
 
+    /// The number of the profile of a unified kernel image that the entry boots, which is zero
+    /// for the first profile and for entries that don't have one.
+    pub fn profile_number(&self) -> u32 {
+        self.profile.as_deref().and_then(parse_digits).unwrap_or(0)
+    }
+
     /// Whether the entry has a boot counter with no tries left.
     pub fn is_bad(&self) -> bool {
         self.boot_counter.is_some_and(|counter| counter.is_bad())
@@ -347,21 +356,24 @@ impl BootCounter {
     }
 }
 
-/// Decides which entries are the default. Each item of `entries` is `(is_default, is_bad)`,
-/// and the result says whether each entry is the default afterwards.
+/// Decides which entries are the default. Each item of `entries` is
+/// `(is_default, is_bad, is_extra_profile)`, and the result says whether each entry is the
+/// default afterwards.
 /// Bad entries, which have no boot counter tries left, are never the default while a good entry
-/// exists. If no entry is a default, the first good entry is picked, or the first entry if every
-/// entry is bad, so that there is always something to boot.
-pub fn resolve_default_flags(entries: &[(bool, bool)]) -> Vec<bool> {
-    let any_good = entries.iter().any(|(_, bad)| !bad);
+/// exists. If no entry is a default, the first good entry is picked, which is not a profile of
+/// a unified kernel image after the first, unless there is nothing else. If every entry is bad,
+/// the first entry is picked, so that there is always something to boot.
+pub fn resolve_default_flags(entries: &[(bool, bool, bool)]) -> Vec<bool> {
+    let any_good = entries.iter().any(|(_, bad, _)| !bad);
     let mut flags: Vec<bool> = entries
         .iter()
-        .map(|(default, bad)| *default && !(any_good && *bad))
+        .map(|(default, bad, _)| *default && !(any_good && *bad))
         .collect();
     if !flags.iter().any(|default| *default) {
         let pick = entries
             .iter()
-            .position(|(_, bad)| !bad)
+            .position(|(_, bad, extra)| !bad && !extra)
+            .or_else(|| entries.iter().position(|(_, bad, _)| !bad))
             .or_else(|| (!entries.is_empty()).then_some(0));
         if let Some(index) = pick {
             flags[index] = true;
@@ -429,7 +441,9 @@ pub fn sort_bls(a_bls: &BlsEntry, a_name: &str, b_bls: &BlsEntry, b_name: &str) 
             .then_with(|| {
                 compare_versions_optional(a_bls.version().as_deref(), b_bls.version().as_deref())
                     .reverse()
-            }),
+            })
+            // The profiles of one image are in the order they are in the image.
+            .then_with(|| a_bls.profile_number().cmp(&b_bls.profile_number())),
         (Some(_), None) => Ordering::Less,
         (None, Some(_)) => Ordering::Greater,
         (None, None) => Ordering::Equal,
@@ -443,6 +457,7 @@ pub fn sort_bls(a_bls: &BlsEntry, a_name: &str, b_bls: &BlsEntry, b_name: &str) 
     // the boot counter: more tries left first, then fewer tries done.
     ordering
         .then_with(|| compare_versions(a_name, b_name).reverse())
+        .then_with(|| a_bls.profile_number().cmp(&b_bls.profile_number()))
         .then_with(|| {
             let tries = |entry: &BlsEntry| {
                 entry
@@ -786,7 +801,7 @@ mod tests {
         assert_eq!(entry.version.as_deref(), Some("40.1"));
         assert_eq!(entry.sort_key.as_deref(), Some("coreos"));
         assert_eq!(entry.uname.as_deref(), Some("6.5.0"));
-        assert_eq!(entry.efi.as_deref(), Some("/EFI/Linux/fedora.efi"));
+        assert_eq!(entry.uki.as_deref(), Some("/EFI/Linux/fedora.efi"));
         assert!(entry.options.is_none());
         assert!(entry.is_valid());
     }
@@ -875,12 +890,284 @@ mod tests {
         assert_eq!(strip_extension(".efi", ".efi"), Some(("", ".efi")));
     }
 
+    fn text_section(name: &str, text: &str) -> PeSection {
+        PeSection {
+            name: name.to_string(),
+            data: Some(text.as_bytes().to_vec()),
+        }
+    }
+
+    fn cmdline(profile: &UkiProfile) -> Option<&[u8]> {
+        profile.sections.get(".cmdline").map(|data| data.as_slice())
+    }
+
+    #[test]
+    fn profiles_without_a_profile_section_are_a_single_base() {
+        let sections = [
+            text_section(".osrel", "ID=a"),
+            text_section(".cmdline", "q"),
+        ];
+        let profiles = uki_profiles(&sections);
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].index, None);
+        assert_eq!(cmdline(&profiles[0]), Some(&b"q"[..]));
+        assert!(profiles[0].sections.contains_key(".osrel"));
+    }
+
+    #[test]
+    fn profiles_follow_the_spec_layout() {
+        let sections = [
+            text_section(".osrel", "ID=a"),
+            text_section(".cmdline", "base"),
+            text_section(".profile", "ID=p0"),
+            text_section(".profile", "ID=p1"),
+            text_section(".cmdline", "one"),
+            text_section(".profile", "ID=p2\nTITLE=Two"),
+            text_section(".cmdline", "two"),
+        ];
+        let profiles = uki_profiles(&sections);
+        assert_eq!(profiles.len(), 3);
+        assert_eq!(
+            profiles.iter().map(|p| p.index).collect::<Vec<_>>(),
+            [Some(0), Some(1), Some(2)]
+        );
+        // The first profile has no sections of its own, so it uses the base.
+        assert_eq!(cmdline(&profiles[0]), Some(&b"base"[..]));
+        assert_eq!(cmdline(&profiles[1]), Some(&b"one"[..]));
+        assert_eq!(cmdline(&profiles[2]), Some(&b"two"[..]));
+        assert!(profiles.iter().all(|p| p.sections.contains_key(".osrel")));
+        assert_eq!(profiles[1].info.id.as_deref(), Some("p1"));
+        assert_eq!(profiles[2].info.title.as_deref(), Some("Two"));
+    }
+
+    #[test]
+    fn the_first_section_of_a_name_wins_within_a_range() {
+        let sections = [
+            text_section(".profile", "ID=p"),
+            text_section(".cmdline", "a"),
+            text_section(".cmdline", "b"),
+        ];
+        assert_eq!(cmdline(&uki_profiles(&sections)[0]), Some(&b"a"[..]));
+    }
+
+    #[test]
+    fn an_empty_or_oversized_profile_section_masks_the_base() {
+        let sections = [
+            text_section(".cmdline", "base"),
+            text_section(".profile", "ID=empty"),
+            text_section(".cmdline", ""),
+            text_section(".profile", "ID=big"),
+            PeSection {
+                name: ".cmdline".to_string(),
+                data: None,
+            },
+        ];
+        let profiles = uki_profiles(&sections);
+        assert_eq!(cmdline(&profiles[0]), None);
+        assert_eq!(cmdline(&profiles[1]), None);
+    }
+
+    #[test]
+    fn a_profile_can_override_the_os_release() {
+        let sections = [
+            text_section(".osrel", "ID=base\nPRETTY_NAME=Base"),
+            text_section(".profile", "ID=p"),
+            text_section(".osrel", "ID=other\nPRETTY_NAME=Other"),
+        ];
+        let profiles = uki_profiles(&sections);
+        let entry = BlsEntry::from_uki_profile(&profiles[0], "/a.efi");
+        assert_eq!(entry.title.as_deref(), Some("Other"));
+    }
+
+    #[test]
+    fn a_leading_profile_section_means_an_empty_base() {
+        let sections = [
+            text_section(".profile", "ID=p"),
+            text_section(".osrel", "ID=a"),
+        ];
+        let profiles = uki_profiles(&sections);
+        assert_eq!(profiles.len(), 1);
+        assert!(profiles[0].sections.contains_key(".osrel"));
+    }
+
+    #[test]
+    fn profiles_are_capped() {
+        let sections: Vec<PeSection> = (0..300)
+            .map(|index| text_section(".profile", &format!("ID=p{index}")))
+            .collect();
+        assert_eq!(uki_profiles(&sections).len(), MAX_PROFILES);
+    }
+
+    #[test]
+    fn profile_info_parses_like_os_release() {
+        let info = ProfileInfo::parse("# c\nID=\"one\"\nTITLE='Hello World'\nID=two\n");
+        assert_eq!(info.id.as_deref(), Some("two"));
+        assert_eq!(info.title.as_deref(), Some("Hello World"));
+        let info = ProfileInfo::parse("ID=\nTITLE=\n");
+        assert_eq!(info, ProfileInfo::default());
+    }
+
+    #[test]
+    fn profile_ids_and_titles_follow_systemd_boot() {
+        let named = ProfileInfo {
+            id: Some("factory".to_string()),
+            title: None,
+        };
+        let titled = ProfileInfo {
+            id: Some("factory".to_string()),
+            title: Some("Factory Reset".to_string()),
+        };
+        let bare = ProfileInfo::default();
+
+        // The first profile has no suffix, the others have the id or their number.
+        assert_eq!(profile_id_suffix(0, &named), None);
+        assert_eq!(profile_id_suffix(1, &named).as_deref(), Some("factory"));
+        assert_eq!(profile_id_suffix(2, &bare).as_deref(), Some("2"));
+
+        assert_eq!(profile_title("Fedora", 0, &bare), "Fedora");
+        assert_eq!(
+            profile_title("Fedora", 0, &titled),
+            "Fedora (Factory Reset)"
+        );
+        assert_eq!(profile_title("Fedora", 1, &named), "Fedora (factory)");
+        assert_eq!(profile_title("Fedora", 1, &bare), "Fedora (Profile #2)");
+        assert_eq!(
+            profile_title("Fedora", 3, &titled),
+            "Fedora (Factory Reset)"
+        );
+    }
+
+    #[test]
+    fn profile_entry_ids_only_keep_the_case_of_the_profile() {
+        assert_eq!(profile_entry_id("Fedora.EFI", None), "fedora.efi");
+        assert_eq!(
+            profile_entry_id("Fedora.EFI", Some("Factory")),
+            "fedora.efi@Factory"
+        );
+    }
+
+    #[test]
+    fn profile_entries_select_the_profile_with_load_options() {
+        let sections = [
+            text_section(".osrel", "ID=a"),
+            text_section(".profile", "ID=p0"),
+            text_section(".profile", "ID=p1"),
+        ];
+        let profiles = uki_profiles(&sections);
+        let first = BlsEntry::from_uki_profile(&profiles[0], "/a.efi");
+        assert_eq!(first.chainload_options(), None);
+        let second = BlsEntry::from_uki_profile(&profiles[1], "/a.efi");
+        assert_eq!(second.chainload_options().as_deref(), Some("@1"));
+        assert_eq!(second.chainload_path().as_deref(), Some("a.efi"));
+        assert!(second.initrd_paths().is_empty());
+    }
+
+    #[test]
+    fn profiles_of_one_image_sort_by_number() {
+        let sections = [
+            text_section(".osrel", "ID=a"),
+            text_section(".profile", "ID=p0"),
+            text_section(".profile", "ID=p1"),
+        ];
+        let profiles = uki_profiles(&sections);
+        let first = BlsEntry::from_uki_profile(&profiles[0], "/a.efi");
+        let second = BlsEntry::from_uki_profile(&profiles[1], "/a.efi");
+        assert_eq!(sort_bls(&first, "a.efi", &second, "a.efi"), Ordering::Less);
+        assert_eq!(
+            sort_bls(&second, "a.efi", &first, "a.efi"),
+            Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn a_newer_version_sorts_before_the_profiles_of_an_older_one() {
+        let new = BlsEntry {
+            version: Some("2".to_string()),
+            profile: Some("1".to_string()),
+            ..sort_entry(Some("linux"), None, Some("2"))
+        };
+        let old = BlsEntry {
+            version: Some("1".to_string()),
+            ..sort_entry(Some("linux"), None, Some("1"))
+        };
+        assert_eq!(sort_bls(&new, "a", &old, "a"), Ordering::Less);
+    }
+
+    #[test]
+    fn default_flags_never_fall_back_to_extra_profiles() {
+        // Each item is (is_default, is_bad, is_extra_profile).
+        let flags = resolve_default_flags(&[(false, false, true), (false, false, false)]);
+        assert_eq!(flags, [false, true]);
+        // An extra profile can still be a default that was asked for.
+        let flags = resolve_default_flags(&[(true, false, true), (false, false, false)]);
+        assert_eq!(flags, [true, false]);
+        // With nothing else, an extra profile is better than nothing.
+        let flags = resolve_default_flags(&[(false, false, true)]);
+        assert_eq!(flags, [true]);
+    }
+
+    #[test]
+    fn pe_keeps_duplicate_sections_in_order() {
+        let image = pe_image(&[
+            (".osrel", b"ID=a"),
+            (".profile", b"ID=one"),
+            (".cmdline", b"x"),
+            (".profile", b"ID=two"),
+            (".cmdline", b"y"),
+            (".text", b"code"),
+        ]);
+        let pe = read_pe(&mut image.as_slice(), &[".osrel", ".profile", ".cmdline"]).unwrap();
+        let names: Vec<_> = pe
+            .sections
+            .iter()
+            .map(|section| section.name.as_str())
+            .collect();
+        assert_eq!(
+            names,
+            [".osrel", ".profile", ".cmdline", ".profile", ".cmdline"]
+        );
+        assert_eq!(pe.sections[3].data.as_deref(), Some(&b"ID=two"[..]));
+    }
+
+    #[test]
+    fn pe_keeps_oversized_sections_without_data() {
+        let big = vec![b'a'; MAX_SECTION_SIZE as usize + 1];
+        let image = pe_image(&[(".cmdline", &big), (".osrel", b"ID=x")]);
+        let pe = read_pe(&mut image.as_slice(), &[".cmdline", ".osrel"]).unwrap();
+        assert_eq!(pe.sections[0].name, ".cmdline");
+        assert_eq!(pe.sections[0].data, None);
+        assert_eq!(pe.sections[1].data.as_deref(), Some(&b"ID=x"[..]));
+    }
+
+    #[test]
+    fn pe_accepts_many_sections_and_rejects_too_many() {
+        let many: Vec<(&str, &[u8])> = (0..300).map(|_| (".dtbauto", &b"d"[..])).collect();
+        let image = pe_image(&many);
+        let pe = read_pe(&mut image.as_slice(), &[".dtbauto"]).unwrap();
+        assert_eq!(pe.sections.len(), 300);
+
+        let mut image = pe_image(&[(".osrel", b"ID=x")]);
+        image[0x86..0x88].copy_from_slice(&5000u16.to_le_bytes());
+        assert!(read_pe(&mut image.as_slice(), &[".osrel"]).is_err());
+    }
+
+    #[test]
+    fn pe_zero_virtual_size_means_an_empty_section() {
+        let mut image = pe_image(&[(".cmdline", b"quiet")]);
+        // The virtual size is at offset 8 of the first section table entry.
+        let entry = 0x80 + 24;
+        image[entry + 8..entry + 12].copy_from_slice(&0u32.to_le_bytes());
+        let pe = read_pe(&mut image.as_slice(), &[".cmdline"]).unwrap();
+        assert_eq!(pe.sections[0].data.as_deref(), Some(&b""[..]));
+    }
+
     #[test]
     fn pe_reports_the_machine_type() {
         let image = pe_image(&[(".osrel", b"ID=x")]);
         let pe = read_pe(&mut image.as_slice(), &[".osrel"]).unwrap();
         assert_eq!(pe.machine, PE_MACHINE_X86_64);
-        assert!(pe.sections.contains_key(".osrel"));
+        assert_eq!(pe.sections.len(), 1);
+        assert_eq!(pe.sections[0].name, ".osrel");
     }
 
     #[test]
@@ -1122,19 +1409,27 @@ mod tests {
     #[test]
     fn default_flags_keep_a_good_default() {
         // The second entry is bad and also matched the default pattern.
-        let flags = resolve_default_flags(&[(true, false), (true, true), (false, false)]);
+        let flags = resolve_default_flags(&[
+            (true, false, false),
+            (true, true, false),
+            (false, false, false),
+        ]);
         assert_eq!(flags, [true, false, false]);
     }
 
     #[test]
     fn default_flags_replace_a_bad_default_with_the_first_good_entry() {
-        let flags = resolve_default_flags(&[(false, false), (true, true), (false, false)]);
+        let flags = resolve_default_flags(&[
+            (false, false, false),
+            (true, true, false),
+            (false, false, false),
+        ]);
         assert_eq!(flags, [true, false, false]);
     }
 
     #[test]
     fn default_flags_fallback_skips_bad_entries() {
-        let flags = resolve_default_flags(&[(false, true), (false, false)]);
+        let flags = resolve_default_flags(&[(false, true, false), (false, false, false)]);
         assert_eq!(flags, [false, true]);
     }
 
@@ -1142,11 +1437,11 @@ mod tests {
     fn default_flags_when_every_entry_is_bad() {
         // A configured default stays, otherwise the first entry is the default.
         assert_eq!(
-            resolve_default_flags(&[(false, true), (true, true)]),
+            resolve_default_flags(&[(false, true, false), (true, true, false)]),
             [false, true]
         );
         assert_eq!(
-            resolve_default_flags(&[(false, true), (false, true)]),
+            resolve_default_flags(&[(false, true, false), (false, true, false)]),
             [true, false]
         );
     }

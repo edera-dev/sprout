@@ -14,8 +14,9 @@ pub const PE_MACHINE_X86_64: u16 = 0x8664;
 /// The machine type of an aarch64 PE image.
 pub const PE_MACHINE_AARCH64: u16 = 0xaa64;
 
-/// The most sections a PE image can have.
-const MAX_SECTIONS: usize = 96;
+/// The most sections that are read from a PE image. A unified kernel image with many profiles
+/// has many more sections than the 96 that Windows allows, and the table is still small.
+const MAX_SECTIONS: usize = 1024;
 
 /// The size of a section table entry.
 const SECTION_ENTRY_SIZE: usize = 40;
@@ -59,22 +60,40 @@ fn u32_at(bytes: &[u8], offset: usize) -> u32 {
 pub struct PeImage {
     /// The machine type from the COFF header, such as [PE_MACHINE_X86_64].
     pub machine: u16,
-    /// The contents of the wanted sections that were found.
-    pub sections: BTreeMap<String, Vec<u8>>,
+    /// The wanted sections, in the order of the section table, including repeated names.
+    pub sections: Vec<PeSection>,
 }
 
-/// Reads the sections named in `wanted` from the PE image in `reader`.
-/// See [read_pe] for the details.
+/// A wanted section of a PE image.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PeSection {
+    /// The name of the section, such as `.osrel`.
+    pub name: String,
+    /// The contents of the section, or None if it is larger than [MAX_SECTION_SIZE]. A section
+    /// without contents is still there, as it takes the place of a section with the same name.
+    pub data: Option<Vec<u8>>,
+}
+
+/// Reads the sections named in `wanted` from the PE image in `reader`, keeping the first
+/// section of each name. See [read_pe] for the details.
 pub fn read_sections<R: ReadAt>(
     reader: &mut R,
     wanted: &[&str],
 ) -> Result<BTreeMap<String, Vec<u8>>> {
-    Ok(read_pe(reader, wanted)?.sections)
+    let mut sections = BTreeMap::new();
+    for section in read_pe(reader, wanted)?.sections {
+        sections.entry(section.name).or_insert(section.data);
+    }
+    // A section that was too large is not available.
+    Ok(sections
+        .into_iter()
+        .filter_map(|(name, data)| data.map(|data| (name, data)))
+        .collect())
 }
 
 /// Reads the machine type and the sections named in `wanted` from the PE image in `reader`.
 /// Only the headers and the wanted sections are read, so this is cheap on large images.
-/// A wanted section that is missing, or larger than [MAX_SECTION_SIZE], is left out.
+/// A wanted section that is larger than [MAX_SECTION_SIZE] is listed without its contents.
 /// An image that isn't a valid PE file is an error.
 pub fn read_pe<R: ReadAt>(reader: &mut R, wanted: &[&str]) -> Result<PeImage> {
     // The DOS header starts with "MZ" and holds the offset of the PE header at 0x3c.
@@ -102,14 +121,14 @@ pub fn read_pe<R: ReadAt>(reader: &mut R, wanted: &[&str]) -> Result<PeImage> {
     let mut table = vec![0u8; section_count * SECTION_ENTRY_SIZE];
     reader.read_at(pe_offset + 24 + optional_header_size, &mut table)?;
 
-    let mut sections = BTreeMap::new();
+    let mut sections = Vec::new();
     for entry in table.as_chunks::<SECTION_ENTRY_SIZE>().0 {
         // The name is up to eight bytes, padded with NUL.
         let name_len = entry[..8].iter().position(|b| *b == 0).unwrap_or(8);
         let Ok(name) = core::str::from_utf8(&entry[..name_len]) else {
             continue;
         };
-        if !wanted.contains(&name) || sections.contains_key(name) {
+        if !wanted.contains(&name) {
             continue;
         }
 
@@ -117,18 +136,23 @@ pub fn read_pe<R: ReadAt>(reader: &mut R, wanted: &[&str]) -> Result<PeImage> {
         let virtual_size = u64::from(u32_at(entry, 8));
         let raw_size = u64::from(u32_at(entry, 16));
         let raw_offset = u64::from(u32_at(entry, 20));
-        let size = if virtual_size == 0 {
-            raw_size
-        } else {
-            virtual_size.min(raw_size)
-        };
+        // A virtual size of zero makes the section empty, which is how a profile removes a section
+        // of the base image.
+        let size = virtual_size.min(raw_size);
         if size > MAX_SECTION_SIZE {
+            sections.push(PeSection {
+                name: name.to_string(),
+                data: None,
+            });
             continue;
         }
 
         let mut data = vec![0u8; size as usize];
         reader.read_at(raw_offset, &mut data)?;
-        sections.insert(name.to_string(), data);
+        sections.push(PeSection {
+            name: name.to_string(),
+            data: Some(data),
+        });
     }
 
     Ok(PeImage { machine, sections })
