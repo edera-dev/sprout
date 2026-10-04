@@ -91,6 +91,12 @@ pub struct OptionsConfiguration {
     /// Enables autoconfiguration of Sprout based on the environment.
     #[serde(default)]
     pub autoconfigure: bool,
+    /// Makes Sprout follow the Boot Loader Specification and systemd-boot exactly where it
+    /// otherwise differs for convenience or safety. For example, the extended boot loader
+    /// partition is always read, a one-shot entry only sets the default entry, and entries with
+    /// missing files are hidden. See the README for everything it changes.
+    #[serde(rename = "bls-strict-mode", default)]
+    pub bls_strict_mode: bool,
 }
 
 /// The default configuration, which matches an empty configuration file.
@@ -118,6 +124,7 @@ impl Default for OptionsConfiguration {
             menu_timeout: None,
             menu_style: Default::default(),
             autoconfigure: false,
+            bls_strict_mode: false,
         }
     }
 }
@@ -162,6 +169,12 @@ mod tests {
         assert_eq!(default.options.menu_style, empty.options.menu_style);
         assert_eq!(default.options.default_entry, empty.options.default_entry);
         assert_eq!(default.options.autoconfigure, empty.options.autoconfigure);
+    }
+
+    #[test]
+    fn bls_strict_mode_is_off_by_default() {
+        assert!(!RootConfiguration::default().options.bls_strict_mode);
+        assert!(!empty().options.bls_strict_mode);
     }
 
     #[test]
