@@ -196,15 +196,12 @@ impl BootableEntry {
     }
 
     /// Create a variant of this entry, with the name suffixed by `suffix` and using `context`.
-    /// The actions of the entry are stamped with `context`, the same as the list generator.
+    /// The actions of the entry are stamped with `context` when the entry is booted.
     /// Variants of the same entry keep the sort key of this entry, so they stay grouped
     /// together in the order they were created in.
     pub fn variant(&self, suffix: &str, context: Rc<SproutContext>) -> Self {
         let mut entry = self.clone();
         entry.name.push_str(suffix);
-        entry.declaration.actions = context
-            .stamp_iter(entry.declaration.actions.iter())
-            .collect();
         // Without any sort key, the name is used to sort, which differs between variants.
         // Pin the sort key to the name of this entry to keep the variants together.
         if entry.sort_key.is_none() && entry.declaration.sort_key.is_none() {
