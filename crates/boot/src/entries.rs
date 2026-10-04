@@ -20,6 +20,7 @@ pub struct BootableEntry {
     boot_counter: Option<BootCounterTarget>,
     id_suffix: Option<String>,
     id_profile: Option<String>,
+    extra_profile: bool,
 }
 
 impl BootableEntry {
@@ -41,6 +42,7 @@ impl BootableEntry {
             boot_counter: None,
             id_suffix: None,
             id_profile: None,
+            extra_profile: false,
         }
     }
 
@@ -78,7 +80,12 @@ impl BootableEntry {
     /// Fetch whether the entry is a profile of a unified kernel image after the first, which
     /// is never picked as the default entry unless it was asked for.
     pub fn is_extra_profile(&self) -> bool {
-        self.id_profile.is_some()
+        self.id_profile.is_some() || self.extra_profile
+    }
+
+    /// Mark this entry as booting a profile of a unified kernel image after the first.
+    pub fn mark_extra_profile(&mut self) {
+        self.extra_profile = true;
     }
 
     /// Set the profile of a unified kernel image that is part of the id of this entry.

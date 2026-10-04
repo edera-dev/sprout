@@ -13,6 +13,7 @@ use eficore::loader::source::ImageSource;
 use eficore::loader::{ImageLoadRequest, ImageLoader};
 use eficore::media_loader::MediaLoaderHandle;
 use eficore::media_loader::constants::linux::LINUX_EFI_INITRD_MEDIA_GUID;
+use eficore::path::ResolvedPath;
 use eficore::secure::SecureBoot;
 use log::warn;
 use uefi::proto::loaded_image::LoadedImage;
@@ -31,6 +32,22 @@ fn read_optional_file(
     path: &str,
     what: &str,
 ) -> Result<Option<Vec<u8>>> {
+    let Some(resolved) = resolve_optional_file(context, path, what)? else {
+        return Ok(None);
+    };
+    let content = resolved
+        .read_file()
+        .with_context(|| format!("unable to read {}", what))?;
+    Ok(Some(content))
+}
+
+/// Resolve the `what` at the stamped `path` relative to the sprout image.
+/// Provides [None] if the path refers to the root of a filesystem rather than a file.
+fn resolve_optional_file(
+    context: &Rc<SproutContext>,
+    path: &str,
+    what: &str,
+) -> Result<Option<ResolvedPath>> {
     let resolved = eficore::path::resolve_path(Some(context.root().loaded_image_path()?), path)
         .with_context(|| format!("unable to resolve {} path", what))?;
 
@@ -42,11 +59,7 @@ fn read_optional_file(
     if subpath.trim_matches('\\').is_empty() {
         return Ok(None);
     }
-
-    let content = resolved
-        .read_file()
-        .with_context(|| format!("unable to read {}", what))?;
-    Ok(Some(content))
+    Ok(Some(resolved))
 }
 
 /// Unloads the image with the contained handle when dropped, unless the handle is taken.
@@ -167,10 +180,12 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
             .devicetree
             .as_ref()
             .map(|path| context.stamp(path)),
-    ) {
+    ) && let Some(resolved) = resolve_optional_file(&context, &path, "devicetree")?
+    {
         if SecureBoot::enabled().unwrap_or(true) {
             warn!("ignoring the devicetree, as Secure Boot is enabled");
-        } else if let Some(content) = read_optional_file(&context, &path, "devicetree")? {
+        } else {
+            let content = resolved.read_file().context("unable to read devicetree")?;
             devicetree =
                 Some(DeviceTree::install(&content).context("unable to install the devicetree")?);
         }

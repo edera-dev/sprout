@@ -706,12 +706,18 @@ fn efi_main() -> Status {
         for (index, stack) in error.chain().enumerate() {
             error!("[{}]: {}", index, stack);
         }
-        // Sleep to allow the user to read the error.
+        // Sleep to allow the user to read the error. A reboot is announced first, so it is
+        // known why the machine is about to reset.
+        if reboot_on_error {
+            error!(
+                "rebooting in {} seconds after a failure to start the boot entry",
+                DELAY_ON_ERROR.as_secs()
+            );
+        }
         uefi::boot::stall(DELAY_ON_ERROR);
 
         // Reboot when asked to, so that the next boot can use the next try or entry.
         if reboot_on_error {
-            error!("rebooting after a failure to start the boot entry");
             uefi::runtime::reset(ResetType::COLD, Status::SUCCESS, None);
         }
         return Status::ABORTED;
