@@ -216,9 +216,11 @@ enum FnmatchToken {
     Star,
     /// `[...]`, which matches a byte in any of the inclusive ranges, already lowercased.
     Class(Vec<(u8, u8)>),
+    /// A pattern that can't match anything, such as one with an unterminated `[`.
+    Never,
 }
 
-/// Splits `pattern` into tokens. An unterminated `[` matches itself.
+/// Splits `pattern` into tokens. An unterminated `[` never matches, as in systemd-boot.
 fn fnmatch_tokens(pattern: &[u8]) -> Vec<FnmatchToken> {
     let mut tokens = Vec::new();
     let mut index = 0;
@@ -250,7 +252,7 @@ fn fnmatch_tokens(pattern: &[u8]) -> Vec<FnmatchToken> {
                     tokens.push(FnmatchToken::Class(ranges));
                     index += length + 1;
                 }
-                _ => tokens.push(FnmatchToken::Literal(b'[')),
+                _ => tokens.push(FnmatchToken::Never),
             },
             other => tokens.push(FnmatchToken::Literal(other.to_ascii_lowercase())),
         }
@@ -282,7 +284,7 @@ pub fn fnmatch_ignore_case(pattern: &str, text: &str) -> bool {
                 p += 1;
                 continue;
             }
-            None => false,
+            Some(FnmatchToken::Never) | None => false,
         };
         if matched {
             p += 1;
@@ -711,9 +713,10 @@ mod tests {
     }
 
     #[test]
-    fn fnmatch_unterminated_bracket_is_a_literal() {
-        assert!(fnmatch_ignore_case("a[b", "a[b"));
+    fn fnmatch_unterminated_bracket_matches_nothing() {
+        assert!(!fnmatch_ignore_case("a[b", "a[b"));
         assert!(!fnmatch_ignore_case("a[b", "ab"));
+        assert!(!fnmatch_ignore_case("a[", "a["));
     }
 
     #[test]
