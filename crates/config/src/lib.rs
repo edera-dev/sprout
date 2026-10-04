@@ -38,6 +38,9 @@ pub struct RootConfiguration {
     /// Default options for Sprout.
     #[serde(default)]
     pub options: OptionsConfiguration,
+    /// Settings for each style of boot menu.
+    #[serde(rename = "menu-styles", default)]
+    pub menu_styles: MenuStylesConfiguration,
     /// Values to be inserted into the root sprout context.
     #[serde(default)]
     pub values: BTreeMap<String, String>,
@@ -99,12 +102,30 @@ pub struct OptionsConfiguration {
     pub bls_strict_mode: bool,
 }
 
+/// Settings for each style of boot menu.
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct MenuStylesConfiguration {
+    /// Settings for the graphical boot menu.
+    #[serde(default)]
+    pub graphical: GraphicalMenuConfiguration,
+}
+
+/// Settings for the graphical boot menu.
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct GraphicalMenuConfiguration {
+    /// Enables selecting entries with the mouse, and shows the cursor. When disabled, or when
+    /// the firmware has no pointing device, entries are selected with the keyboard only.
+    #[serde(rename = "enable-mouse", default)]
+    pub enable_mouse: bool,
+}
+
 /// The default configuration, which matches an empty configuration file.
 impl Default for RootConfiguration {
     fn default() -> Self {
         Self {
             version: latest_version(),
             options: Default::default(),
+            menu_styles: Default::default(),
             values: Default::default(),
             drivers: Default::default(),
             extractors: Default::default(),
@@ -169,6 +190,17 @@ mod tests {
         assert_eq!(default.options.menu_style, empty.options.menu_style);
         assert_eq!(default.options.default_entry, empty.options.default_entry);
         assert_eq!(default.options.autoconfigure, empty.options.autoconfigure);
+    }
+
+    #[test]
+    fn graphical_mouse_is_off_by_default() {
+        assert!(
+            !RootConfiguration::default()
+                .menu_styles
+                .graphical
+                .enable_mouse
+        );
+        assert!(!empty().menu_styles.graphical.enable_mouse);
     }
 
     #[test]
