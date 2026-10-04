@@ -252,6 +252,20 @@ impl BootCounter {
     }
 }
 
+/// Converts an EFI `path` to the form used by the bootloader interface: separated by forward
+/// slashes, with a leading slash and no repeated or trailing separators.
+pub fn boot_path(path: &str) -> String {
+    let mut result = String::new();
+    for part in path.split(['\\', '/']).filter(|part| !part.is_empty()) {
+        result.push('/');
+        result.push_str(part);
+    }
+    if result.is_empty() {
+        result.push('/');
+    }
+    result
+}
+
 /// Decides which entries are the default. Each item of `entries` is `(is_default, is_bad)`,
 /// and the result says whether each entry is the default afterwards.
 /// Bad entries, which have no boot counter tries left, are never the default while a good entry
@@ -581,6 +595,24 @@ mod tests {
         let entry: BlsEntry = "linux /vmlinuz\n".parse().unwrap();
         assert!(entry.boot_counter.is_none());
         assert!(!entry.is_bad());
+    }
+
+    #[test]
+    fn boot_path_uses_forward_slashes_and_a_leading_slash() {
+        assert_eq!(
+            boot_path("\\loader\\entries\\foo+2-1.conf"),
+            "/loader/entries/foo+2-1.conf"
+        );
+        assert_eq!(
+            boot_path("loader/entries/foo.conf"),
+            "/loader/entries/foo.conf"
+        );
+    }
+
+    #[test]
+    fn boot_path_collapses_repeated_separators() {
+        assert_eq!(boot_path("\\a/\\b//c"), "/a/b/c");
+        assert_eq!(boot_path(""), "/");
     }
 
     #[test]

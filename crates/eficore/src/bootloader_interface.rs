@@ -295,8 +295,13 @@ impl BootloaderInterface {
 
         // Attempt to acquire the value of the LoaderConfigTimeout variable.
         // The specification says that a value of 0 means that the menu should be hidden.
+        // A failure to read it is only a warning, as the one-shot variable is already consumed.
         let direct = Self::get_timeout_value("LoaderConfigTimeout", false)
-            .context("unable to check for LoaderConfigTimeout variable")?
+            .context("unable to check for LoaderConfigTimeout variable")
+            .unwrap_or_else(|error| {
+                warn!("{:#}", error);
+                None
+            })
             .map(|direct| match direct {
                 BootloaderInterfaceTimeout::Timeout(0) => BootloaderInterfaceTimeout::MenuHidden,
                 other => other,
