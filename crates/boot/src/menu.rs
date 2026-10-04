@@ -31,6 +31,9 @@ mod logo;
 /// simple: A full-screen menu that selects entries with the arrow keys.
 pub mod simple;
 
+/// How long a hidden menu waits for a key press before the default entry is booted.
+const HIDDEN_MENU_KEY_WAIT: Duration = Duration::from_millis(100);
+
 /// The longest duration a single timer is set for. This is well within the range of
 /// the 100ns units that timers are set in, and still over a century long.
 const MAX_TIMER_DURATION: Duration = Duration::from_secs(u32::MAX as u64);
@@ -167,13 +170,29 @@ pub fn wait_for_events(events: &[Event], timeout: Option<Duration>) -> Result<Op
 }
 
 /// Shows a boot menu of the specified `style` to select a bootable entry to boot.
-/// See [BootMenu::select] for how `timeout` is handled.
+/// See [BootMenu::select] for how `timeout` is handled. A zero `timeout` hides the menu, but
+/// the menu is still shown if a key is pressed right away, unless `menu_disabled` is set.
 pub fn select<'live>(
     timer: &'live PlatformTimer,
     timeout: Option<Duration>,
+    menu_disabled: bool,
     style: MenuStyle,
     entries: &'live [BootableEntry],
 ) -> Result<&'live BootableEntry> {
+    // A hidden menu gives the user a moment to ask for the menu with a key press.
+    let timeout = if timeout.is_some_and(|timeout| timeout.is_zero()) && !menu_disabled {
+        match uefi::system::with_stdin(|input| read_key(input, Some(HIDDEN_MENU_KEY_WAIT))) {
+            Ok(Some(_)) => None,
+            Ok(None) => timeout,
+            Err(error) => {
+                warn!("unable to check for a key press: {:#}", error);
+                timeout
+            }
+        }
+    } else {
+        timeout
+    };
+
     // Notify the bootloader interface that we are about to display the menu.
     // This is only informational, so it should not prevent booting.
     if let Err(error) = BootloaderInterface::mark_menu(timer) {
