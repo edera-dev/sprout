@@ -142,11 +142,15 @@ Settings for a particular menu style. Only the graphical menu has any.
 ```toml
 [menu-styles.graphical]
 enable-mouse = true
+enable-logo = false
+enable-animation = false
 ```
 
-| Key            | Type    | Default | Meaning                                                              |
-|----------------|---------|---------|----------------------------------------------------------------------|
-| `enable-mouse` | boolean | `false` | Select entries with the mouse and show the cursor. Without it, or when the firmware has no pointing device, the menu takes the keyboard only. |
+| Key                | Type    | Default | Meaning                                                          |
+|--------------------|---------|---------|------------------------------------------------------------------|
+| `enable-mouse`     | boolean | `false` | Select entries with the mouse and show the cursor. Without it, or when the firmware has no pointing device, the menu takes the keyboard only. |
+| `enable-logo`      | boolean | `true`  | Show the Sprout logo next to the name. Without it, only the name is shown. |
+| `enable-animation` | boolean | `true`  | Bounce the logo. Without it, the logo stays still.               |
 
 ## `drivers`
 

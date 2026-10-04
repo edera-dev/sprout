@@ -630,8 +630,8 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
             .menu_style
             .unwrap_or(config.options.menu_style);
 
-        // The graphical menu only uses the mouse when it is enabled in the configuration.
-        let graphical_mouse = config.menu_styles.graphical.enable_mouse;
+        // The settings of the graphical menu, which only uses the mouse when it is enabled.
+        let graphical = &config.menu_styles.graphical;
 
         // Find the forced boot entry, unless the boot menu is forced.
         // The oneshot entry from the bootloader interface is forced by id, and it is used instead of
@@ -672,7 +672,7 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
                 menu_timeout,
                 menu_disabled,
                 menu_style,
-                graphical_mouse,
+                graphical,
                 &entries,
             )
             .context("unable to select entry via boot menu")?,

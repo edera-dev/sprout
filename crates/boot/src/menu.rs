@@ -6,7 +6,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use anyhow::{Context, Result};
 use core::time::Duration;
-use edera_sprout_config::MenuStyle;
+use edera_sprout_config::{GraphicalMenuConfiguration, MenuStyle};
 use eficore::bootloader_interface::BootloaderInterface;
 use eficore::platform::timer::PlatformTimer;
 use log::warn;
@@ -177,7 +177,7 @@ pub fn select<'live>(
     timeout: Option<Duration>,
     menu_disabled: bool,
     style: MenuStyle,
-    graphical_mouse: bool,
+    graphical: &GraphicalMenuConfiguration,
     entries: &'live [BootableEntry],
 ) -> Result<&'live BootableEntry> {
     // A hidden menu gives the user a moment to ask for the menu with a key press.
@@ -210,7 +210,9 @@ pub fn select<'live>(
         // The graphical menu needs a graphics output, which not every machine has.
         // If it fails, the simple menu is used instead, which falls back to the basic menu.
         MenuStyle::Graphical => GraphicalMenu {
-            enable_mouse: graphical_mouse,
+            enable_mouse: graphical.enable_mouse,
+            enable_logo: graphical.enable_logo,
+            enable_animation: graphical.enable_animation,
         }
         .select(timeout, entries)
         .or_else(|error| {
