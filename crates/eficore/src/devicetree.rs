@@ -175,6 +175,12 @@ impl Drop for DeviceTree {
                 }
             }
         }
+        if self.installed {
+            info!(
+                "restored the devicetree table of the firmware ({:p})",
+                self.original
+            );
+        }
         // SAFETY: Nothing refers to the pages any more.
         if let Err(error) = unsafe { uefi::boot::free_pages(self.pages, self.count) } {
             warn!("unable to free the devicetree memory: {}", error);
