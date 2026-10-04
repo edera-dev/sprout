@@ -199,6 +199,16 @@ impl BlsEntry {
         self.linux.is_some() || self.efi.is_some() || self.uki.is_some()
     }
 
+    /// Whether the entry names more than one of `linux`, `efi` and `uki` to boot.
+    /// systemd-boot considers such an entry broken and does not show it.
+    pub fn mixes_boot_targets(&self) -> bool {
+        [&self.linux, &self.efi, &self.uki]
+            .iter()
+            .filter(|target| target.is_some())
+            .count()
+            > 1
+    }
+
     /// Whether the entry only boots a unified kernel image, which carries its own initrd.
     fn is_uki_only(&self) -> bool {
         self.linux.is_none() && self.efi.is_none() && self.uki.is_some()
@@ -804,6 +814,49 @@ mod tests {
         assert_eq!(entry.uki.as_deref(), Some("/EFI/Linux/fedora.efi"));
         assert!(entry.options.is_none());
         assert!(entry.is_valid());
+    }
+
+    #[test]
+    fn uki_title_and_version_use_every_systemd_fallback() {
+        let sections = uki_sections(&[(
+            ".osrel",
+            "IMAGE_ID=img\nNAME=N\nID=i\nVERSION=7.1\nVERSION_ID=7\n",
+        )]);
+        let entry = BlsEntry::from_uki(&sections, "/a.efi");
+        assert_eq!(entry.title.as_deref(), Some("img"));
+        assert_eq!(entry.version.as_deref(), Some("7.1"));
+
+        let sections = uki_sections(&[(".osrel", "NAME=N\nID=i\n")]);
+        assert_eq!(
+            BlsEntry::from_uki(&sections, "/a.efi").title.as_deref(),
+            Some("N")
+        );
+    }
+
+    #[test]
+    fn uki_version_only_falls_back_to_uname_outside_strict_mode() {
+        let sections = uki_sections(&[(".osrel", "ID=a\n"), (".uname", "6.1.2\n")]);
+        let loose = BlsEntry::from_uki_with(&sections, "/a.efi", false);
+        assert_eq!(loose.version.as_deref(), Some("6.1.2"));
+        let strict = BlsEntry::from_uki_with(&sections, "/a.efi", true);
+        assert_eq!(strict.version, None);
+        // The kernel version is still there, it is just not the version of the entry.
+        assert_eq!(strict.uname.as_deref(), Some("6.1.2"));
+    }
+
+    #[test]
+    fn entries_that_mix_boot_targets_are_found() {
+        for (input, mixed) in [
+            ("linux /v\n", false),
+            ("efi /e.efi\n", false),
+            ("uki /u.efi\n", false),
+            ("linux /v\nefi /e.efi\n", true),
+            ("linux /v\nuki /u.efi\n", true),
+            ("efi /e.efi\nuki /u.efi\n", true),
+        ] {
+            let entry: BlsEntry = input.parse().unwrap();
+            assert_eq!(entry.mixes_boot_targets(), mixed, "{input}");
+        }
     }
 
     #[test]

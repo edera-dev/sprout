@@ -75,7 +75,12 @@ impl BlsEntry {
     /// Produces an entry for one profile of the unified kernel image at `uki_path`.
     /// A profile after the first is booted with `@<number>` in its load options.
     pub fn from_uki_profile(profile: &UkiProfile, uki_path: &str) -> Self {
-        let mut entry = Self::from_uki(&profile.sections, uki_path);
+        Self::from_uki_profile_with(profile, uki_path, false)
+    }
+
+    /// Like [BlsEntry::from_uki_profile], and `strict` follows systemd-boot exactly.
+    pub fn from_uki_profile_with(profile: &UkiProfile, uki_path: &str, strict: bool) -> Self {
+        let mut entry = Self::from_uki_with(&profile.sections, uki_path, strict);
         if let Some(index) = profile.index {
             entry.profile = (index > 0).then(|| index.to_string());
             entry.title = entry
@@ -87,11 +92,21 @@ impl BlsEntry {
     }
 
     /// Produces an entry for the unified kernel image at `uki_path`, from its PE `sections`.
-    /// The title comes from `PRETTY_NAME`, then `ID`. The version comes from `IMAGE_VERSION`,
-    /// `VERSION_ID`, `BUILD_ID`, then the `.uname` section. The sort key comes from `IMAGE_ID`,
-    /// then `ID`. The embedded command line is kept in `cmdline` and not in `options`, as the
-    /// image reads its own command line.
     pub fn from_uki(sections: &BTreeMap<String, Vec<u8>>, uki_path: &str) -> Self {
+        Self::from_uki_with(sections, uki_path, false)
+    }
+
+    /// Produces an entry for the unified kernel image at `uki_path`, from its PE `sections`.
+    /// The title comes from `PRETTY_NAME`, `IMAGE_ID`, `NAME`, then `ID`. The version comes from
+    /// `IMAGE_VERSION`, `VERSION`, `VERSION_ID`, then `BUILD_ID`, as in systemd-boot, and then
+    /// from the `.uname` section unless `strict` is set. The sort key comes from `IMAGE_ID`, then
+    /// `ID`. The embedded command line is kept in `cmdline` and not in `options`, as the image
+    /// reads its own command line.
+    pub fn from_uki_with(
+        sections: &BTreeMap<String, Vec<u8>>,
+        uki_path: &str,
+        strict: bool,
+    ) -> Self {
         let os_release = section_text(sections, ".osrel")
             .map(|text| OsRelease::parse(&text))
             .unwrap_or_default();
@@ -102,10 +117,11 @@ impl BlsEntry {
                 .map(ToString::to_string)
         };
         let uname = section_text(sections, ".uname");
+        let version = first(&["IMAGE_VERSION", "VERSION", "VERSION_ID", "BUILD_ID"]);
 
         Self {
-            title: first(&["PRETTY_NAME", "ID"]),
-            version: first(&["IMAGE_VERSION", "VERSION_ID", "BUILD_ID"]).or_else(|| uname.clone()),
+            title: first(&["PRETTY_NAME", "IMAGE_ID", "NAME", "ID"]),
+            version: version.or_else(|| uname.clone().filter(|_| !strict)),
             sort_key: first(&["IMAGE_ID", "ID"]),
             uki: Some(uki_path.to_string()),
             cmdline: section_text(sections, ".cmdline"),
