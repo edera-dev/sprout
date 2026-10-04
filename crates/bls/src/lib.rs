@@ -11,7 +11,7 @@ mod loader_conf;
 mod pe;
 mod uki;
 
-pub use loader_conf::{LoaderConf, LoaderTimeout};
+pub use loader_conf::{LoaderConf, LoaderTimeout, RebootOnError};
 pub use pe::{
     MAX_SECTION_SIZE, PE_MACHINE_AARCH64, PE_MACHINE_X86_64, PeImage, ReadAt, read_pe,
     read_sections,
@@ -956,6 +956,75 @@ mod tests {
     fn loader_conf_keeps_unmatched_quotes() {
         let conf = LoaderConf::parse("default \"foo\n");
         assert_eq!(conf.default.as_deref(), Some("\"foo"));
+    }
+
+    #[test]
+    fn reboot_on_error_defaults_to_auto() {
+        assert_eq!(LoaderConf::parse("").reboot_on_error, RebootOnError::Auto);
+    }
+
+    #[test]
+    fn reboot_on_error_reads_booleans_and_auto() {
+        for (value, expected) in [
+            ("auto", RebootOnError::Auto),
+            ("yes", RebootOnError::Yes),
+            ("true", RebootOnError::Yes),
+            ("1", RebootOnError::Yes),
+            ("on", RebootOnError::Yes),
+            ("y", RebootOnError::Yes),
+            ("t", RebootOnError::Yes),
+            ("no", RebootOnError::No),
+            ("off", RebootOnError::No),
+            ("0", RebootOnError::No),
+            ("f", RebootOnError::No),
+            ("false", RebootOnError::No),
+            ("n", RebootOnError::No),
+            ("\"no\"", RebootOnError::No),
+        ] {
+            let conf = LoaderConf::parse(&format!("reboot-on-error {value}\n"));
+            assert_eq!(conf.reboot_on_error, expected, "{value}");
+            assert!(conf.warnings.is_empty(), "{value}");
+        }
+    }
+
+    #[test]
+    fn reboot_on_error_ignores_invalid_values_with_a_warning() {
+        // The values are case sensitive, as they are in systemd-boot.
+        for value in ["YES", "Auto", "maybe", ""] {
+            let conf = LoaderConf::parse(&format!("reboot-on-error {value}\n"));
+            assert_eq!(conf.reboot_on_error, RebootOnError::Auto, "{value}");
+            assert_eq!(conf.warnings.len(), 1, "{value}");
+        }
+    }
+
+    #[test]
+    fn reboot_on_error_last_value_wins() {
+        let conf = LoaderConf::parse("reboot-on-error no\nreboot-on-error yes\n");
+        assert_eq!(conf.reboot_on_error, RebootOnError::Yes);
+    }
+
+    #[test]
+    fn reboot_on_error_decides_from_the_tries_that_were_left() {
+        assert!(!RebootOnError::Auto.should_reboot(None));
+        assert!(!RebootOnError::Auto.should_reboot(Some(0)));
+        assert!(RebootOnError::Auto.should_reboot(Some(1)));
+        assert!(RebootOnError::Auto.should_reboot(Some(3)));
+        assert!(RebootOnError::Yes.should_reboot(None));
+        assert!(!RebootOnError::No.should_reboot(Some(3)));
+    }
+
+    #[test]
+    fn auto_reboots_are_bounded_by_the_boot_counter() {
+        // An entry with two tries that keeps failing is rebooted twice, and then stays put.
+        let mut counter = BootCounter::new(2, 0);
+        let mut reboots = 0;
+        for _ in 0..10 {
+            if RebootOnError::Auto.should_reboot(Some(counter.tries_left)) {
+                reboots += 1;
+            }
+            counter = counter.decremented();
+        }
+        assert_eq!(reboots, 2);
     }
 
     #[test]
