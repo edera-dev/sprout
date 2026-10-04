@@ -1,5 +1,5 @@
 use crate::entries::BootableEntry;
-use crate::menu::font::{self, GLYPH_SIZE, Glyph, HEART};
+use crate::menu::font::{self, ELLIPSIS, GLYPH_SIZE, Glyph, HEART};
 use crate::menu::logo::{LOGO, LOGO_HEIGHT, LOGO_WIDTH};
 use crate::menu::{BootMenu, wait_for_events};
 use alloc::format;
@@ -37,8 +37,14 @@ const BACKGROUND_TOP: (u8, u8, u8) = (0x3a, 0x1c, 0x4e);
 /// The color of the bottom of the background.
 const BACKGROUND_BOTTOM: (u8, u8, u8) = (0x16, 0x0c, 0x24);
 
-/// The color of the pill behind each entry that isn't selected.
-const PILL: BltPixel = BltPixel::new(0x2c, 0x1a, 0x40);
+/// The widest that the status line gets, which the panel has room for.
+const STATUS_WIDEST: &str = "Boot in 999 s.";
+
+/// The color of the panel behind the entries.
+const PANEL: BltPixel = BltPixel::new(0x22, 0x12, 0x34);
+
+/// The color of the edge of the panel, the line below the entries and the scrollbar track.
+const PANEL_EDGE: BltPixel = BltPixel::new(0x4a, 0x2e, 0x66);
 
 /// The color of the pill behind the selected entry, taken from the Sprout logo.
 const PILL_SELECTED: BltPixel = BltPixel::new(0xff, 0x7a, 0xb8);
@@ -208,7 +214,8 @@ impl Mouse {
     }
 }
 
-/// The position and size of the entries on the framebuffer.
+/// The position and size of everything on the framebuffer.
+/// The logo and the name are in a header, with a panel below it that holds the entries.
 struct Layout {
     /// How many pixels each pixel of the font is drawn as.
     scale: usize,
@@ -226,39 +233,118 @@ struct Layout {
     gap: usize,
     /// The number of entries that fit on the framebuffer.
     visible: usize,
+    /// The column, row, width and height of the panel behind the entries.
+    panel: (usize, usize, usize, usize),
+    /// How round the corners of the panel are.
+    radius: usize,
+    /// The column that the text of an entry starts at.
+    text_x: usize,
+    /// How many characters of a title fit in an entry.
+    columns: usize,
+    /// The row of the line between the entries and the status line.
+    footer: usize,
+    /// The column, row, width and height of the logo when it is on the ground.
+    logo: (usize, usize, usize, usize),
+    /// How many pixels the logo rises while it bounces.
+    bounce: usize,
+    /// The column, row and scale of the name, if there is room for it.
+    title: Option<(usize, usize, usize)>,
+    /// Whether there are more entries than fit, which adds a scrollbar.
+    scrolls: bool,
 }
 
 impl Layout {
     /// Calculate the layout of `entries` on a framebuffer of `screen` width and height.
     fn new(screen: (usize, usize), entries: &[BootableEntry]) -> Self {
-        // Large screens get larger text so that it stays readable.
-        let scale = (screen.1 / 360).clamp(1, 4);
-        let cell = GLYPH_SIZE * scale;
-        let (height, gap) = (cell * 2, cell / 2);
+        let (width, height) = screen;
 
-        // All entries are the width of the longest title, with room for the heart and padding.
+        // Large screens get larger text so that it stays readable, but not so large that the
+        // titles take up the whole screen.
+        let scale = (height / 540).min(width / 640).clamp(1, 3);
+        let cell = GLYPH_SIZE * scale;
+        let margin = (cell * 2).max(height / 20).min(width / 8);
+        let padding = cell * 3 / 2;
+        let (row, gap) = (cell * 2, scale * 2);
+        let header_gap = cell * 2;
+
+        // The line between the entries and the status, and the status below it.
+        let footer_height = cell + scale + cell / 2 + cell;
+
+        // The panel is the width of the longest title, but never most of the screen.
         let longest = entries
             .iter()
             .map(|entry| entry.title().chars().count())
             .max()
             .unwrap_or(0);
-        let width = ((longest + 4) * cell).min(screen.0.saturating_sub(cell * 2));
+        let status = HINT.len().max(STATUS_WIDEST.len());
+        let panel_width = ((longest + 4) * cell + padding * 2)
+            .max(40 * cell)
+            .max((status + 8) * cell)
+            .min(width.saturating_sub(margin * 2).min(width * 3 / 5));
 
-        // The title is above the entries, and the status line is below.
-        let top = cell * 4;
-        let space = screen.1.saturating_sub(top + cell * 3);
-        let visible = entries.len().min(((space + gap) / (height + gap)).max(1));
-        let list = visible * (height + gap) - gap;
+        // The header is as tall as the logo, and the logo needs room to bounce.
+        let fit = |logo: usize| {
+            let header = logo + logo / 16;
+            let space = height
+                .saturating_sub(margin * 2 + header + header_gap + padding * 2 + footer_height);
+            let visible = ((space + gap) / (row + gap)).clamp(1, entries.len().max(1));
+            (header, visible)
+        };
+        let mut logo_height = (LOGO_HEIGHT * 2).min(height / 7).max(32);
+        let (mut header, mut visible) = fit(logo_height);
+        // A short screen gets a smaller logo before it loses entries.
+        if visible < entries.len().min(3) {
+            logo_height = (logo_height / 2).max(32);
+            (header, visible) = fit(logo_height);
+        }
+        let logo_width = logo_height * LOGO_WIDTH / LOGO_HEIGHT;
+        let bounce = logo_height / 16;
+
+        // The name is next to the logo, if the two fit together.
+        let title_scale = (logo_height / 32).clamp(scale, scale * 3);
+        let title_width = TITLE.len() * GLYPH_SIZE * title_scale;
+        let fits = logo_width + cell + title_width <= width.saturating_sub(margin * 2);
+        let group = if fits {
+            logo_width + cell + title_width
+        } else {
+            logo_width
+        };
+        let group_x = width.saturating_sub(group) / 2;
+
+        let list = visible * (row + gap) - gap;
+        let panel_height = padding * 2 + list + footer_height;
+        let top = (height.saturating_sub(header + header_gap + panel_height) / 2).max(margin);
+        let panel_x = width.saturating_sub(panel_width) / 2;
+        let panel_y = top + header + header_gap;
+
+        // The scrollbar is in a column next to the entries.
+        let scrolls = visible < entries.len();
+        let gutter = if scrolls { cell } else { 0 };
+        let list_width = panel_width.saturating_sub(padding * 2 + gutter);
+        let list_y = panel_y + padding;
 
         Self {
             scale,
             cell,
-            x: (screen.0 - width) / 2,
-            y: top + space.saturating_sub(list) / 2,
-            width,
-            height,
+            x: panel_x + padding,
+            y: list_y,
+            width: list_width,
+            height: row,
             gap,
             visible,
+            panel: (panel_x, panel_y, panel_width, panel_height),
+            radius: cell,
+            text_x: panel_x + padding + cell * 3,
+            columns: list_width.saturating_sub(cell * 4) / cell,
+            footer: list_y + list + cell,
+            logo: (group_x, top + bounce, logo_width, logo_height),
+            bounce,
+            title: fits.then_some((
+                group_x + logo_width + cell,
+                top + bounce + logo_height.saturating_sub(GLYPH_SIZE * title_scale) / 2,
+                title_scale,
+            )),
+            scrolls,
         }
     }
 
@@ -398,18 +484,22 @@ fn draw_background(fb: &mut Framebuffer, top: (u8, u8, u8), bottom: (u8, u8, u8)
     }
 }
 
-/// Fill a rectangle with the shape of a pill, which has fully rounded ends.
-fn draw_pill(
+/// Fill a rectangle that has rounded corners of `radius`.
+fn draw_rounded(
     fb: &mut Framebuffer,
     x: usize,
     y: usize,
     width: usize,
     height: usize,
+    radius: usize,
     color: BltPixel,
 ) {
-    let radius = height / 2;
+    if width == 0 || height == 0 {
+        return;
+    }
+    let radius = radius.min(height / 2).min(width / 2);
     for row in 0..height {
-        // How far the row is from the edge, where the ends curve in.
+        // How far the row is from the edge, where the corners curve in.
         let edge = row.min(height - 1 - row);
         let inset = if edge >= radius {
             0
@@ -429,6 +519,18 @@ fn draw_pill(
     }
 }
 
+/// Fill a rectangle with the shape of a pill, which has fully rounded ends.
+fn draw_pill(
+    fb: &mut Framebuffer,
+    x: usize,
+    y: usize,
+    width: usize,
+    height: usize,
+    color: BltPixel,
+) {
+    draw_rounded(fb, x, y, width, height, height / 2, color);
+}
+
 /// Draw `glyph` at `x` and `y`, with each pixel of it drawn as `scale` by `scale` pixels.
 fn draw_glyph(
     fb: &mut Framebuffer,
@@ -445,7 +547,7 @@ fn draw_glyph(
     }
 }
 
-/// Draw `text` starting at `x` and `y`, cut off to at most `columns` characters.
+/// Draw `text` starting at `x` and `y`, cut off with an ellipsis if it is over `columns` characters.
 fn draw_text(
     fb: &mut Framebuffer,
     x: usize,
@@ -455,7 +557,13 @@ fn draw_text(
     text: &str,
     color: BltPixel,
 ) {
-    for (index, c) in text.chars().take(columns).enumerate() {
+    let cut = text.chars().count() > columns;
+    let shown = if cut {
+        columns.saturating_sub(1)
+    } else {
+        columns
+    };
+    for (index, c) in text.chars().take(shown).enumerate() {
         draw_glyph(
             fb,
             x + index * GLYPH_SIZE * scale,
@@ -465,43 +573,52 @@ fn draw_text(
             color,
         );
     }
-}
-
-/// Draw `text` in the middle of the framebuffer at `y`.
-fn draw_centered(fb: &mut Framebuffer, y: usize, scale: usize, text: &str, color: BltPixel) {
-    let columns = fb.width() / (GLYPH_SIZE * scale);
-    let width = text.chars().count().min(columns) * GLYPH_SIZE * scale;
-    draw_text(fb, (fb.width() - width) / 2, y, scale, columns, text, color);
-}
-
-/// Draw the logo in the bottom right corner, bouncing a little with each of `ticks`.
-/// Nothing is drawn if the logo would be in the way of the entries.
-fn draw_logo(fb: &mut Framebuffer, layout: &Layout, ticks: usize) {
-    let factor = layout.scale.div_ceil(2);
-    let (width, height) = (LOGO_WIDTH * factor, LOGO_HEIGHT * factor);
-    let (Some(x), Some(floor)) = (
-        fb.width().checked_sub(width + layout.cell),
-        fb.height().checked_sub(height + layout.cell),
-    ) else {
-        return;
-    };
-
-    // The entries are in the way if the logo reaches over them, even while it is bouncing up.
-    let reach = layout.row(layout.visible);
-    if x < layout.x + layout.width && floor.saturating_sub(layout.cell) < reach {
-        return;
+    if cut && columns > 0 {
+        draw_glyph(
+            fb,
+            x + shown * GLYPH_SIZE * scale,
+            y,
+            scale,
+            &ELLIPSIS,
+            color,
+        );
     }
+}
 
-    // The logo rises and falls by up to four logo pixels.
+/// Draw `text` in the middle of `x` and `width` at `y`.
+fn draw_centered(
+    fb: &mut Framebuffer,
+    x: usize,
+    width: usize,
+    y: usize,
+    scale: usize,
+    text: &str,
+    color: BltPixel,
+) {
+    let columns = width / (GLYPH_SIZE * scale);
+    let used = text.chars().count().min(columns) * GLYPH_SIZE * scale;
+    draw_text(fb, x + (width - used) / 2, y, scale, columns, text, color);
+}
+
+/// Draw the logo above the entries, bouncing a little with each of `ticks`.
+fn draw_logo(fb: &mut Framebuffer, layout: &Layout, ticks: usize) {
+    let (x, floor, width, height) = layout.logo;
+
+    // The logo rises and falls by up to `bounce` pixels.
     let phase = ticks % BOUNCE_TICKS;
-    let y = floor - phase.min(BOUNCE_TICKS - phase) / 2 * factor;
+    let rise = phase.min(BOUNCE_TICKS - phase) * layout.bounce / (BOUNCE_TICKS / 2);
+    let y = floor - rise;
 
     for row in 0..height {
         for column in 0..width {
-            let source = ((row / factor) * LOGO_WIDTH + column / factor) * 4;
+            let source =
+                ((row * LOGO_HEIGHT / height) * LOGO_WIDTH + column * LOGO_WIDTH / width) * 4;
             let [red, green, blue, alpha] = LOGO[source..source + 4] else {
                 continue;
             };
+            if alpha == 0 {
+                continue;
+            }
             // The channels are premultiplied, so the color is the logo plus what shows through.
             if let Some(pixel) = fb.pixel(x + column, y + row) {
                 let through = 255 - alpha as u32;
@@ -517,9 +634,23 @@ fn draw_logo(fb: &mut Framebuffer, layout: &Layout, ticks: usize) {
     }
 }
 
+/// Draw the track and the thumb of the scrollbar, which shows where `offset` is in `total`.
+fn draw_scrollbar(fb: &mut Framebuffer, layout: &Layout, offset: usize, total: usize) {
+    let height = layout.visible * (layout.height + layout.gap) - layout.gap;
+    let x = layout.x + layout.width + layout.cell / 2 - layout.scale;
+    let width = layout.scale * 2;
+    fb.fill_rect(x, layout.y, width, height, PANEL_EDGE);
+
+    let thumb = (height * layout.visible / total)
+        .max(layout.cell)
+        .min(height);
+    let travel = total.saturating_sub(layout.visible).max(1);
+    let y = layout.y + (height - thumb) * offset.min(travel) / travel;
+    draw_rounded(fb, x, y, width, thumb, width / 2, ACCENT);
+}
+
 /// Draw the cursor with its tip at `position`.
 fn draw_cursor(fb: &mut Framebuffer, scale: usize, position: (usize, usize)) {
-    let scale = scale.div_ceil(2);
     for (row, line) in CURSOR.iter().enumerate() {
         for (column, shape) in line.bytes().enumerate() {
             let color = match shape {
@@ -547,7 +678,31 @@ fn render(
     cursor: Option<(usize, usize)>,
 ) {
     draw_background(fb, BACKGROUND_TOP, BACKGROUND_BOTTOM);
-    draw_centered(fb, layout.cell * 2, layout.scale * 2, TITLE, ACCENT);
+    draw_logo(fb, layout, scene.ticks);
+    if let Some((x, y, scale)) = layout.title {
+        draw_text(fb, x, y, scale, TITLE.len(), TITLE, ACCENT);
+    }
+
+    let (panel_x, panel_y, panel_width, panel_height) = layout.panel;
+    let edge = layout.scale;
+    draw_rounded(
+        fb,
+        panel_x,
+        panel_y,
+        panel_width,
+        panel_height,
+        layout.radius,
+        PANEL_EDGE,
+    );
+    draw_rounded(
+        fb,
+        panel_x + edge,
+        panel_y + edge,
+        panel_width.saturating_sub(edge * 2),
+        panel_height.saturating_sub(edge * 2),
+        layout.radius.saturating_sub(edge),
+        PANEL,
+    );
 
     for (slot, (index, entry)) in scene
         .entries
@@ -557,40 +712,75 @@ fn render(
         .take(layout.visible)
         .enumerate()
     {
-        let selected = index == scene.selected;
         let row = layout.row(slot);
-        let (pill, text) = if selected {
-            (PILL_SELECTED, TEXT_SELECTED)
-        } else {
-            (PILL, TEXT)
-        };
-        draw_pill(fb, layout.x, row, layout.width, layout.height, pill);
-
         let text_row = row + (layout.height - layout.cell) / 2;
-        if selected {
+        // Only the selected entry has a pill, which keeps the list calm.
+        let text = if index == scene.selected {
+            draw_pill(
+                fb,
+                layout.x,
+                row,
+                layout.width,
+                layout.height,
+                PILL_SELECTED,
+            );
             draw_glyph(
                 fb,
                 layout.x + layout.cell,
                 text_row,
                 layout.scale,
                 &HEART,
-                text,
+                TEXT_SELECTED,
             );
-        }
+            TEXT_SELECTED
+        } else {
+            TEXT
+        };
         draw_text(
             fb,
-            layout.x + layout.cell * 5 / 2 + layout.cell / 2,
+            layout.text_x,
             text_row,
             layout.scale,
-            (layout.width / layout.cell).saturating_sub(4),
+            layout.columns,
             entry.title(),
             text,
         );
     }
 
-    let status_row = fb.height().saturating_sub(layout.cell * 2);
-    draw_centered(fb, status_row, layout.scale, &scene.status, TEXT_MUTED);
-    draw_logo(fb, layout, scene.ticks);
+    if layout.scrolls {
+        draw_scrollbar(fb, layout, offset, scene.entries.len());
+    }
+
+    // The status line is below a line across the panel, with the position when it scrolls.
+    let inner = panel_width.saturating_sub(layout.cell * 3);
+    let inner_x = panel_x + layout.cell * 3 / 2;
+    fb.fill_rect(inner_x, layout.footer, inner, layout.scale, PANEL_EDGE);
+    let status_row = layout.footer + layout.scale + layout.cell / 2;
+    // The position is at the right edge, so the status keeps clear of it on both sides.
+    let keep_clear = if layout.scrolls { layout.cell * 8 } else { 0 };
+    draw_centered(
+        fb,
+        inner_x + keep_clear,
+        inner.saturating_sub(keep_clear * 2),
+        status_row,
+        layout.scale,
+        &scene.status,
+        TEXT_MUTED,
+    );
+    if layout.scrolls {
+        let position = format!("{}/{}", scene.selected + 1, scene.entries.len());
+        let width = position.len() * layout.cell;
+        draw_text(
+            fb,
+            (inner_x + inner).saturating_sub(width),
+            status_row,
+            layout.scale,
+            position.len(),
+            &position,
+            TEXT_MUTED,
+        );
+    }
+
     if let Some(position) = cursor {
         draw_cursor(fb, layout.scale, position);
     }
