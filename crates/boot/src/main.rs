@@ -506,8 +506,9 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
     // The preferred entry sources never use an entry with no boot counter tries left.
     // Each source has whether it matches by id, and whether it skips bad entries.
     // In strict mode, the one-shot entry is the default entry for this boot, like in
-    // systemd-boot, and the menu or its timeout still decides what is booted.
-    let oneshot_source = if strict {
+    // systemd-boot, and the menu or its timeout still decides what is booted. This also holds
+    // when the menu is forced, as the one-shot entry is then not booted at once.
+    let oneshot_source = if strict || force_boot_menu {
         bootloader_interface_oneshot_entry.clone()
     } else {
         None
