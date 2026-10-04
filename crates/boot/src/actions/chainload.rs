@@ -62,6 +62,22 @@ fn resolve_optional_file(
     Ok(Some(resolved))
 }
 
+/// Install the devicetree at the stamped `path` for the image that is about to be started.
+/// Provides [None] if there is none to install, such as when the path refers to the root of a
+/// filesystem, or when Secure Boot is enabled, as a devicetree can't be verified.
+fn install_devicetree(context: &Rc<SproutContext>, path: &str) -> Result<Option<DeviceTree>> {
+    let Some(resolved) = resolve_optional_file(context, path, "devicetree")? else {
+        return Ok(None);
+    };
+    if SecureBoot::enabled().unwrap_or(true) {
+        warn!("ignoring the devicetree, as Secure Boot is enabled");
+        return Ok(None);
+    }
+    let content = resolved.read_file().context("unable to read devicetree")?;
+    let devicetree = DeviceTree::install(&content).context("unable to install the devicetree")?;
+    Ok(Some(devicetree))
+}
+
 /// Unloads the image with the contained handle when dropped, unless the handle is taken.
 /// This ensures that an image that is loaded but never started is not left in memory.
 struct UnloadGuard(Option<Handle>);
@@ -180,14 +196,17 @@ pub fn chainload(context: Rc<SproutContext>, configuration: &ChainloadConfigurat
             .devicetree
             .as_ref()
             .map(|path| context.stamp(path)),
-    ) && let Some(resolved) = resolve_optional_file(&context, &path, "devicetree")?
-    {
-        if SecureBoot::enabled().unwrap_or(true) {
-            warn!("ignoring the devicetree, as Secure Boot is enabled");
-        } else {
-            let content = resolved.read_file().context("unable to read devicetree")?;
-            devicetree =
-                Some(DeviceTree::install(&content).context("unable to install the devicetree")?);
+    ) {
+        match install_devicetree(&context, &path) {
+            Ok(installed) => devicetree = installed,
+            // systemd-boot does not boot an entry whose devicetree can't be installed. Outside
+            // of strict mode it is booted without it, as before the devicetree was supported.
+            Err(error) if !context.root().options().bls_strict_mode => warn!(
+                "booting without the devicetree {}, as it can't be installed: {:#} \
+                 (systemd-boot and strict mode do not boot the entry)",
+                path, error
+            ),
+            Err(error) => return Err(error),
         }
     }
 
