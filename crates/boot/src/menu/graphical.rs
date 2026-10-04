@@ -8,11 +8,12 @@ use alloc::vec::Vec;
 use anyhow::{Context, Result};
 use core::time::Duration;
 use eficore::framebuffer::Framebuffer;
-use uefi::Event;
-use uefi::boot::ScopedProtocol;
+use uefi::boot::{OpenProtocolAttributes, OpenProtocolParams, ScopedProtocol};
+use uefi::proto::ProtocolPointer;
 use uefi::proto::console::gop::{BltPixel, GraphicsOutput};
 use uefi::proto::console::pointer::{AbsolutePointer, Pointer};
 use uefi::proto::console::text::{Input, Key, ScanCode};
+use uefi::{Event, Handle};
 
 /// How often the countdown and the logo are updated.
 const TICK: Duration = Duration::from_millis(125);
@@ -91,15 +92,45 @@ struct Mouse {
     absolute: Option<ScopedProtocol<AbsolutePointer>>,
 }
 
+/// Open the protocol `P` on `handle` without taking it from the firmware.
+/// An exclusive open makes the firmware disconnect every driver that is using the protocol,
+/// and on some firmware that never returns.
+fn open_shared<P: ProtocolPointer + ?Sized>(handle: Handle) -> uefi::Result<ScopedProtocol<P>> {
+    // SAFETY: The protocols opened this way are only used from this thread, and the firmware
+    // keeps them installed for as long as the menu is open.
+    unsafe {
+        uefi::boot::open_protocol::<P>(
+            OpenProtocolParams {
+                handle,
+                agent: uefi::boot::image_handle(),
+                controller: None,
+            },
+            OpenProtocolAttributes::GetProtocol,
+        )
+    }
+}
+
+/// Open the pointer protocol `P`, preferring the one on the console input handle.
+/// That one belongs to the console splitter, which combines every device and is never removed.
+/// Otherwise, the first device that has the protocol is used.
+fn open_pointer<P: ProtocolPointer + ?Sized>() -> Option<ScopedProtocol<P>> {
+    // SAFETY: The handle in the system table is either null or a valid handle.
+    let console = uefi::table::system_table_raw()
+        .and_then(|table| unsafe { Handle::from_ptr(table.as_ref().stdin_handle) });
+    console
+        .and_then(|handle| open_shared::<P>(handle).ok())
+        .or_else(|| {
+            uefi::boot::get_handle_for_protocol::<P>()
+                .and_then(open_shared::<P>)
+                .ok()
+        })
+}
+
 impl Mouse {
     /// Open the pointing devices, if the firmware has any.
     fn open() -> Option<Self> {
-        let relative = uefi::boot::get_handle_for_protocol::<Pointer>()
-            .and_then(uefi::boot::open_protocol_exclusive::<Pointer>)
-            .ok();
-        let absolute = uefi::boot::get_handle_for_protocol::<AbsolutePointer>()
-            .and_then(uefi::boot::open_protocol_exclusive::<AbsolutePointer>)
-            .ok();
+        let relative = open_pointer::<Pointer>();
+        let absolute = open_pointer::<AbsolutePointer>();
         (relative.is_some() || absolute.is_some()).then_some(Self { relative, absolute })
     }
 
