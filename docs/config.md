@@ -2,7 +2,7 @@
 
 Sprout reads a TOML file, `\sprout.toml`, from the root of the EFI partition it was loaded from. This page
 covers everything that file can hold, the command line options that override it, and the BLS behavior that
-sits next to it. For installing Sprout, see the [setup guides](./docs/setup).
+sits next to it. For installing Sprout, see the [setup guides](./setup).
 
 - [Command line options](#command-line-options)
 - [The file at a glance](#the-file-at-a-glance)

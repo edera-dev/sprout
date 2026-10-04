@@ -1,12 +1,12 @@
 ---
 name: update-config-docs
-description: Bring CONFIG.md back in line with the code. Use after changing anything in crates/config, the command line options, loader.conf handling, strict mode, or autoconfiguration, or when asked to check that CONFIG.md is accurate.
+description: Bring docs/config.md back in line with the code. Use after changing anything in crates/config, the command line options, loader.conf handling, strict mode, or autoconfiguration, or when asked to check that docs/config.md is accurate.
 ---
 
-# Update CONFIG.md
+# Update docs/config.md
 
-`CONFIG.md` is the reference for `sprout.toml`, the command line options, BLS support and strict mode.
-The README only links to it, so a setting that is missing from CONFIG.md is undocumented.
+`docs/config.md` is the reference for `sprout.toml`, the command line options, BLS support and strict mode.
+The README only links to it, so a setting that is missing from docs/config.md is undocumented.
 
 ## 1. Find what changed
 
@@ -16,7 +16,7 @@ Start from the diff, or from the whole config surface if there is none:
 git diff main -- crates/config crates/boot/src/options.rs crates/boot/src/config crates/boot/src/autoconfigure crates/bls
 ```
 
-The sources of truth, and the section of CONFIG.md each one feeds:
+The sources of truth, and the section of docs/config.md each one feeds:
 
 | Source                                                    | Section                                   |
 |-----------------------------------------------------------|-------------------------------------------|
@@ -34,7 +34,7 @@ The sources of truth, and the section of CONFIG.md each one feeds:
 
 ## 2. Check each key
 
-For every struct field in `crates/config`, CONFIG.md needs its TOML name (look at `#[serde(rename)]`, as
+For every struct field in `crates/config`, docs/config.md needs its TOML name (look at `#[serde(rename)]`, as
 most multi-word keys use dashes), its type, its default, and what it does. Read the code that uses it in
 `crates/boot`, not only the doc comment, because the behavior is what the reader depends on.
 
@@ -56,7 +56,7 @@ implements it.
 - Keep each section's shape: a short explanation, a TOML example, then a table of keys.
 - Examples must parse. Check that every key in one exists and is spelled the way serde expects.
 - Update the table of contents if you add or rename a heading.
-- Keep README.md short. It gets the feature list and the minimal examples, and CONFIG.md gets everything else.
+- Keep README.md short. It gets the feature list and the minimal examples, and docs/config.md gets everything else.
 - Don't duplicate the strict mode table or the default entry order anywhere else.
 
 ## 4. Write like a person
@@ -79,5 +79,5 @@ cargo build --target aarch64-unknown-uefi
 cargo fmt --all --check
 ```
 
-Then re-read the diff of CONFIG.md against the code once more for any key whose name or default you
+Then re-read the diff of docs/config.md against the code once more for any key whose name or default you
 touched. If the change was only to docs, skip the builds.

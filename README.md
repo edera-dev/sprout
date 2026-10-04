@@ -149,10 +149,10 @@ autoconfigure = true
 ```
 
 The full list of settings, the command line options, generators, and how Sprout treats BLS entries,
-`loader.conf` and strict mode are in [CONFIG.md](./CONFIG.md).
+`loader.conf` and strict mode are in [the configuration reference](./docs/config.md).
 
 [Edera]: https://edera.dev
-[Configuration Reference]: ./CONFIG.md
+[Configuration Reference]: ./docs/config.md
 [Development Guide]: ./DEVELOPMENT.md
 [Contributing Guide]: ./CONTRIBUTING.md
 [Sprout License]: ./LICENSE

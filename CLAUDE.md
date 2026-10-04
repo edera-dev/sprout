@@ -2,8 +2,8 @@
 
 Sprout is a programmable UEFI bootloader written in Rust, for `x86_64` and `aarch64`. It is a `no_std` workspace
 built for the `*-unknown-uefi` targets, so it cannot be run or tested like a normal binary.
-See [README.md](README.md) for features and [CONFIG.md](CONFIG.md) for the configuration format.
-After changing configuration, run the `update-config-docs` skill to keep CONFIG.md accurate.
+See [README.md](README.md) for features and [docs/config.md](docs/config.md) for the configuration format.
+After changing configuration, run the `update-config-docs` skill to keep docs/config.md accurate.
 
 ## Layout
 
