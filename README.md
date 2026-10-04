@@ -58,6 +58,7 @@ We recommend running Sprout without Secure Boot for development, and with Secure
 
 ### Project Documentation
 
+- [Configuration Reference]
 - [Development Guide]
 - [Contributing Guide]
 - [Sprout License]
@@ -110,39 +111,9 @@ We recommend running Sprout without Secure Boot for development, and with Secure
 
 Sprout is provided as a single EFI binary called `sprout.efi`.
 It can be chainloaded from GRUB or other UEFI bootloaders or booted into directly.
-Sprout will look for \sprout.toml in the root of the EFI partition it was loaded from.
-See [Configuration](#configuration) for how to configure sprout.
+Sprout reads its configuration from `\sprout.toml` in the root of the EFI partition it was loaded from.
 
-## Configuration
-
-Sprout is configured using a TOML file at `\sprout.toml` on the root of the EFI partition sprout was booted from.
-
-### Command Line Options
-
-Sprout supports some command line options that can be combined to modify behavior without the configuration file.
-
-```bash
-# Boot Sprout with a specific configuration file.
-$ sprout.efi --config=\path\to\config.toml
-# Boot a specific entry, bypassing the menu.
-$ sprout.efi --boot="Boot Xen"
-# Autoconfigure Sprout, without loading a configuration file.
-$ sprout.efi --autoconfigure
-# Use the basic boot menu instead of the simple one.
-$ sprout.efi --menu-style=basic
-# Use the graphical boot menu, which can be used with the mouse.
-$ sprout.efi --menu-style=graphical
-# Show the boot menu for 10 seconds before booting the default entry.
-$ sprout.efi --menu-timeout=10
-# Show the boot menu even if an entry was chosen with --boot.
-$ sprout.efi --force-menu
-# Keep the boot console as it is when an entry is booted.
-$ sprout.efi --retain-boot-console
-# Follow the BLS specification and systemd-boot exactly.
-$ sprout.efi --bls-strict-mode
-```
-
-### Boot Linux from ESP
+This is a configuration that boots a Linux kernel from the EFI partition:
 
 ```toml
 # sprout configuration: version 1
@@ -164,170 +135,24 @@ chainload.options = ["root=/dev/sda1"]
 chainload.linux-initrd = "\\initrd"
 ```
 
-### Bootloader Specification (BLS) Support
+On a system that follows the Boot Loader Specification, you may not need to write one. With an ext4 driver
+loaded, autoconfiguration finds the entries on its own:
 
 ```toml
-# sprout configuration: version 1
 version = 1
 
-# load an EFI driver for ext4.
 [drivers.ext4]
 path = "\\sprout\\drivers\\ext4.efi"
 
-# global options.
 [options]
-# enable autoconfiguration by detecting bls enabled
-# filesystems and generating boot entries for them.
 autoconfigure = true
 ```
 
-Sprout reads Type #1 entries from `\loader\entries` and Type #2 unified kernel images (UKIs) from
-`\EFI\Linux`, and sorts them as the specification says. A unified kernel image with several profiles
-is one entry for each profile. Entries that are not for the architecture of the machine are hidden.
-Type #1 entries can use `linux`, `efi`, `uki`, `initrd`, `options`, `devicetree`, `architecture`,
-`profile`, `sort-key`, `version`, `machine-id`, and `title`.
-
-To set up the generator by hand instead of using autoconfiguration, add a generator and an action
-that boots the entries. The entry values `$chainload`, `$options`, `$initrd-0` to `$initrd-7`,
-`$devicetree`, `$cmdline`, `$title`, `$version`, and `$entry-root` are available.
-
-```toml
-[generators.bls]
-# the directory that has the entries directory. this is the default.
-bls.path = "\\loader"
-# the directory of unified kernel images. by default, this is \EFI\Linux on
-# the device of the path. an empty path turns unified kernel images off.
-bls.uki-path = "\\EFI\\Linux"
-# also read the extended boot loader partition (XBOOTLDR) of the same disk,
-# which is sorted with the other entries. strict mode always does. its files are on that partition, so
-# the action has to use $entry-root, which is empty for Sprout's own partition.
-bls.xbootldr = false
-# keep the name of the entry file as the name of the entry, so it matches
-# the ids that bootctl uses.
-bls.pin-names = true
-bls.entry.title = "$title"
-bls.entry.actions = ["boot-bls"]
-
-[actions.boot-bls]
-chainload.path = "$entry-root\\$chainload"
-chainload.options = ["$options"]
-chainload.devicetree = "$entry-root\\$devicetree"
-# an entry can have up to 32 initrds, as $initrd-0 to $initrd-31. unused ones are skipped.
-# only the first eight are listed here. add the others to boot an entry with more,
-# as Sprout warns when an entry has an initrd that the chain does not list.
-chainload.linux-initrd-chain = [
-  "$entry-root\\$initrd-0",
-  "$entry-root\\$initrd-1",
-  "$entry-root\\$initrd-2",
-  "$entry-root\\$initrd-3",
-  "$entry-root\\$initrd-4",
-  "$entry-root\\$initrd-5",
-  "$entry-root\\$initrd-6",
-  "$entry-root\\$initrd-7",
-]
-```
-
-An entry that names a `devicetree` boots with that devicetree installed for the image, which is put
-back when the image returns. It is not used when Secure Boot is enabled, as it can't be verified.
-If it can't be installed, Sprout warns and boots without it, unless strict mode is on.
-
-#### Boot counting
-
-An entry file named like `fedora+3.conf` or `fedora+3.efi` has three tries. Each time Sprout boots it, the
-file is renamed, such as to `fedora+2-1.conf`, and the new path is given to the system in
-`LoaderBootCountPath` so `systemd-bless-boot` can remove the counter once the boot works.
-Entries that have no tries left are sorted last and are not picked as the default entry, but they can still be
-booted by hand. By default, if an entry fails to start after a try was used up and it had tries left, the machine
-resets, so the next boot can use the next try or another entry. This is the `reboot-on-error` setting
-in `loader.conf`. Without boot counting, a failure to start returns to the firmware.
-
-#### loader.conf
-
-Sprout reads `\loader\loader.conf` from the partition it was loaded from, as systemd-boot does.
-
-| Key               | Value                                                              |
-|-------------------|--------------------------------------------------------------------|
-| `default`         | A pattern for the id of the default entry, or `@saved`.            |
-| `preferred`       | Like `default`, but entries with no boot counter tries are skipped. |
-| `timeout`         | Seconds, `menu-hidden`, `menu-disabled`, or `menu-force`.           |
-| `reboot-on-error` | `auto` (the default), `yes`, or `no`.                               |
-
-The id of an entry is the name of its file without the boot counter, such as `fedora.conf` or `fedora.efi`.
-Patterns ignore case and can use `*`, `?`, and `[a-z]`. With `@saved`, the entry that was booted last is the
-default. With `reboot-on-error`, `yes` always resets after an entry fails to start, which can loop forever,
-and `auto` only does when a boot counter try was used up and there were tries left.
-Other keys are ignored with a warning.
-
-A hidden menu, from a timeout of zero or `menu-hidden`, still opens when a key is pressed. `menu-disabled` does not.
-
-#### Bootloader interface
-
-Sprout uses the same variables as systemd-boot, so `bootctl`, `systemctl reboot --boot-loader-entry`, and
-`systemd-bless-boot` can work with it. It publishes `LoaderEntries`, `LoaderEntrySelected`,
-`LoaderBootCountPath`, `LoaderFeatures`, and `LoaderInfo`, and reads `LoaderEntryDefault`,
-`LoaderEntryPreferred`, `LoaderEntryOneShot`, `LoaderEntryLastBooted`, `LoaderConfigTimeout`,
-and `LoaderConfigTimeoutOneShot`.
-
-The values that tools like `bootctl` set in the bootloader interface outrank `sprout.toml`, which outranks
-`loader.conf`. In strict mode, `LoaderEntryOneShot` is tried before everything else for the default entry.
-
-The default entry comes from the first of these that matches an entry:
-
-1. `LoaderEntryPreferred`, then `preferred` in `loader.conf`
-2. `LoaderEntryDefault`
-3. `default-entry` in `sprout.toml`
-4. `default` in `loader.conf`
-
-The menu timeout comes from the first of the one-shot timeout, `--menu-timeout`, `LoaderConfigTimeout`,
-`menu-timeout` in `sprout.toml`, and `loader.conf`.
-
-#### Strict mode
-
-By default, Sprout differs from systemd-boot in a few places that are friendlier or safer for a bootloader that
-reads the same files. Each of them is logged when it applies. `--bls-strict-mode`, or `bls-strict-mode = true`
-in the options of `sprout.toml`, removes all of them.
-
-| Behavior                                 | By default                                                | In strict mode                                            |
-|------------------------------------------|-----------------------------------------------------------|-----------------------------------------------------------|
-| One-shot entry (`LoaderEntryOneShot`)    | Booted at once, without the menu.                         | Only the default for this boot. The menu and its timeout still apply. |
-| Menu timeout that nothing sets           | The menu is shown for 10 seconds.                         | The menu is hidden.                                       |
-| Default entry with no boot counter tries | Skipped for another entry.                                | Used, as `default` ignores the tries.                     |
-| Entry with more than one of `linux`, `efi`, `uki` | Boots the first of them.                         | Hidden.                                                   |
-| Entry whose file does not exist          | Shown, and it fails when booted.                          | Hidden.                                                   |
-| Unified kernel image without a name      | Named after its file.                                     | Hidden.                                                   |
-| Name and version of a unified kernel image | The name is `PRETTY_NAME` or `ID`, and the version is `IMAGE_VERSION`, `VERSION_ID`, `BUILD_ID`, then `.uname`. | The fields systemd-boot uses: the name is `PRETTY_NAME`, `IMAGE_ID`, `NAME` or `ID`, and the version is `IMAGE_VERSION`, `VERSION`, `VERSION_ID` or `BUILD_ID`. |
-| Boot counter of a plain `efi` entry      | Counted.                                                  | Not counted, but its tries still make it bad.             |
-| The extended boot loader partition       | Read when `xbootldr` is set on the generator.             | Always read.                                              |
-| Autoconfiguration                        | Reads BLS entries from every disk, one generator each.    | Reads BLS entries from Sprout's partition and the XBOOTLDR of its disk, as one generator. Windows and Linux entries are found as before. |
-| Boot entry that returns                  | Sprout exits to the firmware.                             | The menu is shown again.                                  |
-| Devicetree that can't be installed       | Warns and boots without it.                               | The entry fails.                                          |
-
-In strict mode, the actions of a hand-written generator have to use `$entry-root` for the files of
-an entry, as entries can come from the extended boot loader partition.
-
-### Generators
-
-Generators make entries when Sprout starts. The `matrix` generator makes an entry for every combination of
-its values, the `list` generator makes an entry for each item of a list, and the `bls` generator makes
-entries from BLS files. Variants multiply the entries of any generator, and `exclude` removes some of them.
-
-```toml
-# makes an entry for each kernel and each console, such as "Boot \vmlinuz (serial)".
-[generators.kernels]
-matrix.entry.title = "Boot $kernel ($console)"
-matrix.entry.actions = ["boot-kernel"]
-matrix.values.kernel = ["\\vmlinuz", "\\vmlinuz-lts"]
-variants.console = [
-  { name = "serial", values.console-options = "console=ttyS0" },
-  { name = "graphics", values.console-options = "console=tty0" },
-]
-
-[actions.boot-kernel]
-chainload.path = "$kernel"
-chainload.options = ["$console-options"]
-```
+The full list of settings, the command line options, generators, and how Sprout treats BLS entries,
+`loader.conf` and strict mode are in [CONFIG.md](./CONFIG.md).
 
 [Edera]: https://edera.dev
+[Configuration Reference]: ./CONFIG.md
 [Development Guide]: ./DEVELOPMENT.md
 [Contributing Guide]: ./CONTRIBUTING.md
 [Sprout License]: ./LICENSE
