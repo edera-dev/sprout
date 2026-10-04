@@ -8,6 +8,12 @@ use anyhow::{Result, bail};
 /// keeps a corrupt image from causing a large allocation.
 pub const MAX_SECTION_SIZE: u64 = 64 * 1024;
 
+/// The machine type of an x86_64 PE image.
+pub const PE_MACHINE_X86_64: u16 = 0x8664;
+
+/// The machine type of an aarch64 PE image.
+pub const PE_MACHINE_AARCH64: u16 = 0xaa64;
+
 /// The most sections a PE image can have.
 const MAX_SECTIONS: usize = 96;
 
@@ -48,14 +54,29 @@ fn u32_at(bytes: &[u8], offset: usize) -> u32 {
     ])
 }
 
+/// The parts of a PE image that were read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PeImage {
+    /// The machine type from the COFF header, such as [PE_MACHINE_X86_64].
+    pub machine: u16,
+    /// The contents of the wanted sections that were found.
+    pub sections: BTreeMap<String, Vec<u8>>,
+}
+
 /// Reads the sections named in `wanted` from the PE image in `reader`.
-/// Only the headers and the wanted sections are read, so this is cheap on large images.
-/// A wanted section that is missing, or larger than [MAX_SECTION_SIZE], is left out.
-/// An image that isn't a valid PE file is an error.
+/// See [read_pe] for the details.
 pub fn read_sections<R: ReadAt>(
     reader: &mut R,
     wanted: &[&str],
 ) -> Result<BTreeMap<String, Vec<u8>>> {
+    Ok(read_pe(reader, wanted)?.sections)
+}
+
+/// Reads the machine type and the sections named in `wanted` from the PE image in `reader`.
+/// Only the headers and the wanted sections are read, so this is cheap on large images.
+/// A wanted section that is missing, or larger than [MAX_SECTION_SIZE], is left out.
+/// An image that isn't a valid PE file is an error.
+pub fn read_pe<R: ReadAt>(reader: &mut R, wanted: &[&str]) -> Result<PeImage> {
     // The DOS header starts with "MZ" and holds the offset of the PE header at 0x3c.
     let mut dos = [0u8; 0x40];
     reader.read_at(0, &mut dos)?;
@@ -70,6 +91,7 @@ pub fn read_sections<R: ReadAt>(
     if &coff[..4] != b"PE\0\0" {
         bail!("not a PE image: missing the PE signature");
     }
+    let machine = u16_at(&coff, 4);
     let section_count = usize::from(u16_at(&coff, 6));
     let optional_header_size = u64::from(u16_at(&coff, 20));
     if section_count > MAX_SECTIONS {
@@ -109,5 +131,5 @@ pub fn read_sections<R: ReadAt>(
         sections.insert(name.to_string(), data);
     }
 
-    Ok(sections)
+    Ok(PeImage { machine, sections })
 }

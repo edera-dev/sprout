@@ -12,7 +12,10 @@ mod pe;
 mod uki;
 
 pub use loader_conf::{LoaderConf, LoaderTimeout};
-pub use pe::{MAX_SECTION_SIZE, ReadAt, read_sections};
+pub use pe::{
+    MAX_SECTION_SIZE, PE_MACHINE_AARCH64, PE_MACHINE_X86_64, PeImage, ReadAt, read_pe,
+    read_sections,
+};
 pub use uki::{OsRelease, UKI_SECTIONS};
 
 /// Represents a parsed BLS entry.
@@ -617,6 +620,7 @@ mod tests {
         image[..2].copy_from_slice(b"MZ");
         image[0x3c..0x40].copy_from_slice(&0x80u32.to_le_bytes());
         image[0x80..0x84].copy_from_slice(b"PE\0\0");
+        image[0x84..0x86].copy_from_slice(&0x8664u16.to_le_bytes());
         image[0x86..0x88].copy_from_slice(&(sections.len() as u16).to_le_bytes());
         let mut offset = data_start;
         for (index, (name, data)) in sections.iter().enumerate() {
@@ -718,6 +722,14 @@ mod tests {
         assert_eq!(sections.len(), 2);
         assert_eq!(sections[".osrel"], b"ID=arch\n");
         assert_eq!(sections[".uname"], b"6.5");
+    }
+
+    #[test]
+    fn pe_reports_the_machine_type() {
+        let image = pe_image(&[(".osrel", b"ID=x")]);
+        let pe = read_pe(&mut image.as_slice(), &[".osrel"]).unwrap();
+        assert_eq!(pe.machine, PE_MACHINE_X86_64);
+        assert!(pe.sections.contains_key(".osrel"));
     }
 
     #[test]

@@ -28,6 +28,8 @@ pub fn scan(
     let bls_loader_conf_path = Path::new(cstr16!("\\loader\\loader.conf"));
     // BLS also has an entries directory that can specify explicit entries.
     let bls_entries_path = Path::new(cstr16!("\\loader\\entries"));
+    // BLS Type #2 entries are unified kernel images in the EFI/Linux directory.
+    let bls_uki_path = Path::new(cstr16!("\\EFI\\Linux"));
 
     // Convert the device path root to a string we can use in the configuration.
     let mut root = root
@@ -64,9 +66,27 @@ pub fn scan(
         })
         .unwrap_or(false);
 
+    // Whether we have any unified kernel images.
+    let has_ukis = filesystem
+        .read_dir(bls_uki_path)
+        .map(|mut iterator| {
+            iterator.any(|entry| {
+                entry.is_ok_and(|entry| {
+                    entry.is_regular_file()
+                        && entry
+                            .file_name()
+                            .to_string()
+                            .to_lowercase()
+                            .ends_with(".efi")
+                })
+            })
+        })
+        .unwrap_or(false);
+
     // Detect if a BLS supported configuration is on this filesystem.
-    // We check both loader.conf and entries directory as only one of them is required.
-    if !(has_loader_conf || has_entries_dir) {
+    // We check loader.conf, the entries directory and unified kernel images, as only one of
+    // them is required.
+    if !(has_loader_conf || has_entries_dir || has_ukis) {
         return Ok(false);
     }
 
@@ -81,6 +101,7 @@ pub fn scan(
             ..Default::default()
         },
         path: format!("{}\\loader", root),
+        uki_path: None,
         pin_names: true,
     };
 

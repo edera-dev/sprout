@@ -21,18 +21,18 @@ pub struct BootCounterTarget {
     pub id: String,
     /// The current file name, including the counter and the extension.
     pub file_name: String,
+    /// The extension of the file name, such as `.conf`, in its original case.
+    pub extension: String,
 }
 
 impl BootCounterTarget {
     /// Consumes one try by renaming the entry file, such as `foo+3.conf` to `foo+2-1.conf`.
     /// Returns the path of the renamed file.
     pub fn consume(&self) -> Result<PathBuf> {
-        // The extension is taken from the current file name, as it may be in any case.
-        let extension = &self.file_name[self.file_name.len() - ".conf".len()..];
         let new_name = format!(
             "{}{}",
             self.counter.decremented().render(&self.id),
-            extension
+            self.extension
         );
 
         let mut from = self.directory.clone();
