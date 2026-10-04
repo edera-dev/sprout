@@ -213,7 +213,8 @@ chainload.path = "$entry-root\\$chainload"
 chainload.options = ["$options"]
 chainload.devicetree = "$entry-root\\$devicetree"
 # an entry can have up to 32 initrds, as $initrd-0 to $initrd-31. unused ones are skipped.
-# only the first eight are listed here, so add the others to boot an entry with more.
+# only the first eight are listed here. add the others to boot an entry with more,
+# as Sprout warns when an entry has an initrd that the chain does not list.
 chainload.linux-initrd-chain = [
   "$entry-root\\$initrd-0",
   "$entry-root\\$initrd-1",
@@ -267,7 +268,8 @@ Sprout uses the same variables as systemd-boot, so `bootctl`, `systemctl reboot 
 `LoaderEntryPreferred`, `LoaderEntryOneShot`, `LoaderEntryLastBooted`, `LoaderConfigTimeout`,
 and `LoaderConfigTimeoutOneShot`.
 
-The values that tools like `bootctl` set outrank `sprout.toml`, which outranks `loader.conf`.
+The values that tools like `bootctl` set in the bootloader interface outrank `sprout.toml`, which outranks
+`loader.conf`. In strict mode, `LoaderEntryOneShot` is tried before everything else for the default entry.
 
 The default entry comes from the first of these that matches an entry:
 
@@ -287,16 +289,16 @@ in the options of `sprout.toml`, removes all of them.
 
 | Behavior                                 | By default                                                | In strict mode                                            |
 |------------------------------------------|-----------------------------------------------------------|-----------------------------------------------------------|
-| One-shot entry (`LoaderEntryOneShot`)    | Booted at once, without the menu.                         | Only the default for this boot, so the menu still shows.  |
+| One-shot entry (`LoaderEntryOneShot`)    | Booted at once, without the menu.                         | Only the default for this boot. The menu and its timeout still apply. |
 | Menu timeout that nothing sets           | The menu is shown for 10 seconds.                         | The menu is hidden.                                       |
 | Default entry with no boot counter tries | Skipped for another entry.                                | Used, as `default` ignores the tries.                     |
 | Entry with more than one of `linux`, `efi`, `uki` | Boots the first of them.                         | Hidden.                                                   |
 | Entry whose file does not exist          | Shown, and it fails when booted.                          | Hidden.                                                   |
 | Unified kernel image without a name      | Named after its file.                                     | Hidden.                                                   |
-| Version of a unified kernel image        | Falls back to the kernel version in `.uname`.             | Only the os-release fields.                               |
-| Boot counter of a plain `efi` entry      | Counted.                                                  | Not counted.                                              |
+| Name and version of a unified kernel image | The name is `PRETTY_NAME` or `ID`, and the version is `IMAGE_VERSION`, `VERSION_ID`, `BUILD_ID`, then `.uname`. | The fields systemd-boot uses: the name is `PRETTY_NAME`, `IMAGE_ID`, `NAME` or `ID`, and the version is `IMAGE_VERSION`, `VERSION`, `VERSION_ID` or `BUILD_ID`. |
+| Boot counter of a plain `efi` entry      | Counted.                                                  | Not counted, but its tries still make it bad.             |
 | The extended boot loader partition       | Read when `xbootldr` is set on the generator.             | Always read.                                              |
-| Autoconfiguration                        | Reads BLS entries from every disk, one generator each.    | Reads Sprout's partition and the XBOOTLDR of its disk, as one generator. |
+| Autoconfiguration                        | Reads BLS entries from every disk, one generator each.    | Reads BLS entries from Sprout's partition and the XBOOTLDR of its disk, as one generator. Windows and Linux entries are found as before. |
 | Boot entry that returns                  | Sprout exits to the firmware.                             | The menu is shown again.                                  |
 | Devicetree that can't be installed       | Warns and boots without it.                               | The entry fails.                                          |
 
