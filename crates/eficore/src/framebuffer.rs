@@ -1,7 +1,10 @@
 use alloc::vec;
 use alloc::vec::Vec;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use uefi::proto::console::gop::{BltOp, BltPixel, BltRegion, GraphicsOutput};
+
+/// How many unchanged rows may sit between changed rows before they are blitted separately.
+const BAND_GAP: usize = 8;
 
 /// Represents the EFI framebuffer.
 pub struct Framebuffer {
@@ -68,6 +71,11 @@ impl Framebuffer {
         self.pixels.get_mut(index)
     }
 
+    /// Replace the pixels of the framebuffer with those of `other`, which must be the same size.
+    pub fn copy_from(&mut self, other: &Framebuffer) {
+        self.pixels.copy_from_slice(&other.pixels);
+    }
+
     /// Blit the framebuffer to the specified `gop` [GraphicsOutput].
     pub fn blit(&self, gop: &mut GraphicsOutput) -> Result<()> {
         gop.blt(BltOp::BufferToVideo {
@@ -77,6 +85,65 @@ impl Framebuffer {
             dims: (self.width, self.height),
         })
         .context("unable to blit framebuffer")?;
+        Ok(())
+    }
+
+    /// Blit only what is different from `previous`, which must be the same size, to the specified
+    /// `gop` [GraphicsOutput]. Changes that are far apart vertically are blitted separately, so
+    /// that the pixels between them are not sent to the display.
+    pub fn blit_changes(&self, previous: &Framebuffer, gop: &mut GraphicsOutput) -> Result<()> {
+        if self.width != previous.width || self.height != previous.height {
+            bail!("framebuffer sizes differ");
+        }
+
+        // The top, bottom, left and right of the changed rows that haven't been blitted yet.
+        let mut band: Option<(usize, usize, usize, usize)> = None;
+        let mut quiet = 0;
+        for row in 0..self.height {
+            let range = row * self.width..(row + 1) * self.width;
+            let (now, before) = (&self.pixels[range.clone()], &previous.pixels[range]);
+            let differs = |(now, before): (&BltPixel, &BltPixel)| {
+                (now.red, now.green, now.blue) != (before.red, before.green, before.blue)
+            };
+            let first = now.iter().zip(before).position(differs);
+            let Some(first) = first else {
+                quiet += 1;
+                if quiet > BAND_GAP
+                    && let Some(band) = band.take()
+                {
+                    self.blit_region(gop, band)?;
+                }
+                continue;
+            };
+            let last = now.iter().zip(before).rposition(differs).unwrap_or(first);
+            quiet = 0;
+            band = Some(match band {
+                Some((top, _, left, right)) => (top, row + 1, left.min(first), right.max(last + 1)),
+                None => (row, row + 1, first, last + 1),
+            });
+        }
+        if let Some(band) = band {
+            self.blit_region(gop, band)?;
+        }
+        Ok(())
+    }
+
+    /// Blit the region of the `top`, `bottom`, `left` and `right` to the specified `gop`.
+    fn blit_region(
+        &self,
+        gop: &mut GraphicsOutput,
+        (top, bottom, left, right): (usize, usize, usize, usize),
+    ) -> Result<()> {
+        gop.blt(BltOp::BufferToVideo {
+            buffer: &self.pixels,
+            src: BltRegion::SubRectangle {
+                coords: (left, top),
+                px_stride: self.width,
+            },
+            dest: (left, top),
+            dims: (right - left, bottom - top),
+        })
+        .context("unable to blit framebuffer region")?;
         Ok(())
     }
 }
