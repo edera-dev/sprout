@@ -199,6 +199,13 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
             .context("unable to set loader path in bootloader interface"),
     );
 
+    // Strict mode can be asked for on the command line or in the configuration.
+    let mut options = options;
+    options.bls_strict_mode |= config.options.bls_strict_mode;
+    if options.bls_strict_mode {
+        info!("BLS strict mode is enabled");
+    }
+
     // Create the root context.
     let mut root = RootContext::new(loaded_image_path, timer, options);
 

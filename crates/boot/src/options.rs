@@ -29,6 +29,8 @@ pub struct SproutOptions {
     pub menu_style: Option<MenuStyle>,
     /// Retains the boot console before boot.
     pub retain_boot_console: bool,
+    /// Makes Sprout follow the Boot Loader Specification and systemd-boot exactly.
+    pub bls_strict_mode: bool,
 }
 
 /// The default Sprout options.
@@ -42,6 +44,7 @@ impl Default for SproutOptions {
             menu_timeout: None,
             menu_style: None,
             retain_boot_console: false,
+            bls_strict_mode: false,
         }
     }
 }
@@ -60,6 +63,7 @@ impl SproutOptions {
             MenuTimeout,
             MenuStyle,
             RetainBootConsole,
+            BlsStrictMode,
         }
 
         // All the options for the Sprout executable.
@@ -78,6 +82,8 @@ impl SproutOptions {
                 .help_text("Boot menu style, basic, simple or graphical"),
             Opt::flag(ArgID::RetainBootConsole, &["--retain-boot-console"])
                 .help_text("Retain boot console before boot"),
+            Opt::flag(ArgID::BlsStrictMode, &["--bls-strict-mode"])
+                .help_text("Follow the BLS specification and systemd-boot exactly"),
         ]);
 
         // Acquire the arguments as determined by the UEFI core.
@@ -140,6 +146,10 @@ impl SproutOptions {
                         ArgID::RetainBootConsole => {
                             // Retain the boot console before booting.
                             result.retain_boot_console = true;
+                        }
+                        ArgID::BlsStrictMode => {
+                            // Follow the BLS specification and systemd-boot exactly.
+                            result.bls_strict_mode = true;
                         }
                         ArgID::Help => {
                             let ctx = HelpWriterContext {
