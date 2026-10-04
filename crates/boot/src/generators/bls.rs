@@ -66,6 +66,7 @@ fn bootable_entry(
     name: &str,
     entry: &BlsEntry,
     initrds: &[String],
+    entry_root: &str,
 ) -> BootableEntry {
     // Produce a new sprout context for the entry with the extracted values.
     let mut context = context.fork();
@@ -84,6 +85,9 @@ fn bootable_entry(
         title_base.clone()
     };
 
+    // The device that the files of the entry are on, for a path like "$entry-root\\$chainload".
+    // It is empty for the partition that Sprout was loaded from.
+    context.set("entry-root", entry_root.to_string());
     context.set("title-base", title_base);
     context.set("title", title_full);
     context.set("chainload", chainload);
@@ -132,6 +136,7 @@ fn generate_type1(
     context: &Rc<SproutContext>,
     bls: &BlsConfiguration,
     path: &str,
+    entry_root: &str,
 ) -> Result<Vec<(BlsEntry, BootableEntry)>> {
     let mut entries = Vec::new();
 
@@ -259,7 +264,7 @@ fn generate_type1(
             continue;
         }
 
-        let mut boot = bootable_entry(context, bls, &name, &entry, &initrds);
+        let mut boot = bootable_entry(context, bls, &name, &entry, &initrds, entry_root);
         boot.set_id_suffix(&extension);
 
         // Record where the boot counter lives so a try can be consumed when this entry boots.
@@ -287,6 +292,7 @@ fn generate_type2(
     context: &Rc<SproutContext>,
     bls: &BlsConfiguration,
     uki_path: &str,
+    entry_root: &str,
     entries: &[(BlsEntry, BootableEntry)],
 ) -> Result<Vec<(BlsEntry, BootableEntry)>> {
     let resolved = eficore::path::resolve_path(Some(context.root().loaded_image_path()?), uki_path)
@@ -356,7 +362,7 @@ fn generate_type2(
             let mut entry = profile.entry;
             entry.boot_counter = boot_counter;
 
-            let mut boot = bootable_entry(context, bls, &name, &entry, &[]);
+            let mut boot = bootable_entry(context, bls, &name, &entry, &[], entry_root);
             boot.set_id_suffix(&extension);
             if let Some(ref suffix) = suffix {
                 boot.set_id_profile(suffix);
@@ -392,18 +398,19 @@ fn generate_type2(
     Ok(found)
 }
 
-/// Generates entries from the BLS entries directory and the unified kernel image directory
-/// using the specified `bls` configuration and `context`. The BLS conversion is best-effort
-/// and will ignore any unsupported entries.
-pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Vec<BootableEntry>> {
-    // Stamp the path to the BLS directory.
-    let path = context.stamp(&bls.path);
-
-    let uki_path = bls.uki_path_for(&path);
-
+/// Generates the entries of one partition, from the BLS entries directory at `bls_path` and the
+/// unified kernel image directory at `uki_path`, if there is one. The files of the entries are on
+/// the device `entry_root`.
+fn generate_partition(
+    context: &Rc<SproutContext>,
+    bls: &BlsConfiguration,
+    bls_path: &str,
+    uki_path: Option<&str>,
+    entry_root: &str,
+) -> Result<Vec<(BlsEntry, BootableEntry)>> {
     // A problem reading the Type #1 entries only stops the unified kernel images when there
     // are none to add, so that either kind of entry can still boot.
-    let mut entries = match generate_type1(&context, bls, &path) {
+    let mut entries = match generate_type1(context, bls, bls_path, entry_root) {
         Ok(entries) => entries,
         Err(error) if uki_path.is_some() => {
             warn!("unable to generate bls entries: {:#}", error);
@@ -415,13 +422,81 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
     // Add the unified kernel images, unless that is disabled. A problem scanning them
     // should not prevent booting the other entries.
     if let Some(uki_path) = uki_path {
-        let uki_path = context.stamp(&uki_path);
-        match generate_type2(&context, bls, &uki_path, &entries) {
+        let uki_path = context.stamp(uki_path);
+        match generate_type2(context, bls, &uki_path, entry_root, &entries) {
             Ok(found) => entries.extend(found),
             Err(error) => warn!(
                 "unable to generate unified kernel image entries: {:#}",
                 error
             ),
+        }
+    }
+    Ok(entries)
+}
+
+/// Finds the root of the Extended Boot Loader Partition on the disk that Sprout was loaded from,
+/// as the text of the device with a trailing slash. None if there is no such partition.
+fn xbootldr_root(context: &Rc<SproutContext>) -> Result<Option<String>> {
+    let Some(path) = eficore::xbootldr::find_xbootldr(context.root().loaded_image_path()?)? else {
+        return Ok(None);
+    };
+    let mut root = path
+        .to_string16(DisplayOnly(false), AllowShortcuts(false))
+        .context("unable to convert the xbootldr device path to a string")?
+        .to_string();
+    // Add a trailing forward-slash to the root to ensure the device root is completed.
+    root.push('/');
+    Ok(Some(root))
+}
+
+/// Generates entries from the BLS entries directory and the unified kernel image directory
+/// using the specified `bls` configuration and `context`, and from the Extended Boot Loader
+/// Partition if that is enabled. The BLS conversion is best-effort and will ignore any
+/// unsupported entries.
+pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Vec<BootableEntry>> {
+    // Stamp the path to the BLS directory.
+    let path = context.stamp(&bls.path);
+
+    let uki_path = bls.uki_path_for(&path);
+    let mut entries = generate_partition(
+        &context,
+        bls,
+        &path,
+        uki_path.as_deref(),
+        BlsConfiguration::root_of(&path),
+    )?;
+
+    // Add the entries of the Extended Boot Loader Partition, which are sorted together with the
+    // others. A problem with it should not prevent booting from the entries that are found.
+    if bls.xbootldr {
+        match xbootldr_root(&context) {
+            Ok(Some(root)) => {
+                let xbootldr_uki = uki_path.as_ref().map(|_| format!("{}\\EFI\\Linux", root));
+                match generate_partition(
+                    &context,
+                    bls,
+                    &format!("{}\\loader", root),
+                    xbootldr_uki.as_deref(),
+                    &root,
+                ) {
+                    Ok(found) => {
+                        for (entry, boot) in found {
+                            // An entry that is on both partitions would be ambiguous.
+                            if entries.iter().any(|(_, other)| other.id() == boot.id()) {
+                                warn!(
+                                    "xbootldr entry {} has the same id as another entry, skipping",
+                                    boot.id()
+                                );
+                            } else {
+                                entries.push((entry, boot));
+                            }
+                        }
+                    }
+                    Err(error) => warn!("unable to generate xbootldr entries: {:#}", error),
+                }
+            }
+            Ok(None) => info!("no xbootldr partition was found"),
+            Err(error) => warn!("unable to find the xbootldr partition: {:#}", error),
         }
     }
 
