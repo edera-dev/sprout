@@ -20,11 +20,9 @@ pub fn generate(
         context.insert(combination);
         let context = context.freeze();
 
-        // Stamp the entry title and actions from the template.
-        let mut entry = list.entry.clone();
-
-        // Stamp all the actions this entry references.
-        entry.actions = context.stamp_iter(entry.actions.into_iter()).collect();
+        // The actions are stamped with the final context of the entry when it is booted,
+        // so that variants and the values of the entry can override the values of the generator.
+        let entry = list.entry.clone();
 
         // Push the entry into the list with the new context.
         entries.push(BootableEntry::new(
