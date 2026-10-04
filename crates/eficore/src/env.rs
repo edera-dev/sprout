@@ -1,4 +1,4 @@
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 use anyhow::{Context, Result};
 use uefi::proto::loaded_image::LoadedImage;
@@ -33,14 +33,9 @@ pub fn args() -> Result<Vec<String>> {
         .collect::<Vec<u16>>();
     let options = String::from_utf16_lossy(&options);
 
-    // Use shlex to parse the options.
-    // If shlex fails, we will perform a simple whitespace split.
-    let mut args = shlex::split(&options).unwrap_or_else(|| {
-        options
-            .split_ascii_whitespace()
-            .map(|string| string.to_string())
-            .collect::<Vec<_>>()
-    });
+    // Split the options on whitespace, keeping quoted text together.
+    // Backslashes are kept as they are, since UEFI paths use them as separators.
+    let mut args = split_options(&options);
 
     // Correct firmware that may add invalid arguments at the start.
     // Witnessed this on a Dell Precision 5690 when direct booting.
@@ -65,4 +60,39 @@ pub fn args() -> Result<Vec<String>> {
     }
 
     Ok(args)
+}
+
+/// Splits `options` into arguments on whitespace. Text in single or double quotes is kept together.
+fn split_options(options: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut in_arg = false;
+    let mut quote = None;
+
+    for c in options.chars() {
+        match quote {
+            Some(q) if c == q => quote = None,
+            Some(_) => current.push(c),
+            None if c == '"' || c == '\'' => {
+                quote = Some(c);
+                in_arg = true;
+            }
+            None if c.is_whitespace() => {
+                if in_arg {
+                    args.push(core::mem::take(&mut current));
+                    in_arg = false;
+                }
+            }
+            None => {
+                current.push(c);
+                in_arg = true;
+            }
+        }
+    }
+
+    if in_arg {
+        args.push(current);
+    }
+
+    args
 }
