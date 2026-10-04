@@ -74,3 +74,7 @@ coding agents. QEMU runs in the background with a QMP socket, and its consoles a
 - `smoke.sh [arch]`: Starts, drives the graphical menu, waits for the Linux shell and stops.
 
 `boot.sh` supports this with `QEMU_HEADLESS`, `QEMU_QMP`, `QEMU_SERIAL_FILE`, `QEMU_CONSOLE_FILE` and `QEMU_EXTRA_ARGS`.
+
+## Releasing
+
+Maintainers cut releases as described in [RELEASING.md](RELEASING.md).
