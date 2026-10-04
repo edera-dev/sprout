@@ -817,20 +817,30 @@ mod tests {
     }
 
     #[test]
-    fn uki_title_and_version_use_every_systemd_fallback() {
+    fn uki_title_and_version_use_every_systemd_fallback_in_strict_mode() {
         let sections = uki_sections(&[(
             ".osrel",
             "IMAGE_ID=img\nNAME=N\nID=i\nVERSION=7.1\nVERSION_ID=7\n",
         )]);
-        let entry = BlsEntry::from_uki(&sections, "/a.efi");
+        let entry = BlsEntry::from_uki_with(&sections, "/a.efi", true);
         assert_eq!(entry.title.as_deref(), Some("img"));
         assert_eq!(entry.version.as_deref(), Some("7.1"));
 
         let sections = uki_sections(&[(".osrel", "NAME=N\nID=i\n")]);
-        assert_eq!(
-            BlsEntry::from_uki(&sections, "/a.efi").title.as_deref(),
-            Some("N")
-        );
+        let entry = BlsEntry::from_uki_with(&sections, "/a.efi", true);
+        assert_eq!(entry.title.as_deref(), Some("N"));
+    }
+
+    #[test]
+    fn uki_title_and_version_keep_the_sprout_fallbacks_outside_strict_mode() {
+        // The long VERSION would be added to the title, so it is not used.
+        let sections = uki_sections(&[(
+            ".osrel",
+            "IMAGE_ID=img\nNAME=N\nID=i\nVERSION=\"24.04 LTS (Noble)\"\nVERSION_ID=7\n",
+        )]);
+        let entry = BlsEntry::from_uki(&sections, "/a.efi");
+        assert_eq!(entry.title.as_deref(), Some("i"));
+        assert_eq!(entry.version.as_deref(), Some("7"));
     }
 
     #[test]

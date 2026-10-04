@@ -97,10 +97,11 @@ impl BlsEntry {
     }
 
     /// Produces an entry for the unified kernel image at `uki_path`, from its PE `sections`.
-    /// The title comes from `PRETTY_NAME`, `IMAGE_ID`, `NAME`, then `ID`. The version comes from
-    /// `IMAGE_VERSION`, `VERSION`, `VERSION_ID`, then `BUILD_ID`, as in systemd-boot, and then
-    /// from the `.uname` section unless `strict` is set. The sort key comes from `IMAGE_ID`, then
-    /// `ID`. The embedded command line is kept in `cmdline` and not in `options`, as the image
+    /// With `strict`, the title comes from `PRETTY_NAME`, `IMAGE_ID`, `NAME`, then `ID`, and the
+    /// version from `IMAGE_VERSION`, `VERSION`, `VERSION_ID`, then `BUILD_ID`, as in systemd-boot.
+    /// Otherwise the title comes from `PRETTY_NAME`, then `ID`, and the version from
+    /// `IMAGE_VERSION`, `VERSION_ID`, `BUILD_ID`, then the `.uname` section. The sort key comes
+    /// from `IMAGE_ID`, then `ID`. The embedded command line is kept in `cmdline` and not in `options`, as the image
     /// reads its own command line.
     pub fn from_uki_with(
         sections: &BTreeMap<String, Vec<u8>>,
@@ -117,10 +118,22 @@ impl BlsEntry {
                 .map(ToString::to_string)
         };
         let uname = section_text(sections, ".uname");
-        let version = first(&["IMAGE_VERSION", "VERSION", "VERSION_ID", "BUILD_ID"]);
+        // systemd-boot looks at more fields. Outside of strict mode the version is not taken from
+        // VERSION, which is often a long name that would be added to the title.
+        let (title, version) = if strict {
+            (
+                first(&["PRETTY_NAME", "IMAGE_ID", "NAME", "ID"]),
+                first(&["IMAGE_VERSION", "VERSION", "VERSION_ID", "BUILD_ID"]),
+            )
+        } else {
+            (
+                first(&["PRETTY_NAME", "ID"]),
+                first(&["IMAGE_VERSION", "VERSION_ID", "BUILD_ID"]),
+            )
+        };
 
         Self {
-            title: first(&["PRETTY_NAME", "IMAGE_ID", "NAME", "ID"]),
+            title,
             version: version.or_else(|| uname.clone().filter(|_| !strict)),
             sort_key: first(&["IMAGE_ID", "ID"]),
             uki: Some(uki_path.to_string()),
