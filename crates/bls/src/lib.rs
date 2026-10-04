@@ -34,6 +34,8 @@ pub struct BlsEntry {
     pub efi: Option<String>,
     /// The path to a unified kernel image.
     pub uki: Option<String>,
+    /// The path to the flattened devicetree to boot with.
+    pub devicetree: Option<String>,
     /// The profile of the unified kernel image to boot.
     pub profile: Option<String>,
     /// The architecture the entry is for, such as `x64` or `aa64`.
@@ -67,6 +69,7 @@ impl FromStr for BlsEntry {
         let mut initrd: Vec<String> = Vec::new();
         let mut efi: Option<String> = None;
         let mut uki: Option<String> = None;
+        let mut devicetree: Option<String> = None;
         let mut profile: Option<String> = None;
         let mut architecture: Option<String> = None;
         let mut sort_key: Option<String> = None;
@@ -127,6 +130,11 @@ impl FromStr for BlsEntry {
                     efi = Some(value.trim().to_string());
                 }
 
+                // The path to the flattened devicetree to boot with.
+                "devicetree" => {
+                    devicetree = Some(value.trim().to_string());
+                }
+
                 // The path to a unified kernel image.
                 "uki" => {
                     uki = Some(value.trim().to_string());
@@ -169,6 +177,7 @@ impl FromStr for BlsEntry {
             initrd,
             efi,
             uki,
+            devicetree,
             profile,
             architecture,
             sort_key,
@@ -224,6 +233,14 @@ impl BlsEntry {
             .clone()
             .or(self.efi.clone())
             .or(self.uki.clone())
+            .map(|path| path.replace('/', "\\").trim_start_matches('\\').to_string())
+    }
+
+    /// Fetches the path to the devicetree to boot with, if any.
+    /// It also converts / to \\ to match EFI path style.
+    pub fn devicetree_path(&self) -> Option<String> {
+        self.devicetree
+            .as_ref()
             .map(|path| path.replace('/', "\\").trim_start_matches('\\').to_string())
     }
 
@@ -1137,6 +1154,17 @@ mod tests {
     #[test]
     fn default_flags_of_no_entries_are_empty() {
         assert!(resolve_default_flags(&[]).is_empty());
+    }
+
+    #[test]
+    fn parse_devicetree_and_convert_the_path() {
+        let entry: BlsEntry = "linux /vmlinuz\ndevicetree /dtb/board.dtb\n"
+            .parse()
+            .unwrap();
+        assert_eq!(entry.devicetree.as_deref(), Some("/dtb/board.dtb"));
+        assert_eq!(entry.devicetree_path().as_deref(), Some("dtb\\board.dtb"));
+        let entry: BlsEntry = "linux /vmlinuz\n".parse().unwrap();
+        assert_eq!(entry.devicetree_path(), None);
     }
 
     #[test]
