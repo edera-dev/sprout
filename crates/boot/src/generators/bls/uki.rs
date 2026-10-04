@@ -1,11 +1,10 @@
 use alloc::{
-    collections::BTreeMap,
     format,
     string::{String, ToString},
     vec::Vec,
 };
 use anyhow::{Context, Result, anyhow, bail};
-use edera_sprout_bls::{PeImage, ReadAt, UKI_SECTIONS, read_pe};
+use edera_sprout_bls::{BlsEntry, PeImage, ReadAt, UKI_SECTIONS, read_pe, strip_extension};
 use log::warn;
 use uefi::{
     CString16, Handle, Status,
@@ -13,14 +12,16 @@ use uefi::{
     proto::media::fs::SimpleFileSystem,
 };
 
-/// A unified kernel image that was found, with the sections Sprout reads.
+/// A unified kernel image that was found, with the metadata Sprout reads.
 pub struct UkiFile {
     /// The name of the file, such as `fedora+3.efi`.
     pub file_name: String,
     /// The machine type of the image.
     pub machine: u16,
-    /// The contents of the PE sections listed in [UKI_SECTIONS].
-    pub sections: BTreeMap<String, Vec<u8>>,
+    /// Whether the image has an `.osrel` section, which unified kernel images always have.
+    pub has_osrel: bool,
+    /// The entry made from the sections of the image.
+    pub entry: BlsEntry,
 }
 
 /// Reads a file at arbitrary offsets, so that a large image isn't loaded to read its headers.
@@ -80,7 +81,8 @@ pub fn scan(filesystem: Handle, directory: &str) -> Result<Vec<UkiFile>> {
             continue;
         }
         let file_name = info.file_name().to_string();
-        if file_name.to_lowercase().ends_with(".efi") {
+        // Hidden files, such as the AppleDouble files that macOS writes, are not images.
+        if !file_name.starts_with('.') && strip_extension(&file_name, ".efi").is_some() {
             names.push(file_name);
         }
     }
@@ -92,7 +94,9 @@ pub fn scan(filesystem: Handle, directory: &str) -> Result<Vec<UkiFile>> {
             Ok(image) => found.push(UkiFile {
                 file_name,
                 machine: image.machine,
-                sections: image.sections,
+                has_osrel: image.sections.contains_key(".osrel"),
+                // The sections are dropped here, so only the small entry is kept per image.
+                entry: BlsEntry::from_uki(&image.sections, &path),
             }),
             Err(error) => warn!("unable to read unified kernel image {}: {:#}", path, error),
         }

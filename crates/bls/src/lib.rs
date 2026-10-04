@@ -265,6 +265,16 @@ impl BootCounter {
     }
 }
 
+/// Splits the `extension` off the end of the file `name`, ignoring case.
+/// Returns the stem and the extension as it was written in the name.
+pub fn strip_extension<'a>(name: &'a str, extension: &str) -> Option<(&'a str, &'a str)> {
+    let split = name.len().checked_sub(extension.len())?;
+    if !name.is_char_boundary(split) || !name[split..].eq_ignore_ascii_case(extension) {
+        return None;
+    }
+    Some(name.split_at(split))
+}
+
 /// Converts an EFI `path` to the form used by the bootloader interface: separated by forward
 /// slashes, with a leading slash and no repeated or trailing separators.
 pub fn boot_path(path: &str) -> String {
@@ -722,6 +732,39 @@ mod tests {
         assert_eq!(sections.len(), 2);
         assert_eq!(sections[".osrel"], b"ID=arch\n");
         assert_eq!(sections[".uname"], b"6.5");
+    }
+
+    #[test]
+    fn strip_extension_ignores_case_and_keeps_the_original_extension() {
+        assert_eq!(
+            strip_extension("foo+3.conf", ".conf"),
+            Some(("foo+3", ".conf"))
+        );
+        assert_eq!(strip_extension("FOO.EFI", ".efi"), Some(("FOO", ".EFI")));
+        assert_eq!(strip_extension("a.Efi", ".efi"), Some(("a", ".Efi")));
+    }
+
+    #[test]
+    fn strip_extension_rejects_other_names() {
+        assert_eq!(strip_extension("foo.conf", ".efi"), None);
+        assert_eq!(strip_extension("efi", ".efi"), None);
+        assert_eq!(strip_extension("", ".efi"), None);
+        assert_eq!(strip_extension("foo.efi.bak", ".efi"), None);
+    }
+
+    #[test]
+    fn strip_extension_does_not_split_characters() {
+        // The last bytes of this name are not at a character boundary for a four byte suffix.
+        assert_eq!(strip_extension("a\u{e9}fi", ".efi"), None);
+        assert_eq!(
+            strip_extension("\u{e9}.efi", ".efi"),
+            Some(("\u{e9}", ".efi"))
+        );
+    }
+
+    #[test]
+    fn strip_extension_of_a_bare_extension_has_an_empty_stem() {
+        assert_eq!(strip_extension(".efi", ".efi"), Some(("", ".efi")));
     }
 
     #[test]

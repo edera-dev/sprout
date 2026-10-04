@@ -9,7 +9,7 @@ use alloc::{
 };
 use anyhow::{Context, Result};
 use core::{cmp::Ordering, str::FromStr};
-use edera_sprout_bls::{BlsEntry, BootCounter, sort_bls};
+use edera_sprout_bls::{BlsEntry, BootCounter, sort_bls, strip_extension};
 use edera_sprout_config::generators::bls::BlsConfiguration;
 use log::{info, warn};
 use uefi::{
@@ -169,26 +169,22 @@ fn generate_type1(
         }
 
         // Get the file name of the filesystem item.
-        let mut name = entry.file_name().to_string();
+        let file_name = entry.file_name().to_string();
 
-        // Ignore files that are not .conf files.
-        if !name.to_lowercase().ends_with(".conf") {
+        // Ignore hidden files, such as the AppleDouble files that macOS writes, and files that
+        // are not .conf files. Files named just ".conf" are not valid entry files.
+        let Some((stem, extension)) = strip_extension(&file_name, ".conf") else {
+            continue;
+        };
+        if file_name.starts_with('.') || stem.is_empty() {
             continue;
         }
-
-        // Remove the .conf extension.
-        name.truncate(name.len() - 5);
-
-        // Skip over files that are named just ".conf" as they are not valid entry files.
-        if name.is_empty() {
-            continue;
-        }
+        let extension = extension.to_string();
 
         // Split the boot counter off the file name. The entry id never includes the counter, so
         // that it stays the same as tries are consumed.
-        let file_name = entry.file_name().to_string();
         let (id, boot_counter) = {
-            let (id, counter) = BootCounter::parse(&name);
+            let (id, counter) = BootCounter::parse(stem);
             (id.to_string(), counter)
         };
         let name = id;
@@ -254,7 +250,7 @@ fn generate_type1(
                 directory: entries_path.clone(),
                 id: name.clone(),
                 file_name,
-                extension: ".conf".to_string(),
+                extension,
             });
         }
 
@@ -292,7 +288,7 @@ fn generate_type2(
             );
             continue;
         }
-        if !image.sections.contains_key(".osrel") {
+        if !image.has_osrel {
             info!(
                 "skipping {} as it has no .osrel section, so it is not a unified kernel image",
                 image.file_name
@@ -302,8 +298,10 @@ fn generate_type2(
 
         // The id is the file name without the extension and the boot counter.
         let file_name = image.file_name;
-        let extension = file_name[file_name.len() - ".efi".len()..].to_string();
-        let stem = &file_name[..file_name.len() - ".efi".len()];
+        let Some((stem, extension)) = strip_extension(&file_name, ".efi") else {
+            continue;
+        };
+        let extension = extension.to_string();
         let (id, boot_counter) = BootCounter::parse(stem);
         if id.is_empty() {
             continue;
@@ -322,8 +320,7 @@ fn generate_type2(
             continue;
         }
 
-        let efi_path = format!("{}\\{}", directory_name, file_name);
-        let mut entry = BlsEntry::from_uki(&image.sections, &efi_path);
+        let mut entry = image.entry;
         entry.boot_counter = boot_counter;
 
         let mut boot = bootable_entry(context, bls, &id, &entry, &[]);
@@ -349,11 +346,22 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
     // Stamp the path to the BLS directory.
     let path = context.stamp(&bls.path);
 
-    let mut entries = generate_type1(&context, bls, &path)?;
+    let uki_path = bls.uki_path_for(&path);
+
+    // A problem reading the Type #1 entries only stops the unified kernel images when there
+    // are none to add, so that either kind of entry can still boot.
+    let mut entries = match generate_type1(&context, bls, &path) {
+        Ok(entries) => entries,
+        Err(error) if uki_path.is_some() => {
+            warn!("unable to generate bls entries: {:#}", error);
+            Vec::new()
+        }
+        Err(error) => return Err(error),
+    };
 
     // Add the unified kernel images, unless that is disabled. A problem scanning them
     // should not prevent booting the other entries.
-    if let Some(uki_path) = bls.uki_path_for(&path) {
+    if let Some(uki_path) = uki_path {
         let uki_path = context.stamp(&uki_path);
         match generate_type2(&context, bls, &uki_path, &entries) {
             Ok(found) => entries.extend(found),
