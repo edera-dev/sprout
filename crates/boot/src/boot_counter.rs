@@ -1,5 +1,5 @@
 use alloc::{format, string::String};
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use edera_sprout_bls::BootCounter;
 use uefi::{
     CString16, Handle,
@@ -69,6 +69,10 @@ impl BootCounterTarget {
         let info = file
             .get_boxed_info::<FileInfo>()
             .context("unable to get the entry file info")?;
+        // A read-only file is left as it is, as the counter is not meant to be changed.
+        if info.attribute().contains(FileAttribute::READ_ONLY) {
+            bail!("the entry file is read-only");
+        }
         // The info is a fixed header followed by the null-terminated UCS-2 name.
         let size =
             FILE_INFO_HEADER_SIZE + 2 * (new_name.len() + 1) + <FileInfo as Align>::alignment();

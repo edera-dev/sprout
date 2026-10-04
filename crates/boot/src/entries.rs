@@ -4,7 +4,7 @@ use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
 use edera_sprout_config::entries::EntryDeclaration;
-use edera_sprout_parsing::glob_match;
+use edera_sprout_parsing::{fnmatch_ignore_case, glob_match};
 
 /// Represents an entry that is stamped and ready to be booted.
 #[derive(Clone)]
@@ -17,6 +17,7 @@ pub struct BootableEntry {
     pin_name: bool,
     sort_key: Option<String>,
     boot_counter: Option<BootCounterTarget>,
+    id_suffix: Option<String>,
 }
 
 impl BootableEntry {
@@ -36,12 +37,28 @@ impl BootableEntry {
             pin_name: false,
             sort_key: None,
             boot_counter: None,
+            id_suffix: None,
         }
     }
 
     /// Fetch the name of the entry. This is usually a machine-identifiable key.
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Fetch the id of the entry, which is how the bootloader interface refers to it.
+    /// A BLS entry has the id systemd-boot gives it: the name with the file extension, such as
+    /// `fedora.conf`, in lower case. Any other entry has its name as the id.
+    pub fn id(&self) -> String {
+        match self.id_suffix {
+            Some(ref suffix) => format!("{}{}", self.name, suffix).to_lowercase(),
+            None => self.name.clone(),
+        }
+    }
+
+    /// Set the file extension that is part of the id of this entry, such as `.conf`.
+    pub fn set_id_suffix(&mut self, suffix: &str) {
+        self.id_suffix = Some(suffix.to_string());
     }
 
     /// Fetch the title of the entry. This is usually a human-readable key.
@@ -133,13 +150,12 @@ impl BootableEntry {
         glob_match(needle, &self.name) || glob_match(needle, &self.title)
     }
 
-    /// Determine if this entry matches `needle` by comparing to the id of the entry, which is
-    /// the name with or without the `.conf` or `.efi` suffix. This is how loader.conf selects entries.
-    /// The `needle` is a glob pattern, where `*` matches any sequence of characters.
+    /// Determine if this entry matches `needle` by comparing to the id or the name of the entry,
+    /// so that both `fedora.conf` and `fedora` select the entry. This is how loader.conf and the
+    /// bootloader interface select entries, so the `needle` is a pattern that is matched ignoring
+    /// case and supports `*`, `?` and `[a-z]`.
     pub fn is_match_id(&self, needle: &str) -> bool {
-        glob_match(needle, &self.name)
-            || glob_match(needle, &format!("{}.conf", self.name))
-            || glob_match(needle, &format!("{}.efi", self.name))
+        fnmatch_ignore_case(needle, &self.id()) || fnmatch_ignore_case(needle, &self.name)
     }
 
     /// Create a variant of this entry, with the name suffixed by `suffix` and using `context`.
@@ -175,6 +191,14 @@ impl BootableEntry {
             .as_deref()
             .or(self.declaration.sort_key.as_deref())
             .unwrap_or(&self.name)
+    }
+
+    /// Find the first entry that matches `needle` by id inside the entry iterator `haystack`.
+    pub fn find_id<'a>(
+        needle: &str,
+        haystack: impl Iterator<Item = &'a BootableEntry>,
+    ) -> Option<&'a BootableEntry> {
+        haystack.into_iter().find(|entry| entry.is_match_id(needle))
     }
 
     /// Find an entry by `needle` inside the entry iterator `haystack`.

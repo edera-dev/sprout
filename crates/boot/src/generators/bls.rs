@@ -28,6 +28,13 @@ const PE_MACHINE: u16 = edera_sprout_bls::PE_MACHINE_X86_64;
 #[cfg(target_arch = "aarch64")]
 const PE_MACHINE: u16 = edera_sprout_bls::PE_MACHINE_AARCH64;
 
+/// The name of the architecture of this machine in BLS entries.
+#[cfg(target_arch = "x86_64")]
+const ARCHITECTURE: &str = "x64";
+/// The name of the architecture of this machine in BLS entries.
+#[cfg(target_arch = "aarch64")]
+const ARCHITECTURE: &str = "aa64";
+
 /// The number of initrd slots set on each BLS entry.
 /// Entries set `initrd-0` through `initrd-7`, and slots without an initrd are empty.
 pub const BLS_INITRD_SLOTS: usize = 8;
@@ -63,7 +70,7 @@ fn bootable_entry(
 
     let title_base = entry.title().unwrap_or_else(|| name.to_string());
     let chainload = entry.chainload_path().unwrap_or_default();
-    let options = entry.options().unwrap_or_default();
+    let options = entry.chainload_options().unwrap_or_default();
     let version = entry.version().unwrap_or_default();
     let machine_id = entry.machine_id().unwrap_or_default();
 
@@ -179,6 +186,10 @@ fn generate_type1(
         if file_name.starts_with('.') || stem.is_empty() {
             continue;
         }
+        // Names that start with auto- are reserved for entries the boot loader makes itself.
+        if file_name.starts_with("auto-") {
+            continue;
+        }
         let extension = extension.to_string();
 
         // Split the boot counter off the file name. The entry id never includes the counter, so
@@ -228,6 +239,11 @@ fn generate_type1(
             continue;
         }
 
+        // Ignore entries that are for another architecture.
+        if !entry.matches_architecture(ARCHITECTURE) {
+            continue;
+        }
+
         // Put the initrds through a quirk modifier to support Fedora.
         let initrds = quirk_initrd_remove_tuned(entry.initrd_paths());
 
@@ -241,6 +257,7 @@ fn generate_type1(
         }
 
         let mut boot = bootable_entry(context, bls, &name, &entry, &initrds);
+        boot.set_id_suffix(&extension);
 
         // Record where the boot counter lives so a try can be consumed when this entry boots.
         if let Some(counter) = boot_counter {
@@ -308,10 +325,18 @@ fn generate_type2(
         }
         let id = id.to_string();
 
+        let mut entry = image.entry;
+        entry.boot_counter = boot_counter;
+
+        let mut boot = bootable_entry(context, bls, &id, &entry, &[]);
+        boot.set_id_suffix(&extension);
+
+        // An image with the same id as another entry, such as a leftover copy with another boot
+        // counter, would be ambiguous. Type 1 and type 2 entries have different ids.
         if entries
             .iter()
             .chain(found.iter())
-            .any(|(_, boot)| boot.name() == id)
+            .any(|(_, other)| other.id() == boot.id())
         {
             warn!(
                 "unified kernel image {} has the same id as another entry, skipping",
@@ -320,10 +345,6 @@ fn generate_type2(
             continue;
         }
 
-        let mut entry = image.entry;
-        entry.boot_counter = boot_counter;
-
-        let mut boot = bootable_entry(context, bls, &id, &entry, &[]);
         if let Some(counter) = boot_counter {
             boot.set_boot_counter(BootCounterTarget {
                 counter,

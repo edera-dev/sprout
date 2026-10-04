@@ -94,17 +94,20 @@ fn load_loader_conf(context: &SproutContext) -> Result<LoaderConf> {
     };
 
     // Measure the loader.conf into the TPM, as it changes how Sprout boots.
-    PlatformTpm::log_event(
+    // A failure to measure is only a warning, as it was not Sprout's own configuration.
+    if let Err(error) = PlatformTpm::log_event(
         PlatformTpm::PCR_BOOT_LOADER_CONFIG,
         &content,
         "sprout: loader.conf",
-    )
-    .context("unable to measure the loader.conf file into the TPM")?;
+    ) {
+        warn!(
+            "unable to measure the loader.conf file into the TPM: {:#}",
+            error
+        );
+    }
 
-    let Ok(content) = String::from_utf8(content) else {
-        warn!("ignoring loader.conf that is not valid UTF-8");
-        return Ok(LoaderConf::default());
-    };
+    // Read what is valid, as a stray byte should not discard the whole file.
+    let content = String::from_utf8_lossy(&content);
     Ok(LoaderConf::parse(&content))
 }
 
@@ -329,7 +332,7 @@ fn run() -> Result<()> {
 
     // Tell the bootloader interface what entries are available.
     advisory(
-        BootloaderInterface::set_entries(entries.iter().map(|entry| entry.name()))
+        BootloaderInterface::set_entries(entries.iter().map(|entry| entry.id()))
             .context("unable to set entries in bootloader interface"),
     );
 
@@ -350,6 +353,18 @@ fn run() -> Result<()> {
             .context("unable to get bootloader interface default entry"),
     );
 
+    // Acquire the preferred entry from the bootloader interface.
+    let bootloader_interface_preferred_entry = advisory(
+        BootloaderInterface::get_preferred_entry()
+            .context("unable to get bootloader interface preferred entry"),
+    );
+
+    // Acquire the entry that was saved by the previous boot.
+    let last_booted_entry = advisory(
+        BootloaderInterface::get_last_booted_entry()
+            .context("unable to get last booted entry from bootloader interface"),
+    );
+
     // Acquire the oneshot entry from the bootloader interface.
     let bootloader_interface_oneshot_entry = advisory(
         BootloaderInterface::get_oneshot_entry()
@@ -357,7 +372,7 @@ fn run() -> Result<()> {
     );
 
     // If --boot is specified, boot that entry immediately.
-    let mut force_boot_entry = context.root().options().boot.clone();
+    let force_boot_entry = context.root().options().boot.clone();
     // If --force-menu is specified, show the boot menu regardless of the value of --boot.
     let mut force_boot_menu = context.root().options().force_menu;
 
@@ -424,43 +439,77 @@ fn run() -> Result<()> {
         }
     }
 
-    // The loader.conf default entry, where @saved selects the entry of the previous boot.
-    let use_saved_entry = loader_conf.default.as_deref() == Some("@saved");
-    let saved_entry = if use_saved_entry {
-        advisory(
-            BootloaderInterface::get_last_booted_entry()
-                .context("unable to get last booted entry from bootloader interface"),
-        )
-    } else {
-        None
+    // Whether the default entry is saved on every boot, which is what `@saved` asks for.
+    // The saved entry is selected by `@saved` from the bootloader interface, or from loader.conf
+    // when the bootloader interface does not set an entry.
+    let is_saved = |value: &Option<String>| {
+        value
+            .as_deref()
+            .is_some_and(|v| v.eq_ignore_ascii_case("@saved"))
     };
-    let loader_conf_default_entry = if use_saved_entry {
-        saved_entry.clone()
-    } else {
-        loader_conf.default.clone()
+    let use_saved_entry = is_saved(&bootloader_interface_default_entry)
+        || (bootloader_interface_default_entry.is_none() && is_saved(&loader_conf.default));
+
+    // Turns the value of an entry setting into a pattern. `@saved` is the entry that was saved
+    // by the previous boot, and any other value that starts with `@` is not supported.
+    let entry_pattern = |value: Option<String>| -> Option<String> {
+        let value = value?;
+        if value.eq_ignore_ascii_case("@saved") {
+            return last_booted_entry.clone();
+        }
+        if value.starts_with('@') {
+            warn!("ignoring unsupported entry setting '{}'", value);
+            return None;
+        }
+        Some(value)
     };
 
-    // Pick the default entry from the first source that matches an entry, in this order:
-    // the configuration, LoaderEntryDefault, loader.conf. A source that matches no entry,
-    // such as when the entry was removed, is ignored so that the next source is used.
-    for (source, pattern, id_only) in [
-        ("configuration", config.options.default_entry.clone(), false),
+    // Pick the default entry from the first source that matches an entry. A source that matches
+    // no entry, such as when the entry was removed, is ignored so that the next source is used.
+    // The preferred entry sources never use an entry with no boot counter tries left.
+    // Each source has whether it matches by id, and whether it skips bad entries.
+    for (source, pattern, by_id, skip_bad) in [
         (
-            "bootloader interface",
-            bootloader_interface_default_entry,
+            "configuration",
+            config.options.default_entry.clone(),
+            false,
             false,
         ),
-        ("loader.conf", loader_conf_default_entry, true),
+        (
+            "bootloader interface preferred",
+            entry_pattern(bootloader_interface_preferred_entry),
+            true,
+            true,
+        ),
+        (
+            "loader.conf preferred",
+            entry_pattern(loader_conf.preferred.clone()),
+            true,
+            true,
+        ),
+        (
+            "bootloader interface default",
+            entry_pattern(bootloader_interface_default_entry.clone()),
+            true,
+            false,
+        ),
+        (
+            "loader.conf default",
+            entry_pattern(loader_conf.default.clone()),
+            true,
+            false,
+        ),
     ] {
         let Some(pattern) = pattern else {
             continue;
         };
         let matches = |entry: &BootableEntry| {
-            if id_only {
+            let matched = if by_id {
                 entry.is_match_id(&pattern)
             } else {
                 entry.is_match(&pattern)
-            }
+            };
+            matched && !(skip_bad && entry.is_bad())
         };
         // A source that only matches entries with no boot counter tries left is skipped while
         // another source could pick a usable entry, unless every entry is bad.
@@ -479,16 +528,7 @@ fn run() -> Result<()> {
             }
             break;
         }
-        warn!(
-            "ignoring {} default entry '{}': no matching entry",
-            source, pattern
-        );
-    }
-
-    // Apply bootloader interface oneshot entry settings.
-    // If set, we will force booting the oneshot entry.
-    if let Some(ref bootloader_interface_oneshot_entry) = bootloader_interface_oneshot_entry {
-        force_boot_entry = Some(bootloader_interface_oneshot_entry.clone());
+        warn!("ignoring {} entry '{}': no matching entry", source, pattern);
     }
 
     // Entries that have no boot counter tries left are never picked automatically.
@@ -525,12 +565,19 @@ fn run() -> Result<()> {
         .unwrap_or(config.options.menu_style);
 
     // Find the forced boot entry, unless the boot menu is forced.
-    // If the forced boot entry can't be found, such as when it was removed,
+    // The oneshot entry from the bootloader interface is forced by id, and it is used instead of
+    // --boot. If the forced boot entry can't be found, such as when it was removed,
     // the boot menu is used instead.
-    let forced_entry = force_boot_entry
-        .as_ref()
-        .filter(|_| !force_boot_menu)
-        .and_then(|force_boot_entry| {
+    let forced_entry = if force_boot_menu {
+        None
+    } else if let Some(ref oneshot) = bootloader_interface_oneshot_entry {
+        let entry = BootableEntry::find_id(oneshot, entries.iter());
+        if entry.is_none() {
+            warn!("unable to find entry '{}', using the boot menu", oneshot);
+        }
+        entry
+    } else {
+        force_boot_entry.as_ref().and_then(|force_boot_entry| {
             let entry = BootableEntry::find(force_boot_entry, entries.iter());
             if entry.is_none() {
                 warn!(
@@ -539,7 +586,8 @@ fn run() -> Result<()> {
                 );
             }
             entry
-        });
+        })
+    };
 
     // Use the forced boot entry if possible, otherwise pick an entry using a boot menu.
     let entry = match forced_entry {
@@ -551,17 +599,28 @@ fn run() -> Result<()> {
 
     // Tell the bootloader interface what the selected entry is.
     advisory(
-        BootloaderInterface::set_selected_entry(entry.name().to_string())
+        BootloaderInterface::set_selected_entry(entry.id())
             .context("unable to set selected entry in bootloader interface"),
     );
 
-    // Save the selected entry for the next boot when loader.conf asks for it.
-    // A forced boot, such as a one-shot entry, is not saved, and neither is an unchanged value.
-    if use_saved_entry && forced_entry.is_none() && saved_entry.as_deref() != Some(entry.name()) {
-        advisory(
-            BootloaderInterface::set_last_booted_entry(entry.name())
-                .context("unable to save last booted entry in bootloader interface"),
-        );
+    // Save the selected entry for the next boot when `@saved` asks for it, and forget a saved
+    // entry that is no longer used. A forced boot, such as a one-shot entry, changes nothing,
+    // and neither does an unchanged value.
+    if forced_entry.is_none() {
+        let id = entry.id();
+        if use_saved_entry {
+            if last_booted_entry.as_deref() != Some(id.as_str()) {
+                advisory(
+                    BootloaderInterface::set_last_booted_entry(&id)
+                        .context("unable to save last booted entry in bootloader interface"),
+                );
+            }
+        } else if last_booted_entry.is_some() {
+            advisory(
+                BootloaderInterface::remove_last_booted_entry()
+                    .context("unable to remove last booted entry in bootloader interface"),
+            );
+        }
     }
 
     // Execute the late phase, now that the entry is chosen but before its actions are executed.
@@ -569,9 +628,9 @@ fn run() -> Result<()> {
 
     // Consume a try from the boot counter of the selected entry.
     // Failing to do so must not prevent the entry from booting.
-    if let Some(target) = entry.boot_counter()
-        && !target.counter.is_bad()
-    {
+    // An entry with no tries left, which was picked by hand, is counted too, so that it can
+    // still be marked as good.
+    if let Some(target) = entry.boot_counter() {
         match target.consume() {
             Ok(path) => {
                 info!("updated boot counter of entry {}: {}", entry.name(), path);
