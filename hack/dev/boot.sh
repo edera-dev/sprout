@@ -73,8 +73,16 @@ if [ "${NO_NETWORK}" != "1" ]; then
 		-device 'virtio-net-pci,netdev=network0'
 fi
 
+# The firmware in the dev image hangs before it starts Sprout when accelerated on Apple Silicon,
+# so use the firmware that comes with Homebrew's QEMU there. QEMU_FIRMWARE overrides the choice.
+if [ -z "${QEMU_FIRMWARE}" ] && [ "${TARGET_ARCH}" = "aarch64" ] && [ "${QEMU_ACCEL}" = "hvf" ] &&
+	command -v brew >/dev/null 2>&1; then
+	BREW_FIRMWARE="$(brew --prefix qemu 2>/dev/null)/share/qemu/edk2-aarch64-code.fd"
+	[ -f "${BREW_FIRMWARE}" ] && QEMU_FIRMWARE="${BREW_FIRMWARE}"
+fi
+
 rm -f "${FINAL_DIR}/ovmf-boot.fd"
-cp "${FINAL_DIR}/ovmf.fd" "${FINAL_DIR}/ovmf-boot.fd"
+cp "${QEMU_FIRMWARE:-${FINAL_DIR}/ovmf.fd}" "${FINAL_DIR}/ovmf-boot.fd"
 if [ "${TARGET_ARCH}" = "aarch64" ]; then
 	dd if=/dev/zero of="${FINAL_DIR}/ovmf-boot.fd" bs=1 count=1 seek=67108863 >/dev/null 2>&1
 fi
