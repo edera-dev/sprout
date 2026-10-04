@@ -81,9 +81,10 @@ pub struct OptionsConfiguration {
     /// The entry to mark as the default entry, instead of the first entry.
     #[serde(rename = "default-entry", default)]
     pub default_entry: Option<String>,
-    /// The timeout of the boot menu.
-    #[serde(rename = "menu-timeout", default = "default_menu_timeout")]
-    pub menu_timeout: u64,
+    /// The timeout of the boot menu in seconds. When unset, the timeout comes from the
+    /// bootloader interface or `loader.conf`, falling back to [DEFAULT_MENU_TIMEOUT_SECONDS].
+    #[serde(rename = "menu-timeout", default)]
+    pub menu_timeout: Option<u64>,
     /// The style of boot menu to display.
     #[serde(rename = "menu-style", default)]
     pub menu_style: MenuStyle,
@@ -114,7 +115,7 @@ impl Default for OptionsConfiguration {
     fn default() -> Self {
         Self {
             default_entry: None,
-            menu_timeout: default_menu_timeout(),
+            menu_timeout: None,
             menu_style: Default::default(),
             autoconfigure: false,
         }
@@ -141,10 +142,6 @@ pub fn latest_version() -> u32 {
     LATEST_VERSION
 }
 
-fn default_menu_timeout() -> u64 {
-    DEFAULT_MENU_TIMEOUT_SECONDS
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,10 +165,13 @@ mod tests {
     }
 
     #[test]
+    fn menu_timeout_is_unset_by_default() {
+        assert_eq!(RootConfiguration::default().options.menu_timeout, None);
+        assert_eq!(empty().options.menu_timeout, None);
+    }
+
+    #[test]
     fn default_menu_timeout_is_not_zero() {
-        assert_eq!(
-            RootConfiguration::default().options.menu_timeout,
-            DEFAULT_MENU_TIMEOUT_SECONDS
-        );
+        assert_ne!(DEFAULT_MENU_TIMEOUT_SECONDS, 0);
     }
 }

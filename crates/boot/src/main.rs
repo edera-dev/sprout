@@ -12,13 +12,13 @@ use crate::{
 use alloc::{
     collections::{BTreeMap, BTreeSet},
     format,
-    string::ToString,
+    string::{String, ToString},
     vec::Vec,
 };
 use anyhow::{Context, Result, bail};
 use core::{ops::Deref, time::Duration};
-use edera_sprout_bls::compare_versions;
-use edera_sprout_config::RootConfiguration;
+use edera_sprout_bls::{LoaderConf, LoaderTimeout, compare_versions};
+use edera_sprout_config::{DEFAULT_MENU_TIMEOUT_SECONDS, RootConfiguration};
 use eficore::{
     bootloader_interface::{BootloaderInterface, BootloaderInterfaceTimeout},
     partition::PartitionGuidForm,
@@ -81,6 +81,31 @@ fn advisory<T: Default>(result: Result<T>) -> T {
         warn!("{:#}", error);
         T::default()
     })
+}
+
+/// Loads the loader.conf of the partition Sprout was loaded from.
+/// A missing loader.conf has no settings.
+fn load_loader_conf(context: &SproutContext) -> Result<LoaderConf> {
+    let Ok(content) = eficore::path::read_file_contents(
+        Some(context.root().loaded_image_path()?),
+        "\\loader\\loader.conf",
+    ) else {
+        return Ok(LoaderConf::default());
+    };
+
+    // Measure the loader.conf into the TPM, as it changes how Sprout boots.
+    PlatformTpm::log_event(
+        PlatformTpm::PCR_BOOT_LOADER_CONFIG,
+        &content,
+        "sprout: loader.conf",
+    )
+    .context("unable to measure the loader.conf file into the TPM")?;
+
+    let Ok(content) = String::from_utf8(content) else {
+        warn!("ignoring loader.conf that is not valid UTF-8");
+        return Ok(LoaderConf::default());
+    };
+    Ok(LoaderConf::parse(&content))
 }
 
 /// Run Sprout, returning an error if one occurs.
@@ -295,14 +320,6 @@ fn run() -> Result<()> {
         entry.restamp_title();
         entry.restamp_sort_key();
 
-        // Mark this entry as the default entry if it is declared as such.
-        if let Some(ref default_entry) = config.options.default_entry {
-            // If the entry matches the default entry, mark it as the default entry.
-            if entry.is_match(default_entry) {
-                entry.mark_default();
-            }
-        }
-
         true
     });
 
@@ -316,9 +333,9 @@ fn run() -> Result<()> {
             .context("unable to set entries in bootloader interface"),
     );
 
-    // Acquire the timeout setting from the bootloader interface.
-    let bootloader_interface_timeout = advisory(
-        BootloaderInterface::get_timeout().context("unable to get bootloader interface timeout"),
+    // Acquire the timeouts from the bootloader interface.
+    let bootloader_interface_timeouts = advisory(
+        BootloaderInterface::get_timeouts().context("unable to get bootloader interface timeouts"),
     );
 
     // Acquire the default entry from the bootloader interface.
@@ -333,24 +350,53 @@ fn run() -> Result<()> {
             .context("unable to get bootloader interface oneshot entry"),
     );
 
+    // Load the loader.conf of the partition Sprout was loaded from.
+    let loader_conf = load_loader_conf(&context).context("unable to load loader.conf")?;
+    for warning in &loader_conf.warnings {
+        warn!("{}", warning);
+    }
+
     // If --boot is specified, boot that entry immediately.
     let mut force_boot_entry = context.root().options().boot.clone();
     // If --force-menu is specified, show the boot menu regardless of the value of --boot.
     let mut force_boot_menu = context.root().options().force_menu;
 
-    // Determine the menu timeout in seconds based on the options or configuration.
-    // We prefer the options over the configuration to allow for overriding.
-    let mut menu_timeout = context
-        .root()
-        .options()
-        .menu_timeout
-        .unwrap_or(config.options.menu_timeout);
+    // Pick the menu timeout from the first source that specifies one, in this order:
+    // the one-shot timeout, --menu-timeout, the configuration, LoaderConfigTimeout, loader.conf.
+    let seconds = |seconds: Option<u64>| {
+        seconds.map_or(
+            BootloaderInterfaceTimeout::Unspecified,
+            BootloaderInterfaceTimeout::Timeout,
+        )
+    };
+    let loader_conf_timeout = match loader_conf.timeout {
+        None => BootloaderInterfaceTimeout::Unspecified,
+        Some(LoaderTimeout::Seconds(0)) | Some(LoaderTimeout::Hidden) => {
+            BootloaderInterfaceTimeout::MenuHidden
+        }
+        Some(LoaderTimeout::Seconds(timeout)) => BootloaderInterfaceTimeout::Timeout(timeout),
+        Some(LoaderTimeout::Disabled) => BootloaderInterfaceTimeout::MenuDisabled,
+        Some(LoaderTimeout::Force) => BootloaderInterfaceTimeout::MenuForce,
+    };
+    let timeout = [
+        bootloader_interface_timeouts.oneshot,
+        seconds(context.root().options().menu_timeout),
+        seconds(config.options.menu_timeout),
+        bootloader_interface_timeouts.direct,
+        loader_conf_timeout,
+    ]
+    .into_iter()
+    .find(|timeout| !matches!(timeout, BootloaderInterfaceTimeout::Unspecified))
+    .unwrap_or_default();
+
+    // The menu timeout in seconds, if no source specified one.
+    let mut menu_timeout = DEFAULT_MENU_TIMEOUT_SECONDS;
 
     // Whether the boot menu should wait for the user, instead of counting down.
     let mut wait_for_user = false;
 
-    // Apply bootloader interface timeout settings.
-    match bootloader_interface_timeout {
+    // Apply the chosen timeout.
+    match timeout {
         BootloaderInterfaceTimeout::MenuForce => {
             // Force the boot menu, and wait for the user to choose an entry.
             force_boot_menu = true;
@@ -378,30 +424,54 @@ fn run() -> Result<()> {
         }
     }
 
-    // Apply bootloader interface default entry settings.
-    if let Some(ref bootloader_interface_default_entry) = bootloader_interface_default_entry {
-        if entries
-            .iter()
-            .any(|entry| entry.is_match(bootloader_interface_default_entry))
-        {
-            // Iterate over all the entries and mark the default entry as the one specified.
+    // The loader.conf default entry, where @saved selects the entry of the previous boot.
+    let use_saved_entry = loader_conf.default.as_deref() == Some("@saved");
+    let loader_conf_default_entry = if use_saved_entry {
+        advisory(
+            BootloaderInterface::get_last_booted_entry()
+                .context("unable to get last booted entry from bootloader interface"),
+        )
+    } else {
+        loader_conf.default.clone()
+    };
+
+    // Pick the default entry from the first source that matches an entry, in this order:
+    // the configuration, LoaderEntryDefault, loader.conf. A source that matches no entry,
+    // such as when the entry was removed, is ignored so that the next source is used.
+    for (source, pattern, id_only) in [
+        ("configuration", config.options.default_entry.clone(), false),
+        (
+            "bootloader interface",
+            bootloader_interface_default_entry,
+            false,
+        ),
+        ("loader.conf", loader_conf_default_entry, true),
+    ] {
+        let Some(pattern) = pattern else {
+            continue;
+        };
+        let matches = |entry: &BootableEntry| {
+            if id_only {
+                entry.is_match_id(&pattern)
+            } else {
+                entry.is_match(&pattern)
+            }
+        };
+        if entries.iter().any(matches) {
+            // Mark the matching entries as the default and unmark all the others.
             for entry in &mut entries {
-                // Mark the entry as the default entry if it matches the specified entry.
-                // If the entry does not match the specified entry, unmark it as the default entry.
-                if entry.is_match(bootloader_interface_default_entry) {
+                if matches(entry) {
                     entry.mark_default();
                 } else {
                     entry.unmark_default();
                 }
             }
-        } else {
-            // If no entry matches, such as when the entry was removed, the setting is ignored
-            // so that the configured default entry is still used.
-            warn!(
-                "ignoring bootloader interface default entry '{}': no matching entry",
-                bootloader_interface_default_entry
-            );
+            break;
         }
+        warn!(
+            "ignoring {} default entry '{}': no matching entry",
+            source, pattern
+        );
     }
 
     // Apply bootloader interface oneshot entry settings.
@@ -474,6 +544,14 @@ fn run() -> Result<()> {
             .context("unable to set selected entry in bootloader interface"),
     );
 
+    // Save the selected entry for the next boot when loader.conf asks for it.
+    if use_saved_entry {
+        advisory(
+            BootloaderInterface::set_last_booted_entry(entry.name())
+                .context("unable to save last booted entry in bootloader interface"),
+        );
+    }
+
     // Execute the late phase, now that the entry is chosen but before its actions are executed.
     phase(context.clone(), &config.phases.late).context("unable to execute late phase")?;
 
@@ -483,7 +561,18 @@ fn run() -> Result<()> {
         && !target.counter.is_bad()
     {
         match target.consume() {
-            Ok(path) => info!("updated boot counter of entry {}: {}", entry.name(), path),
+            Ok(path) => {
+                info!("updated boot counter of entry {}: {}", entry.name(), path);
+                // Tell the system where the counter is, so it can mark the boot as good.
+                let path = format!(
+                    "/{}",
+                    path.to_string().replace('\\', "/").trim_start_matches('/')
+                );
+                advisory(
+                    BootloaderInterface::set_boot_count_path(&path)
+                        .context("unable to set boot count path in bootloader interface"),
+                );
+            }
             Err(error) => warn!(
                 "unable to update boot counter of entry {}: {:#}",
                 entry.name(),

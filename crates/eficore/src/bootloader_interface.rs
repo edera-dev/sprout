@@ -34,6 +34,16 @@ pub enum BootloaderInterfaceTimeout {
     Unspecified,
 }
 
+/// The timeouts set in the bootloader interface.
+/// The one-shot timeout only applies to this boot, so it ranks above everything else.
+#[derive(Default)]
+pub struct BootloaderInterfaceTimeouts {
+    /// The timeout from LoaderConfigTimeoutOneShot.
+    pub oneshot: BootloaderInterfaceTimeout,
+    /// The timeout from LoaderConfigTimeout.
+    pub direct: BootloaderInterfaceTimeout,
+}
+
 /// Bootloader Interface support.
 pub struct BootloaderInterface;
 
@@ -54,6 +64,8 @@ impl BootloaderInterface {
             | LoaderFeatures::MenuDisable
             | LoaderFeatures::EntryDefault
             | LoaderFeatures::EntryOneShot
+            | LoaderFeatures::BootCounting
+            | LoaderFeatures::SavedEntry
     }
 
     /// Tell the system that Sprout was initialized at the current time.
@@ -263,45 +275,62 @@ impl BootloaderInterface {
         Ok(Some(BootloaderInterfaceTimeout::Timeout(value)))
     }
 
-    /// Get the timeout from the bootloader interface.
+    /// Get the timeouts from the bootloader interface.
     /// This indicates how the menu should behave.
-    /// If no values are set, Unspecified is returned.
-    pub fn get_timeout() -> Result<BootloaderInterfaceTimeout> {
+    /// A timeout that is not set is Unspecified.
+    pub fn get_timeouts() -> Result<BootloaderInterfaceTimeouts> {
         // Attempt to acquire the value of the LoaderConfigTimeoutOneShot variable.
-        // This should take precedence over the LoaderConfigTimeout variable.
-        let oneshot = Self::get_timeout_value("LoaderConfigTimeoutOneShot", true)
-            .context("unable to check for LoaderConfigTimeoutOneShot variable")?;
-
-        // If oneshot was found, return it.
         // The specification says the one-shot timeout shows the menu on this boot,
         // and a value of 0 means the menu waits for the user.
-        if let Some(oneshot) = oneshot {
-            return Ok(match oneshot {
+        let oneshot = Self::get_timeout_value("LoaderConfigTimeoutOneShot", true)
+            .context("unable to check for LoaderConfigTimeoutOneShot variable")?
+            .map(|oneshot| match oneshot {
                 BootloaderInterfaceTimeout::Timeout(0) => BootloaderInterfaceTimeout::MenuForce,
                 BootloaderInterfaceTimeout::Timeout(value) => {
                     BootloaderInterfaceTimeout::MenuForceTimeout(value)
                 }
                 other => other,
-            });
-        }
+            })
+            .unwrap_or_default();
 
         // Attempt to acquire the value of the LoaderConfigTimeout variable.
-        // This will be used if the LoaderConfigTimeoutOneShot variable is not set.
-        let direct = Self::get_timeout_value("LoaderConfigTimeout", false)
-            .context("unable to check for LoaderConfigTimeout variable")?;
-
-        // If direct was found, return it.
         // The specification says that a value of 0 means that the menu should be hidden.
-        if let Some(direct) = direct {
-            return Ok(match direct {
+        let direct = Self::get_timeout_value("LoaderConfigTimeout", false)
+            .context("unable to check for LoaderConfigTimeout variable")?
+            .map(|direct| match direct {
                 BootloaderInterfaceTimeout::Timeout(0) => BootloaderInterfaceTimeout::MenuHidden,
                 other => other,
-            });
-        }
+            })
+            .unwrap_or_default();
 
-        // If we reach here, we know that neither variable was set.
-        // We provide the unspecified value instead.
-        Ok(BootloaderInterfaceTimeout::Unspecified)
+        Ok(BootloaderInterfaceTimeouts { oneshot, direct })
+    }
+
+    /// Tell the system the path of the entry file whose boot counter was updated, relative
+    /// to the partition root, so that it can be marked as good once the boot succeeds.
+    pub fn set_boot_count_path(path: &str) -> Result<()> {
+        Self::VENDOR.set_cstr16(
+            "LoaderBootCountPath",
+            path,
+            VariableClass::BootAndRuntimeTemporary,
+        )
+    }
+
+    /// Get the entry that was saved by the previous boot, if any.
+    pub fn get_last_booted_entry() -> Result<Option<String>> {
+        Ok(Self::VENDOR
+            .get_cstr16("LoaderEntryLastBooted")
+            .context("unable to get last booted entry from bootloader interface")?
+            .filter(|value| !value.is_empty()))
+    }
+
+    /// Save the entry that is booting, so a later boot can select it again.
+    pub fn set_last_booted_entry(entry: &str) -> Result<()> {
+        Self::VENDOR.set_cstr16(
+            "LoaderEntryLastBooted",
+            entry,
+            VariableClass::BootAndRuntimePersistent,
+        )
     }
 
     /// Get the default entry set by the bootloader interface.
