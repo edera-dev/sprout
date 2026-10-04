@@ -67,6 +67,7 @@ impl BootloaderInterface {
             | LoaderFeatures::SavedEntry
             | LoaderFeatures::EntryPreferred
             | LoaderFeatures::SortKey
+            | LoaderFeatures::DeviceTree
     }
 
     /// Tell the system that Sprout was initialized at the current time.

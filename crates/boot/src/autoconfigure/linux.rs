@@ -237,6 +237,7 @@ pub fn scan(
         options: vec!["$linux-options".to_string()],
         linux_initrd: Some("$initrd".to_string()),
         linux_initrd_chain: vec![],
+        devicetree: None,
     };
 
     // Insert the chainload action into the configuration.

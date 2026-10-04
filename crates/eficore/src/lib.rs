@@ -6,6 +6,9 @@
 #![no_std]
 extern crate alloc;
 
+/// Installing a devicetree for the image that is started.
+pub mod devicetree;
+
 /// EFI handle helpers.
 pub mod handle;
 

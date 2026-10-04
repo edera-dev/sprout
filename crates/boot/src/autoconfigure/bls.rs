@@ -125,6 +125,8 @@ pub fn scan(
         linux_initrd_chain: (0..BLS_INITRD_SLOTS)
             .map(|slot| format!("{}\\$initrd-{}", root, slot))
             .collect(),
+        // An unset devicetree stamps to the root of the filesystem, which the action skips.
+        devicetree: Some(format!("{}\\$devicetree", root)),
     };
 
     // Insert the chainload action into the configuration.

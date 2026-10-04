@@ -23,4 +23,9 @@ pub struct ChainloadConfiguration {
     /// using the same mechanism as `linux-initrd`. This cannot be used with `linux-initrd`.
     #[serde(default, rename = "linux-initrd-chain")]
     pub linux_initrd_chain: Vec<String>,
+    /// An optional path to a flattened devicetree to give to the image.
+    /// It is installed as the devicetree of the machine until the image returns. It is not
+    /// used when Secure Boot is enabled, as it can't be verified.
+    #[serde(default)]
+    pub devicetree: Option<String>,
 }
