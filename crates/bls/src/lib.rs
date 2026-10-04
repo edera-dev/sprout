@@ -8,8 +8,10 @@ use anyhow::{Error, Result};
 use core::{cmp::Ordering, iter::Peekable, str::FromStr};
 
 mod loader_conf;
+mod pe;
 
 pub use loader_conf::{LoaderConf, LoaderTimeout};
+pub use pe::{MAX_SECTION_SIZE, ReadAt, read_sections};
 
 /// Represents a parsed BLS entry.
 /// Fields unrelated to Sprout are not included.
@@ -541,6 +543,7 @@ fn compare_alphabetic<I: Iterator<Item = char>>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
     use core::cmp::Ordering;
 
     fn sort_entry(
@@ -595,6 +598,97 @@ mod tests {
         let entry: BlsEntry = "linux /vmlinuz\n".parse().unwrap();
         assert!(entry.boot_counter.is_none());
         assert!(!entry.is_bad());
+    }
+
+    /// Builds a minimal PE image with the given sections, each padded to 16 bytes of raw data.
+    fn pe_image(sections: &[(&str, &[u8])]) -> Vec<u8> {
+        let table_start = 0x80 + 24;
+        let data_start = table_start + sections.len() * 40;
+        let mut image = vec![0u8; data_start];
+        image[..2].copy_from_slice(b"MZ");
+        image[0x3c..0x40].copy_from_slice(&0x80u32.to_le_bytes());
+        image[0x80..0x84].copy_from_slice(b"PE\0\0");
+        image[0x86..0x88].copy_from_slice(&(sections.len() as u16).to_le_bytes());
+        let mut offset = data_start;
+        for (index, (name, data)) in sections.iter().enumerate() {
+            let entry = table_start + index * 40;
+            image[entry..entry + name.len()].copy_from_slice(name.as_bytes());
+            let raw_size = data.len().div_ceil(16) * 16;
+            image[entry + 8..entry + 12].copy_from_slice(&(data.len() as u32).to_le_bytes());
+            image[entry + 16..entry + 20].copy_from_slice(&(raw_size as u32).to_le_bytes());
+            image[entry + 20..entry + 24].copy_from_slice(&(offset as u32).to_le_bytes());
+            let mut raw = data.to_vec();
+            raw.resize(raw_size, 0);
+            image.extend_from_slice(&raw);
+            offset += raw_size;
+        }
+        image
+    }
+
+    #[test]
+    fn pe_reads_only_the_requested_sections() {
+        let image = pe_image(&[
+            (".text", b"code"),
+            (".osrel", b"ID=arch\n"),
+            (".uname", b"6.5"),
+        ]);
+        let sections = read_sections(&mut image.as_slice(), &[".osrel", ".uname"]).unwrap();
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[".osrel"], b"ID=arch\n");
+        assert_eq!(sections[".uname"], b"6.5");
+    }
+
+    #[test]
+    fn pe_leaves_out_missing_sections() {
+        let image = pe_image(&[(".text", b"code")]);
+        let sections = read_sections(&mut image.as_slice(), &[".osrel"]).unwrap();
+        assert!(sections.is_empty());
+    }
+
+    #[test]
+    fn pe_uses_the_virtual_size_not_the_padded_size() {
+        let image = pe_image(&[(".cmdline", b"quiet")]);
+        let sections = read_sections(&mut image.as_slice(), &[".cmdline"]).unwrap();
+        assert_eq!(sections[".cmdline"], b"quiet");
+    }
+
+    #[test]
+    fn pe_skips_sections_over_the_size_limit() {
+        let big = vec![b'a'; MAX_SECTION_SIZE as usize + 1];
+        let image = pe_image(&[(".cmdline", &big), (".osrel", b"ID=x")]);
+        let sections = read_sections(&mut image.as_slice(), &[".cmdline", ".osrel"]).unwrap();
+        assert!(!sections.contains_key(".cmdline"));
+        assert!(sections.contains_key(".osrel"));
+    }
+
+    #[test]
+    fn pe_rejects_images_that_are_not_pe() {
+        assert!(read_sections(&mut b"".as_slice(), &[".osrel"]).is_err());
+        assert!(read_sections(&mut vec![0u8; 0x200].as_slice(), &[".osrel"]).is_err());
+        let mut image = pe_image(&[(".osrel", b"ID=x")]);
+        image[0x80] = b'X';
+        assert!(read_sections(&mut image.as_slice(), &[".osrel"]).is_err());
+    }
+
+    #[test]
+    fn pe_rejects_a_missing_mz_signature() {
+        let mut image = pe_image(&[(".osrel", b"ID=x")]);
+        image[0] = b'X';
+        assert!(read_sections(&mut image.as_slice(), &[".osrel"]).is_err());
+    }
+
+    #[test]
+    fn pe_rejects_a_truncated_image() {
+        let image = pe_image(&[(".osrel", b"ID=archlinux\n")]);
+        let truncated = &image[..image.len() - 8];
+        assert!(read_sections(&mut &truncated[..], &[".osrel"]).is_err());
+    }
+
+    #[test]
+    fn pe_rejects_too_many_sections() {
+        let mut image = pe_image(&[(".osrel", b"ID=x")]);
+        image[0x86..0x88].copy_from_slice(&200u16.to_le_bytes());
+        assert!(read_sections(&mut image.as_slice(), &[".osrel"]).is_err());
     }
 
     #[test]
