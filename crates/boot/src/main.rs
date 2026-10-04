@@ -27,7 +27,7 @@ use eficore::{
     setup,
 };
 use log::{error, info, warn};
-use uefi::{entry, proto::device_path::LoadedImageDevicePath};
+use uefi::{entry, proto::device_path::LoadedImageDevicePath, runtime::ResetType};
 use uefi_raw::Status;
 
 /// actions: Code that can be configured and executed by Sprout.
@@ -112,7 +112,7 @@ fn load_loader_conf(context: &SproutContext) -> Result<LoaderConf> {
 }
 
 /// Run Sprout, returning an error if one occurs.
-fn run() -> Result<()> {
+fn run(reboot_on_error: &mut bool) -> Result<()> {
     // For safety reasons, we will note that Secure Boot is in beta on Sprout.
     if SecureBoot::enabled().context("unable to determine Secure Boot status")? {
         warn!("Sprout Secure Boot is in beta. Some functionality may not work as expected.");
@@ -644,10 +644,13 @@ fn run() -> Result<()> {
     // Failing to do so must not prevent the entry from booting.
     // An entry with no tries left, which was picked by hand, is counted too, so that it can
     // still be marked as good.
+    // The tries that were left before this boot used one up, if it did.
+    let mut consumed_tries_left = None;
     if let Some(target) = entry.boot_counter() {
         match target.consume() {
             Ok(path) => {
                 info!("updated boot counter of entry {}: {}", entry.name(), path);
+                consumed_tries_left = Some(target.counter.tries_left);
                 // Tell the system where the counter is, so it can mark the boot as good.
                 let path = edera_sprout_bls::boot_path(&path.to_string());
                 advisory(
@@ -662,6 +665,12 @@ fn run() -> Result<()> {
             ),
         }
     }
+
+    // Decide whether a failure to start the entry reboots the machine. This is only decided now,
+    // as an earlier failure did not use up a try, so a reboot would not make any progress.
+    *reboot_on_error = loader_conf
+        .reboot_on_error
+        .should_reboot(consumed_tries_left);
 
     // Execute all the actions for the selected entry.
     for action in &entry.declaration().actions {
@@ -689,7 +698,8 @@ fn efi_main() -> Status {
     }
 
     // Run Sprout, then handle the error.
-    let result = run();
+    let mut reboot_on_error = false;
+    let result = run(&mut reboot_on_error);
     if let Err(ref error) = result {
         // Print an error trace.
         error!("sprout encountered an error: {}", error);
@@ -698,6 +708,12 @@ fn efi_main() -> Status {
         }
         // Sleep to allow the user to read the error.
         uefi::boot::stall(DELAY_ON_ERROR);
+
+        // Reboot when asked to, so that the next boot can use the next try or entry.
+        if reboot_on_error {
+            error!("rebooting after a failure to start the boot entry");
+            uefi::runtime::reset(ResetType::COLD, Status::SUCCESS, None);
+        }
         return Status::ABORTED;
     }
 

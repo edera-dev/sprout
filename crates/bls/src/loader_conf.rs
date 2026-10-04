@@ -30,6 +30,43 @@ impl LoaderTimeout {
     }
 }
 
+/// What to do when the selected entry fails to start, from the `reboot-on-error` setting.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum RebootOnError {
+    /// Never reboot.
+    No,
+    /// Always reboot, which can loop forever if the entry never starts.
+    Yes,
+    /// Reboot only if a boot counter try was just used up and tries were left, so that the
+    /// entry eventually runs out of tries and is not booted any more.
+    #[default]
+    Auto,
+}
+
+impl RebootOnError {
+    /// Parses a `reboot-on-error` value, which is `auto` or a boolean. The words are case
+    /// sensitive, as in systemd-boot.
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "auto" => Some(Self::Auto),
+            "1" | "yes" | "y" | "true" | "t" | "on" => Some(Self::Yes),
+            "0" | "no" | "n" | "false" | "f" | "off" => Some(Self::No),
+            _ => None,
+        }
+    }
+
+    /// Whether to reboot after the entry failed to start. `consumed_tries_left` is the number of
+    /// tries that were left before this boot used one up, or None if the entry has no boot
+    /// counter or the try could not be used up, as then a reboot would not make progress.
+    pub fn should_reboot(self, consumed_tries_left: Option<u32>) -> bool {
+        match self {
+            Self::Yes => true,
+            Self::No => false,
+            Self::Auto => consumed_tries_left.is_some_and(|left| left > 0),
+        }
+    }
+}
+
 /// The settings Sprout understands from a `loader.conf` file.
 /// Reference: <https://www.freedesktop.org/software/systemd/man/latest/loader.conf.html>
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -41,6 +78,8 @@ pub struct LoaderConf {
     pub preferred: Option<String>,
     /// How long to show the boot menu.
     pub timeout: Option<LoaderTimeout>,
+    /// What to do when the selected entry fails to start.
+    pub reboot_on_error: RebootOnError,
     /// Problems found while parsing, such as keys that are not supported.
     pub warnings: Vec<String>,
 }
@@ -87,6 +126,13 @@ impl LoaderConf {
                     None => conf
                         .warnings
                         .push(format!("ignoring invalid loader.conf timeout '{}'", value)),
+                },
+                "reboot-on-error" => match RebootOnError::parse(value) {
+                    Some(reboot_on_error) => conf.reboot_on_error = reboot_on_error,
+                    None => conf.warnings.push(format!(
+                        "ignoring invalid loader.conf reboot-on-error '{}'",
+                        value
+                    )),
                 },
                 "default" | "preferred" => conf
                     .warnings
