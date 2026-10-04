@@ -377,7 +377,8 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
     let mut force_boot_menu = context.root().options().force_menu;
 
     // Pick the menu timeout from the first source that specifies one, in this order:
-    // the one-shot timeout, --menu-timeout, the configuration, LoaderConfigTimeout, loader.conf.
+    // the one-shot timeout, --menu-timeout, LoaderConfigTimeout, the configuration, loader.conf.
+    // The bootloader interface is what tools like bootctl set, so it outranks the configuration.
     let seconds = |seconds: Option<u64>| {
         seconds.map_or(
             BootloaderInterfaceTimeout::Unspecified,
@@ -396,8 +397,8 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
     let timeout = [
         bootloader_interface_timeouts.oneshot,
         seconds(context.root().options().menu_timeout),
-        seconds(config.options.menu_timeout),
         bootloader_interface_timeouts.direct,
+        seconds(config.options.menu_timeout),
         loader_conf_timeout,
     ]
     .into_iter()
@@ -473,17 +474,12 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
         Some(value)
     };
 
-    // Pick the default entry from the first source that matches an entry. A source that matches
+    // Pick the default entry from the first source that matches an entry, where the bootloader
+    // interface, which is what tools like bootctl set, outranks the configuration. A source that matches
     // no entry, such as when the entry was removed, is ignored so that the next source is used.
     // The preferred entry sources never use an entry with no boot counter tries left.
     // Each source has whether it matches by id, and whether it skips bad entries.
     for (source, value, by_id, skip_bad) in [
-        (
-            "configuration",
-            config.options.default_entry.clone(),
-            false,
-            false,
-        ),
         (
             "bootloader interface preferred",
             bootloader_interface_preferred_entry.clone(),
@@ -500,6 +496,12 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
             "bootloader interface default",
             bootloader_interface_default_entry.clone(),
             true,
+            false,
+        ),
+        (
+            "configuration",
+            config.options.default_entry.clone(),
+            false,
             false,
         ),
         (
