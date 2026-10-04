@@ -102,6 +102,9 @@ pub fn scan(
         },
         path: format!("{}\\loader", root),
         uki_path: None,
+        // Every filesystem is scanned, including the Extended Boot Loader Partition, which
+        // gets a generator of its own.
+        xbootldr: false,
         pin_names: true,
     };
 

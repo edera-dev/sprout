@@ -26,6 +26,12 @@ pub struct BlsConfiguration {
     /// with the same names, so they should not both scan it.
     #[serde(default, rename = "uki-path")]
     pub uki_path: Option<String>,
+    /// Whether to also read the Extended Boot Loader Partition, which is the partition with the
+    /// XBOOTLDR type on the same disk as the partition Sprout was loaded from. Its entries are
+    /// sorted with the others, and their paths are on that partition, so an action has to use
+    /// the `$entry-root` value to find them, such as `$entry-root\\$chainload`.
+    #[serde(default)]
+    pub xbootldr: bool,
     /// Whether generated entries keep the name of the BLS entry file as-is.
     /// When enabled, the generator name is not prepended, so the entry names match
     /// the BLS entry ids used by tools like `bootctl set-default`. Variants still append
@@ -38,6 +44,12 @@ pub struct BlsConfiguration {
 }
 
 impl BlsConfiguration {
+    /// The device of the stamped BLS path `bls_path`, which is everything up to the last slash,
+    /// and which is empty for a path on the partition Sprout was loaded from.
+    pub fn root_of(bls_path: &str) -> &str {
+        bls_path.rfind('/').map_or("", |index| &bls_path[..=index])
+    }
+
     /// The directory of unified kernel images for the stamped BLS path `bls_path`,
     /// or None if unified kernel images are disabled.
     pub fn uki_path_for(&self, bls_path: &str) -> Option<String> {
@@ -45,10 +57,7 @@ impl BlsConfiguration {
             Some("") => None,
             Some(path) => Some(path.to_string()),
             // Keep the device of the BLS path, which is everything up to the last slash.
-            None => {
-                let device = bls_path.rfind('/').map_or("", |index| &bls_path[..=index]);
-                Some(format!("{}{}", device, BLS_UKI_DIRECTORY))
-            }
+            None => Some(format!("{}{}", Self::root_of(bls_path), BLS_UKI_DIRECTORY)),
         }
     }
 }
@@ -60,6 +69,7 @@ impl Default for BlsConfiguration {
             entry: Default::default(),
             path: default_bls_path(),
             uki_path: None,
+            xbootldr: false,
             pin_names: default_pin_names(),
         }
     }
@@ -76,6 +86,20 @@ fn default_bls_path() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn root_is_the_device_of_the_bls_path() {
+        assert_eq!(BlsConfiguration::root_of("\\loader"), "");
+        assert_eq!(
+            BlsConfiguration::root_of("PciRoot(0x0)/HD(2,GPT,abc)/\\loader"),
+            "PciRoot(0x0)/HD(2,GPT,abc)/"
+        );
+    }
+
+    #[test]
+    fn xbootldr_is_off_by_default() {
+        assert!(!BlsConfiguration::default().xbootldr);
+    }
 
     #[test]
     fn uki_path_is_next_to_the_default_bls_path() {
