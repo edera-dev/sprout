@@ -722,6 +722,7 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
         // still be marked as good.
         // The tries that were left before this boot used one up, if it did.
         let mut consumed_tries_left = None;
+        let mut entry_context = entry.context();
         if let Some(target) = entry.boot_counter()
             && target.counting
         {
@@ -729,6 +730,21 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
                 Ok(path) => {
                     info!("updated boot counter of entry {}: {}", entry.name(), path);
                     consumed_tries_left = Some(target.counter.tries_left);
+                    // A unified kernel image is the entry file itself, so it has to be booted by
+                    // its new name.
+                    if let Some(chainload) = entry_context.get("chainload")
+                        && let Some(directory) = chainload.len().checked_sub(target.file_name.len())
+                        && chainload
+                            .get(directory..)
+                            .is_some_and(|name| name.eq_ignore_ascii_case(&target.file_name))
+                        && let Some(renamed) =
+                            path.to_string().rsplit('\\').next().map(String::from)
+                    {
+                        let renamed = format!("{}{}", &chainload[..directory], renamed);
+                        let mut context = entry_context.fork();
+                        context.set("chainload", renamed);
+                        entry_context = context.freeze();
+                    }
                     // Tell the system where the counter is, so it can mark the boot as good.
                     let path = edera_sprout_bls::boot_path(&path.to_string());
                     advisory(
@@ -752,8 +768,8 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
 
         // Execute all the actions for the selected entry.
         for action in &entry.declaration().actions {
-            let action = entry.context().stamp(action);
-            actions::execute(entry.context().clone(), &action)
+            let action = entry_context.stamp(action);
+            actions::execute(entry_context.clone(), &action)
                 .context(format!("unable to execute action '{}'", action))?;
         }
 
