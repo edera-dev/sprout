@@ -8,8 +8,15 @@ use anyhow::{Error, Result};
 use core::{cmp::Ordering, iter::Peekable, str::FromStr};
 
 mod loader_conf;
+mod pe;
+mod uki;
 
 pub use loader_conf::{LoaderConf, LoaderTimeout};
+pub use pe::{
+    MAX_SECTION_SIZE, PE_MACHINE_AARCH64, PE_MACHINE_X86_64, PeImage, ReadAt, read_pe,
+    read_sections,
+};
+pub use uki::{OsRelease, UKI_SECTIONS};
 
 /// Represents a parsed BLS entry.
 /// Fields unrelated to Sprout are not included.
@@ -31,6 +38,10 @@ pub struct BlsEntry {
     pub version: Option<String>,
     /// The machine id of the entry.
     pub machine_id: Option<String>,
+    /// The command line embedded in a unified kernel image.
+    pub cmdline: Option<String>,
+    /// The kernel version embedded in a unified kernel image.
+    pub uname: Option<String>,
     /// The boot counter of the entry, taken from the entry file name.
     /// This is never set by parsing the file content.
     pub boot_counter: Option<BootCounter>,
@@ -136,6 +147,8 @@ impl FromStr for BlsEntry {
             sort_key,
             version,
             machine_id,
+            cmdline: None,
+            uname: None,
             boot_counter: None,
         })
     }
@@ -250,6 +263,16 @@ impl BootCounter {
     pub fn is_bad(&self) -> bool {
         self.tries_left == 0
     }
+}
+
+/// Splits the `extension` off the end of the file `name`, ignoring case.
+/// Returns the stem and the extension as it was written in the name.
+pub fn strip_extension<'a>(name: &'a str, extension: &str) -> Option<(&'a str, &'a str)> {
+    let split = name.len().checked_sub(extension.len())?;
+    if !name.is_char_boundary(split) || !name[split..].eq_ignore_ascii_case(extension) {
+        return None;
+    }
+    Some(name.split_at(split))
 }
 
 /// Converts an EFI `path` to the form used by the bootloader interface: separated by forward
@@ -541,6 +564,8 @@ fn compare_alphabetic<I: Iterator<Item = char>>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::collections::BTreeMap;
+    use alloc::vec;
     use core::cmp::Ordering;
 
     fn sort_entry(
@@ -595,6 +620,212 @@ mod tests {
         let entry: BlsEntry = "linux /vmlinuz\n".parse().unwrap();
         assert!(entry.boot_counter.is_none());
         assert!(!entry.is_bad());
+    }
+
+    /// Builds a minimal PE image with the given sections, each padded to 16 bytes of raw data.
+    fn pe_image(sections: &[(&str, &[u8])]) -> Vec<u8> {
+        let table_start = 0x80 + 24;
+        let data_start = table_start + sections.len() * 40;
+        let mut image = vec![0u8; data_start];
+        image[..2].copy_from_slice(b"MZ");
+        image[0x3c..0x40].copy_from_slice(&0x80u32.to_le_bytes());
+        image[0x80..0x84].copy_from_slice(b"PE\0\0");
+        image[0x84..0x86].copy_from_slice(&0x8664u16.to_le_bytes());
+        image[0x86..0x88].copy_from_slice(&(sections.len() as u16).to_le_bytes());
+        let mut offset = data_start;
+        for (index, (name, data)) in sections.iter().enumerate() {
+            let entry = table_start + index * 40;
+            image[entry..entry + name.len()].copy_from_slice(name.as_bytes());
+            let raw_size = data.len().div_ceil(16) * 16;
+            image[entry + 8..entry + 12].copy_from_slice(&(data.len() as u32).to_le_bytes());
+            image[entry + 16..entry + 20].copy_from_slice(&(raw_size as u32).to_le_bytes());
+            image[entry + 20..entry + 24].copy_from_slice(&(offset as u32).to_le_bytes());
+            let mut raw = data.to_vec();
+            raw.resize(raw_size, 0);
+            image.extend_from_slice(&raw);
+            offset += raw_size;
+        }
+        image
+    }
+
+    fn uki_sections(items: &[(&str, &str)]) -> BTreeMap<String, Vec<u8>> {
+        items
+            .iter()
+            .map(|(name, data)| (name.to_string(), data.as_bytes().to_vec()))
+            .collect()
+    }
+
+    #[test]
+    fn os_release_parses_plain_quoted_and_commented_lines() {
+        let os_release = OsRelease::parse(
+            "# comment\nID=arch\nPRETTY_NAME=\"Arch Linux\"\nNAME='Arch'\n\nBAD LINE\n",
+        );
+        assert_eq!(os_release.get("ID"), Some("arch"));
+        assert_eq!(os_release.get("PRETTY_NAME"), Some("Arch Linux"));
+        assert_eq!(os_release.get("NAME"), Some("Arch"));
+        assert_eq!(os_release.get("MISSING"), None);
+    }
+
+    #[test]
+    fn os_release_unescapes_quoted_values_and_last_value_wins() {
+        let os_release = OsRelease::parse("A=\"say \\\"hi\\\" \\\\ \\$x\"\nB=1\nB=2\n");
+        assert_eq!(os_release.get("A"), Some("say \"hi\" \\ $x"));
+        assert_eq!(os_release.get("B"), Some("2"));
+    }
+
+    #[test]
+    fn uki_entry_uses_os_release_title_version_and_sort_key() {
+        let sections = uki_sections(&[
+            (
+                ".osrel",
+                "ID=fedora\nIMAGE_ID=coreos\nPRETTY_NAME=\"Fedora CoreOS\"\nVERSION_ID=40\nIMAGE_VERSION=40.1\n",
+            ),
+            (".uname", "6.5.0\0"),
+        ]);
+        let entry = BlsEntry::from_uki(&sections, "/EFI/Linux/fedora.efi");
+        assert_eq!(entry.title.as_deref(), Some("Fedora CoreOS"));
+        assert_eq!(entry.version.as_deref(), Some("40.1"));
+        assert_eq!(entry.sort_key.as_deref(), Some("coreos"));
+        assert_eq!(entry.uname.as_deref(), Some("6.5.0"));
+        assert_eq!(entry.efi.as_deref(), Some("/EFI/Linux/fedora.efi"));
+        assert!(entry.options.is_none());
+        assert!(entry.is_valid());
+    }
+
+    #[test]
+    fn uki_entry_falls_back_through_the_fields() {
+        let sections = uki_sections(&[(".osrel", "ID=arch\nBUILD_ID=rolling\n")]);
+        let entry = BlsEntry::from_uki(&sections, "/EFI/Linux/a.efi");
+        assert_eq!(entry.title.as_deref(), Some("arch"));
+        assert_eq!(entry.version.as_deref(), Some("rolling"));
+        assert_eq!(entry.sort_key.as_deref(), Some("arch"));
+
+        let sections = uki_sections(&[(".uname", "6.1.2\n")]);
+        let entry = BlsEntry::from_uki(&sections, "/EFI/Linux/a.efi");
+        assert_eq!(entry.title, None);
+        assert_eq!(entry.version.as_deref(), Some("6.1.2"));
+    }
+
+    #[test]
+    fn uki_entry_keeps_the_trimmed_cmdline() {
+        let sections = uki_sections(&[(".cmdline", "root=/dev/sda1 quiet\0\n")]);
+        let entry = BlsEntry::from_uki(&sections, "/EFI/Linux/a.efi");
+        assert_eq!(entry.cmdline.as_deref(), Some("root=/dev/sda1 quiet"));
+    }
+
+    #[test]
+    fn uki_entry_without_sections_is_still_bootable() {
+        let entry = BlsEntry::from_uki(&BTreeMap::new(), "/EFI/Linux/a.efi");
+        assert!(entry.title.is_none());
+        assert!(entry.is_valid());
+        assert_eq!(entry.chainload_path().as_deref(), Some("EFI\\Linux\\a.efi"));
+    }
+
+    #[test]
+    fn pe_reads_only_the_requested_sections() {
+        let image = pe_image(&[
+            (".text", b"code"),
+            (".osrel", b"ID=arch\n"),
+            (".uname", b"6.5"),
+        ]);
+        let sections = read_sections(&mut image.as_slice(), &[".osrel", ".uname"]).unwrap();
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[".osrel"], b"ID=arch\n");
+        assert_eq!(sections[".uname"], b"6.5");
+    }
+
+    #[test]
+    fn strip_extension_ignores_case_and_keeps_the_original_extension() {
+        assert_eq!(
+            strip_extension("foo+3.conf", ".conf"),
+            Some(("foo+3", ".conf"))
+        );
+        assert_eq!(strip_extension("FOO.EFI", ".efi"), Some(("FOO", ".EFI")));
+        assert_eq!(strip_extension("a.Efi", ".efi"), Some(("a", ".Efi")));
+    }
+
+    #[test]
+    fn strip_extension_rejects_other_names() {
+        assert_eq!(strip_extension("foo.conf", ".efi"), None);
+        assert_eq!(strip_extension("efi", ".efi"), None);
+        assert_eq!(strip_extension("", ".efi"), None);
+        assert_eq!(strip_extension("foo.efi.bak", ".efi"), None);
+    }
+
+    #[test]
+    fn strip_extension_does_not_split_characters() {
+        // The last bytes of this name are not at a character boundary for a four byte suffix.
+        assert_eq!(strip_extension("a\u{e9}fi", ".efi"), None);
+        assert_eq!(
+            strip_extension("\u{e9}.efi", ".efi"),
+            Some(("\u{e9}", ".efi"))
+        );
+    }
+
+    #[test]
+    fn strip_extension_of_a_bare_extension_has_an_empty_stem() {
+        assert_eq!(strip_extension(".efi", ".efi"), Some(("", ".efi")));
+    }
+
+    #[test]
+    fn pe_reports_the_machine_type() {
+        let image = pe_image(&[(".osrel", b"ID=x")]);
+        let pe = read_pe(&mut image.as_slice(), &[".osrel"]).unwrap();
+        assert_eq!(pe.machine, PE_MACHINE_X86_64);
+        assert!(pe.sections.contains_key(".osrel"));
+    }
+
+    #[test]
+    fn pe_leaves_out_missing_sections() {
+        let image = pe_image(&[(".text", b"code")]);
+        let sections = read_sections(&mut image.as_slice(), &[".osrel"]).unwrap();
+        assert!(sections.is_empty());
+    }
+
+    #[test]
+    fn pe_uses_the_virtual_size_not_the_padded_size() {
+        let image = pe_image(&[(".cmdline", b"quiet")]);
+        let sections = read_sections(&mut image.as_slice(), &[".cmdline"]).unwrap();
+        assert_eq!(sections[".cmdline"], b"quiet");
+    }
+
+    #[test]
+    fn pe_skips_sections_over_the_size_limit() {
+        let big = vec![b'a'; MAX_SECTION_SIZE as usize + 1];
+        let image = pe_image(&[(".cmdline", &big), (".osrel", b"ID=x")]);
+        let sections = read_sections(&mut image.as_slice(), &[".cmdline", ".osrel"]).unwrap();
+        assert!(!sections.contains_key(".cmdline"));
+        assert!(sections.contains_key(".osrel"));
+    }
+
+    #[test]
+    fn pe_rejects_images_that_are_not_pe() {
+        assert!(read_sections(&mut b"".as_slice(), &[".osrel"]).is_err());
+        assert!(read_sections(&mut vec![0u8; 0x200].as_slice(), &[".osrel"]).is_err());
+        let mut image = pe_image(&[(".osrel", b"ID=x")]);
+        image[0x80] = b'X';
+        assert!(read_sections(&mut image.as_slice(), &[".osrel"]).is_err());
+    }
+
+    #[test]
+    fn pe_rejects_a_missing_mz_signature() {
+        let mut image = pe_image(&[(".osrel", b"ID=x")]);
+        image[0] = b'X';
+        assert!(read_sections(&mut image.as_slice(), &[".osrel"]).is_err());
+    }
+
+    #[test]
+    fn pe_rejects_a_truncated_image() {
+        let image = pe_image(&[(".osrel", b"ID=archlinux\n")]);
+        let truncated = &image[..image.len() - 8];
+        assert!(read_sections(&mut &truncated[..], &[".osrel"]).is_err());
+    }
+
+    #[test]
+    fn pe_rejects_too_many_sections() {
+        let mut image = pe_image(&[(".osrel", b"ID=x")]);
+        image[0x86..0x88].copy_from_slice(&200u16.to_le_bytes());
+        assert!(read_sections(&mut image.as_slice(), &[".osrel"]).is_err());
     }
 
     #[test]
