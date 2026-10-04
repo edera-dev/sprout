@@ -15,7 +15,7 @@ use edera_sprout_bls::{
 use edera_sprout_config::generators::bls::BlsConfiguration;
 use log::{info, warn};
 use uefi::{
-    cstr16,
+    CString16, cstr16,
     fs::{FileSystem, PathBuf},
     proto::device_path::text::{AllowShortcuts, DisplayOnly},
     proto::media::fs::SimpleFileSystem,
@@ -38,8 +38,8 @@ const ARCHITECTURE: &str = "x64";
 const ARCHITECTURE: &str = "aa64";
 
 /// The number of initrd slots set on each BLS entry.
-/// Entries set `initrd-0` through `initrd-7`, and slots without an initrd are empty.
-pub const BLS_INITRD_SLOTS: usize = 8;
+/// Entries set `initrd-0` through `initrd-31`, and slots without an initrd are empty.
+pub const BLS_INITRD_SLOTS: usize = 32;
 
 // TODO(azenla): remove this once variable substitution is implemented.
 /// This function is used to remove the `tuned_initrd` variable from the initrd paths.
@@ -138,6 +138,7 @@ fn generate_type1(
     path: &str,
     entry_root: &str,
 ) -> Result<Vec<(BlsEntry, BootableEntry)>> {
+    let strict = context.root().options().bls_strict_mode;
     let mut entries = Vec::new();
 
     // Resolve the path to the BLS directory.
@@ -252,6 +253,42 @@ fn generate_type1(
             continue;
         }
 
+        // An entry that names more than one of linux, efi and uki is broken, and systemd-boot
+        // does not show it. Outside of strict mode, the first of them in that order is booted.
+        if entry.mixes_boot_targets() {
+            if strict {
+                warn!(
+                    "hiding bls entry {} as it has more than one of linux, efi and uki",
+                    name
+                );
+                continue;
+            }
+            warn!(
+                "bls entry {} has more than one of linux, efi and uki, which systemd-boot hides; \
+                 using the first of linux, efi and uki (strict mode hides it)",
+                name
+            );
+        }
+
+        // The file that the entry boots has to exist. systemd-boot hides an entry that has
+        // none, while outside of strict mode it is shown and fails when it is booted.
+        if let Some(target) = entry.chainload_path()
+            && let Ok(target_path) = CString16::try_from(format!("\\{}", target).as_str())
+            && let Ok(false) = fs.try_exists(PathBuf::from(target_path))
+        {
+            if strict {
+                warn!(
+                    "hiding bls entry {} as its file {} does not exist",
+                    name, target
+                );
+                continue;
+            }
+            warn!(
+                "bls entry {} refers to the file {}, which does not exist (strict mode hides it)",
+                name, target
+            );
+        }
+
         // Put the initrds through a quirk modifier to support Fedora.
         let initrds = quirk_initrd_remove_tuned(entry.initrd_paths());
 
@@ -271,7 +308,12 @@ fn generate_type1(
         }
 
         // Record where the boot counter lives so a try can be consumed when this entry boots.
-        if let Some(counter) = boot_counter {
+        // systemd-boot only counts the tries of the entries it boots as a kernel or as a unified
+        // kernel image, and not those of a plain EFI program.
+        let counted = !(strict && entry.linux.is_none() && entry.uki.is_none());
+        if let Some(counter) = boot_counter
+            && counted
+        {
             boot.set_boot_counter(BootCounterTarget {
                 counter,
                 filesystem: bls_resolved.filesystem_handle,
@@ -307,7 +349,8 @@ fn generate_type2(
     let directory_name = directory.to_string();
 
     let mut found: Vec<(BlsEntry, BootableEntry)> = Vec::new();
-    for image in uki::scan(resolved.filesystem_handle, &directory_name)? {
+    let strict = context.root().options().bls_strict_mode;
+    for image in uki::scan(resolved.filesystem_handle, &directory_name, strict)? {
         // Only unified kernel images that are built for this machine are entries.
         if image.machine != PE_MACHINE {
             info!(
@@ -361,6 +404,16 @@ fn generate_type2(
                 Some(ref suffix) => format!("{}@{}", id, suffix),
                 None => id.clone(),
             };
+
+            // systemd-boot skips an image that has no name, while outside of strict mode the
+            // name of the file is used.
+            if strict && profile.entry.title.is_none() {
+                warn!(
+                    "hiding unified kernel image {} as it has no name in its os-release",
+                    file_name
+                );
+                continue;
+            }
 
             let mut entry = profile.entry;
             entry.boot_counter = boot_counter;
@@ -470,7 +523,7 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
         BlsConfiguration::root_of(&path),
     ) {
         Ok(entries) => entries,
-        Err(error) if bls.xbootldr => {
+        Err(error) if bls.xbootldr || context.root().options().bls_strict_mode => {
             warn!("unable to generate bls entries: {:#}", error);
             Vec::new()
         }
@@ -479,7 +532,7 @@ pub fn generate(context: Rc<SproutContext>, bls: &BlsConfiguration) -> Result<Ve
 
     // Add the entries of the Extended Boot Loader Partition, which are sorted together with the
     // others. A problem with it should not prevent booting from the entries that are found.
-    if bls.xbootldr {
+    if bls.xbootldr || context.root().options().bls_strict_mode {
         match xbootldr_root(&context) {
             Ok(Some(root)) => {
                 let xbootldr_uki = uki_path.as_ref().map(|_| format!("{}\\EFI\\Linux", root));

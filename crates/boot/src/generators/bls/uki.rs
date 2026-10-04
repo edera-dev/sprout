@@ -62,7 +62,7 @@ impl ReadAt for FileReader {
 /// Finds the `.efi` files in `directory` on `filesystem` and reads their sections.
 /// A missing directory has no images. Files that can't be read as a PE image are skipped,
 /// as one broken file should not prevent booting any of the other entries.
-pub fn scan(filesystem: Handle, directory: &str) -> Result<Vec<UkiFile>> {
+pub fn scan(filesystem: Handle, directory: &str, strict: bool) -> Result<Vec<UkiFile>> {
     let mut fs = uefi::boot::open_protocol_exclusive::<SimpleFileSystem>(filesystem)
         .context("unable to open the unified kernel image filesystem")?;
     let mut root = fs
@@ -112,7 +112,7 @@ pub fn scan(filesystem: Handle, directory: &str) -> Result<Vec<UkiFile>> {
                     .map(|profile| UkiProfileEntry {
                         index: profile.index,
                         has_osrel: profile.sections.contains_key(".osrel"),
-                        entry: BlsEntry::from_uki_profile(&profile, &path),
+                        entry: BlsEntry::from_uki_profile_with(&profile, &path, strict),
                         info: profile.info,
                     })
                     .collect(),
