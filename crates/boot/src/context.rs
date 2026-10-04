@@ -233,7 +233,19 @@ impl SproutContext {
     /// For example, if this context contains {"a":"b"}, and the text "hello\\$a", it will produce
     /// "hello\\b" as an output string.
     pub fn stamp(&self, text: impl AsRef<str>) -> String {
-        stamp_values(&self.all_values(), text.as_ref()).1
+        // A value can refer to other values, which a single pass leaves unresolved when the
+        // key it refers to was already handled. Stamp until the text settles, up to the same
+        // limit that finalizing a context uses.
+        let values = self.all_values();
+        let mut result = text.as_ref().to_string();
+        for _ in 0..CONTEXT_FINALIZE_ITERATION_LIMIT {
+            let (changed, stamped) = stamp_values(&values, &result);
+            result = stamped;
+            if !changed || result.len() > CONTEXT_FINALIZE_VALUE_LENGTH_LIMIT {
+                break;
+            }
+        }
+        result
     }
 
     /// Stamps all the items from the iterator `input` with all the values in this [SproutContext]
