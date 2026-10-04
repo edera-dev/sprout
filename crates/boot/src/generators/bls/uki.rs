@@ -4,7 +4,9 @@ use alloc::{
     vec::Vec,
 };
 use anyhow::{Context, Result, anyhow, bail};
-use edera_sprout_bls::{BlsEntry, PeImage, ReadAt, UKI_SECTIONS, read_pe, strip_extension};
+use edera_sprout_bls::{
+    BlsEntry, PeImage, ProfileInfo, ReadAt, UKI_SECTIONS, read_pe, strip_extension, uki_profiles,
+};
 use log::warn;
 use uefi::{
     CString16, Handle, Status,
@@ -18,9 +20,19 @@ pub struct UkiFile {
     pub file_name: String,
     /// The machine type of the image.
     pub machine: u16,
-    /// Whether the image has an `.osrel` section, which unified kernel images always have.
+    /// The profiles of the image. An image without profiles has one.
+    pub profiles: Vec<UkiProfileEntry>,
+}
+
+/// One profile of a unified kernel image.
+pub struct UkiProfileEntry {
+    /// The number of the profile, or None if the image has no profiles.
+    pub index: Option<u32>,
+    /// The metadata of the profile.
+    pub info: ProfileInfo,
+    /// Whether the profile has an `.osrel` section, which unified kernel images always have.
     pub has_osrel: bool,
-    /// The entry made from the sections of the image.
+    /// The entry made from the sections of the profile.
     pub entry: BlsEntry,
 }
 
@@ -94,9 +106,16 @@ pub fn scan(filesystem: Handle, directory: &str) -> Result<Vec<UkiFile>> {
             Ok(image) => found.push(UkiFile {
                 file_name,
                 machine: image.machine,
-                has_osrel: image.sections.contains_key(".osrel"),
-                // The sections are dropped here, so only the small entry is kept per image.
-                entry: BlsEntry::from_uki(&image.sections, &path),
+                // The sections are dropped here, so only the small entries are kept per image.
+                profiles: uki_profiles(&image.sections)
+                    .into_iter()
+                    .map(|profile| UkiProfileEntry {
+                        index: profile.index,
+                        has_osrel: profile.sections.contains_key(".osrel"),
+                        entry: BlsEntry::from_uki_profile(&profile, &path),
+                        info: profile.info,
+                    })
+                    .collect(),
             }),
             Err(error) => warn!("unable to read unified kernel image {}: {:#}", path, error),
         }

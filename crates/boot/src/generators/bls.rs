@@ -9,7 +9,9 @@ use alloc::{
 };
 use anyhow::{Context, Result};
 use core::{cmp::Ordering, str::FromStr};
-use edera_sprout_bls::{BlsEntry, BootCounter, is_reserved_entry_name, sort_bls, strip_extension};
+use edera_sprout_bls::{
+    BlsEntry, BootCounter, is_reserved_entry_name, profile_id_suffix, sort_bls, strip_extension,
+};
 use edera_sprout_config::generators::bls::BlsConfiguration;
 use log::{info, warn};
 use uefi::{
@@ -54,7 +56,7 @@ fn quirk_initrd_remove_tuned(paths: Vec<String>) -> Vec<String> {
 fn sort_entries(a: &(BlsEntry, BootableEntry), b: &(BlsEntry, BootableEntry)) -> Ordering {
     let (a_bls, a_boot) = a;
     let (b_bls, b_boot) = b;
-    sort_bls(a_bls, a_boot.name(), b_bls, b_boot.name())
+    sort_bls(a_bls, a_boot.sort_name(), b_bls, b_boot.sort_name())
 }
 
 /// Produces the bootable entry for the BLS `entry` with the id `name` and the `initrds`.
@@ -297,18 +299,10 @@ fn generate_type2(
 
     let mut found: Vec<(BlsEntry, BootableEntry)> = Vec::new();
     for image in uki::scan(resolved.filesystem_handle, &directory_name)? {
-        // Only unified kernel images are entries. Images built for another architecture, and
-        // other EFI programs that have no os-release section, are skipped.
+        // Only unified kernel images that are built for this machine are entries.
         if image.machine != PE_MACHINE {
             info!(
                 "skipping {} as it is built for another architecture",
-                image.file_name
-            );
-            continue;
-        }
-        if !image.has_osrel {
-            info!(
-                "skipping {} as it has no .osrel section, so it is not a unified kernel image",
                 image.file_name
             );
             continue;
@@ -329,37 +323,71 @@ fn generate_type2(
         }
         let id = id.to_string();
 
-        let mut entry = image.entry;
-        entry.boot_counter = boot_counter;
+        // Every profile of the image is an entry. They share the file, and so the boot counter.
+        let mut suffixes: Vec<String> = Vec::new();
+        for profile in image.profiles {
+            // A profile without an os-release section is not a unified kernel image, such as
+            // other EFI programs.
+            if !profile.has_osrel {
+                info!(
+                    "skipping {} as it has no .osrel section, so it is not a unified kernel image",
+                    file_name
+                );
+                continue;
+            }
 
-        let mut boot = bootable_entry(context, bls, &id, &entry, &[]);
-        boot.set_id_suffix(&extension);
+            // The first profile has the id of the file, and the others name their profile.
+            // A profile that repeats the identifier of an earlier one is told apart by its number.
+            let index = profile.index.unwrap_or(0);
+            let mut suffix = profile_id_suffix(index, &profile.info);
+            if let Some(ref name) = suffix
+                && suffixes.contains(name)
+            {
+                suffix = Some(index.to_string());
+            }
+            if let Some(ref name) = suffix {
+                suffixes.push(name.clone());
+            }
+            let name = match suffix {
+                Some(ref suffix) => format!("{}@{}", id, suffix),
+                None => id.clone(),
+            };
 
-        // An image with the same id as another entry, such as a leftover copy with another boot
-        // counter, would be ambiguous. Type 1 and type 2 entries have different ids.
-        if entries
-            .iter()
-            .chain(found.iter())
-            .any(|(_, other)| other.id() == boot.id())
-        {
-            warn!(
-                "unified kernel image {} has the same id as another entry, skipping",
-                file_name
-            );
-            continue;
+            let mut entry = profile.entry;
+            entry.boot_counter = boot_counter;
+
+            let mut boot = bootable_entry(context, bls, &name, &entry, &[]);
+            boot.set_id_suffix(&extension);
+            if let Some(ref suffix) = suffix {
+                boot.set_id_profile(suffix);
+            }
+
+            // An image with the same id as another entry, such as a leftover copy with another
+            // boot counter, would be ambiguous. Type 1 and type 2 entries have different ids.
+            if entries
+                .iter()
+                .chain(found.iter())
+                .any(|(_, other)| other.id() == boot.id())
+            {
+                warn!(
+                    "unified kernel image {} has the same id as another entry, skipping",
+                    file_name
+                );
+                continue;
+            }
+
+            if let Some(counter) = boot_counter {
+                boot.set_boot_counter(BootCounterTarget {
+                    counter,
+                    filesystem: resolved.filesystem_handle,
+                    directory: PathBuf::from(directory.clone()),
+                    id: id.clone(),
+                    file_name: file_name.clone(),
+                    extension: extension.clone(),
+                });
+            }
+            found.push((entry, boot));
         }
-
-        if let Some(counter) = boot_counter {
-            boot.set_boot_counter(BootCounterTarget {
-                counter,
-                filesystem: resolved.filesystem_handle,
-                directory: PathBuf::from(directory.clone()),
-                id,
-                file_name,
-                extension,
-            });
-        }
-        found.push((entry, boot));
     }
     Ok(found)
 }

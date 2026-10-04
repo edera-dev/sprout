@@ -3,6 +3,7 @@ use crate::context::SproutContext;
 use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
+use edera_sprout_bls::profile_entry_id;
 use edera_sprout_config::entries::EntryDeclaration;
 use edera_sprout_parsing::{fnmatch_ignore_case, glob_match};
 
@@ -18,6 +19,7 @@ pub struct BootableEntry {
     sort_key: Option<String>,
     boot_counter: Option<BootCounterTarget>,
     id_suffix: Option<String>,
+    id_profile: Option<String>,
 }
 
 impl BootableEntry {
@@ -38,6 +40,7 @@ impl BootableEntry {
             sort_key: None,
             boot_counter: None,
             id_suffix: None,
+            id_profile: None,
         }
     }
 
@@ -51,9 +54,36 @@ impl BootableEntry {
     /// `fedora.conf`, in lower case. Any other entry has its name as the id.
     pub fn id(&self) -> String {
         match self.id_suffix {
-            Some(ref suffix) => format!("{}{}", self.name, suffix).to_lowercase(),
+            Some(ref suffix) => {
+                let file = format!("{}{}", self.sort_name(), suffix);
+                profile_entry_id(&file, self.id_profile.as_deref())
+            }
             None => self.name.clone(),
         }
+    }
+
+    /// Fetch the name of the entry without the profile of a unified kernel image, which is
+    /// the same for every profile of the same image.
+    pub fn sort_name(&self) -> &str {
+        self.id_profile
+            .as_deref()
+            .and_then(|profile| {
+                self.name
+                    .strip_suffix(profile)
+                    .and_then(|name| name.strip_suffix('@'))
+            })
+            .unwrap_or(&self.name)
+    }
+
+    /// Fetch whether the entry is a profile of a unified kernel image after the first, which
+    /// is never picked as the default entry unless it was asked for.
+    pub fn is_extra_profile(&self) -> bool {
+        self.id_profile.is_some()
+    }
+
+    /// Set the profile of a unified kernel image that is part of the id of this entry.
+    pub fn set_id_profile(&mut self, profile: &str) {
+        self.id_profile = Some(profile.to_string());
     }
 
     /// Set the file extension that is part of the id of this entry, such as `.conf`.

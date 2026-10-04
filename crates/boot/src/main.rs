@@ -547,7 +547,7 @@ fn run(reboot_on_error: &mut bool) -> Result<()> {
     let default_flags = edera_sprout_bls::resolve_default_flags(
         &entries
             .iter()
-            .map(|entry| (entry.is_default(), entry.is_bad()))
+            .map(|entry| (entry.is_default(), entry.is_bad(), entry.is_extra_profile()))
             .collect::<Vec<_>>(),
     );
     for (entry, default) in entries.iter_mut().zip(default_flags) {

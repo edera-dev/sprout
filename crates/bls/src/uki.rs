@@ -1,10 +1,14 @@
-use crate::BlsEntry;
+use crate::{BlsEntry, PeSection};
 use alloc::collections::BTreeMap;
+use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 /// The PE sections of a unified kernel image that Sprout reads.
-pub const UKI_SECTIONS: [&str; 3] = [".osrel", ".cmdline", ".uname"];
+pub const UKI_SECTIONS: [&str; 4] = [".osrel", ".cmdline", ".uname", ".profile"];
+
+/// The most profiles that are read from a unified kernel image.
+pub const MAX_PROFILES: usize = 256;
 
 /// A parsed os-release file, such as the `.osrel` section of a unified kernel image.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -68,12 +72,26 @@ fn section_text(sections: &BTreeMap<String, Vec<u8>>, name: &str) -> Option<Stri
 }
 
 impl BlsEntry {
-    /// Produces an entry for the unified kernel image at `efi_path`, from its PE `sections`.
+    /// Produces an entry for one profile of the unified kernel image at `uki_path`.
+    /// A profile after the first is booted with `@<number>` in its load options.
+    pub fn from_uki_profile(profile: &UkiProfile, uki_path: &str) -> Self {
+        let mut entry = Self::from_uki(&profile.sections, uki_path);
+        if let Some(index) = profile.index {
+            entry.profile = (index > 0).then(|| index.to_string());
+            entry.title = entry
+                .title
+                .take()
+                .map(|title| profile_title(&title, index, &profile.info));
+        }
+        entry
+    }
+
+    /// Produces an entry for the unified kernel image at `uki_path`, from its PE `sections`.
     /// The title comes from `PRETTY_NAME`, then `ID`. The version comes from `IMAGE_VERSION`,
     /// `VERSION_ID`, `BUILD_ID`, then the `.uname` section. The sort key comes from `IMAGE_ID`,
     /// then `ID`. The embedded command line is kept in `cmdline` and not in `options`, as the
     /// image reads its own command line.
-    pub fn from_uki(sections: &BTreeMap<String, Vec<u8>>, efi_path: &str) -> Self {
+    pub fn from_uki(sections: &BTreeMap<String, Vec<u8>>, uki_path: &str) -> Self {
         let os_release = section_text(sections, ".osrel")
             .map(|text| OsRelease::parse(&text))
             .unwrap_or_default();
@@ -89,10 +107,138 @@ impl BlsEntry {
             title: first(&["PRETTY_NAME", "ID"]),
             version: first(&["IMAGE_VERSION", "VERSION_ID", "BUILD_ID"]).or_else(|| uname.clone()),
             sort_key: first(&["IMAGE_ID", "ID"]),
-            efi: Some(efi_path.to_string()),
+            uki: Some(uki_path.to_string()),
             cmdline: section_text(sections, ".cmdline"),
             uname,
             ..Self::default()
         }
+    }
+}
+
+/// The metadata in the `.profile` section of a profile of a unified kernel image.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ProfileInfo {
+    /// A short identifier of the profile.
+    pub id: Option<String>,
+    /// A title for people to read.
+    pub title: Option<String>,
+}
+
+impl ProfileInfo {
+    /// Parses the text of a `.profile` section, which is in the format of an os-release file.
+    /// A key without a value is treated as missing.
+    pub fn parse(text: &str) -> Self {
+        let os_release = OsRelease::parse(text);
+        let get = |key: &str| {
+            os_release
+                .get(key)
+                .filter(|value| !value.is_empty())
+                .map(ToString::to_string)
+        };
+        Self {
+            id: get("ID"),
+            title: get("TITLE"),
+        }
+    }
+}
+
+/// The sections that one profile of a unified kernel image boots with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UkiProfile {
+    /// The number of the profile, or None if the image has no `.profile` sections.
+    pub index: Option<u32>,
+    /// The metadata of the profile.
+    pub info: ProfileInfo,
+    /// The sections of the profile on top of those of the base image. A section that is empty
+    /// or too large to read, which is how a profile removes a section, is not here.
+    pub sections: BTreeMap<String, Vec<u8>>,
+}
+
+/// Keeps the first section of each name in `range`.
+fn first_of_each(range: &[PeSection]) -> BTreeMap<String, Option<Vec<u8>>> {
+    let mut sections = BTreeMap::new();
+    for section in range {
+        sections
+            .entry(section.name.clone())
+            .or_insert_with(|| section.data.clone());
+    }
+    sections
+}
+
+/// Splits the `sections` of a unified kernel image, in the order of the section table, into the
+/// profiles of the image. Each `.profile` section starts a profile that goes on until the next
+/// one, and the sections before the first are the base that every profile starts from.
+/// A section of a profile takes the place of the section of the same name in the base.
+/// An image without `.profile` sections has one profile, which is the base.
+pub fn uki_profiles(sections: &[PeSection]) -> Vec<UkiProfile> {
+    // Sections that are empty or too large are not available.
+    let usable = |map: BTreeMap<String, Option<Vec<u8>>>| -> BTreeMap<String, Vec<u8>> {
+        map.into_iter()
+            .filter_map(|(name, data)| {
+                data.filter(|data| !data.is_empty())
+                    .map(|data| (name, data))
+            })
+            .collect()
+    };
+
+    let starts: Vec<usize> = sections
+        .iter()
+        .enumerate()
+        .filter(|(_, section)| section.name == ".profile")
+        .map(|(index, _)| index)
+        .collect();
+    let Some(&first) = starts.first() else {
+        return alloc::vec![UkiProfile {
+            index: None,
+            info: ProfileInfo::default(),
+            sections: usable(first_of_each(sections)),
+        }];
+    };
+
+    let base = first_of_each(&sections[..first]);
+    starts
+        .iter()
+        .take(MAX_PROFILES)
+        .enumerate()
+        .map(|(index, start)| {
+            let end = starts.get(index + 1).copied().unwrap_or(sections.len());
+            let range = &sections[*start..end];
+            let mut merged = base.clone();
+            merged.extend(first_of_each(range));
+            UkiProfile {
+                index: Some(index as u32),
+                info: range[0]
+                    .data
+                    .as_ref()
+                    .map(|data| ProfileInfo::parse(&String::from_utf8_lossy(data)))
+                    .unwrap_or_default(),
+                sections: usable(merged),
+            }
+        })
+        .collect()
+}
+
+/// The part of the id of an entry that comes after the `@`, which names the profile.
+/// The first profile has none, and the others have their identifier or their number.
+pub fn profile_id_suffix(index: u32, info: &ProfileInfo) -> Option<String> {
+    (index > 0).then(|| info.id.clone().unwrap_or_else(|| index.to_string()))
+}
+
+/// The title of the entry for a profile, given the `name` of the image.
+pub fn profile_title(name: &str, index: u32, info: &ProfileInfo) -> String {
+    match (&info.title, &info.id) {
+        (Some(title), _) => format!("{} ({})", name, title),
+        (None, Some(id)) if index > 0 => format!("{} ({})", name, id),
+        (None, None) if index > 0 => format!("{} (Profile #{})", name, index + 1),
+        _ => name.to_string(),
+    }
+}
+
+/// The id of the entry for a profile of the image with the file name `file_id`, such as
+/// `fedora.efi`. The file name is in lower case, as in systemd-boot, and the profile is not.
+pub fn profile_entry_id(file_id: &str, suffix: Option<&str>) -> String {
+    match suffix {
+        Some(suffix) => format!("{}@{}", file_id.to_lowercase(), suffix),
+        None => file_id.to_lowercase(),
     }
 }
