@@ -72,7 +72,7 @@ We recommend running Sprout without Secure Boot for development, and with Secure
 - [x] Loadable driver support
 - [x] [Bootloader specification (BLS)](https://uapi-group.org/specifications/specs/boot_loader_specification/) support:
   Type #1 entries, Type #2 unified kernel images, and the extended boot loader partition
-- [x] [UKI support](https://github.com/edera-dev/sprout/issues/6): beta, including images with multiple profiles
+- [x] [UKI support](https://github.com/edera-dev/sprout/issues/6): including images with multiple profiles
 - [x] Boot counting, so `systemd-bless-boot` can assess a boot
 - [x] `loader.conf` support
 - [x] Chainload support
@@ -84,9 +84,9 @@ We recommend running Sprout without Secure Boot for development, and with Secure
 - [x] A strict mode that follows the BLS specification and systemd-boot exactly
 - [x] Generators for BLS entries, lists, and matrices, with variants
 - [x] BLS autoconfiguration support
-- [x] [Secure Boot support](https://github.com/edera-dev/sprout/issues/20): beta
-- [x] [Bootloader interface support](https://github.com/edera-dev/sprout/issues/21): beta
-- [x] [BLS specification conformance](https://github.com/edera-dev/sprout/issues/2): beta
+- [x] [Secure Boot support](https://github.com/edera-dev/sprout/issues/20)
+- [x] [Bootloader interface support](https://github.com/edera-dev/sprout/issues/21)
+- [x] [BLS specification conformance](https://github.com/edera-dev/sprout/issues/2)
 
 ### Roadmap
 

@@ -23,7 +23,6 @@ use eficore::{
     bootloader_interface::{BootloaderInterface, BootloaderInterfaceTimeout},
     partition::PartitionGuidForm,
     platform::{timer::PlatformTimer, tpm::PlatformTpm},
-    secure::SecureBoot,
     setup,
 };
 use log::{error, info, warn};
@@ -113,11 +112,6 @@ fn load_loader_conf(context: &SproutContext) -> Result<LoaderConf> {
 
 /// Run Sprout, returning an error if one occurs.
 fn run(reboot_on_error: &mut bool) -> Result<()> {
-    // For safety reasons, we will note that Secure Boot is in beta on Sprout.
-    if SecureBoot::enabled().context("unable to determine Secure Boot status")? {
-        warn!("Sprout Secure Boot is in beta. Some functionality may not work as expected.");
-    }
-
     // Start the platform timer.
     let timer = PlatformTimer::start();
 
