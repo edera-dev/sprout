@@ -161,11 +161,17 @@ controller so the new filesystems appear. Drivers have no defined load order.
 ```toml
 [drivers.ext4]
 path = "\\sprout\\drivers\\ext4.efi"
+provides = "filesystems"
 ```
 
-| Key    | Meaning                                                |
-|--------|--------------------------------------------------------|
-| `path` | Path to the driver image. Required. Can use values.    |
+| Key        | Default | Meaning                                                                 |
+|------------|---------|-------------------------------------------------------------------------|
+| `path`     |         | Path to the driver image. Required. Can use values.                     |
+| `provides` | `any`   | What the driver provides: `any` or `filesystems`.                       |
+
+With `filesystems`, the driver only adds filesystem or disk support. When every driver says so, Sprout
+reconnects only the disk and partition controllers instead of all of them. A single `any` driver makes
+Sprout reconnect every controller.
 
 The name (`ext4` above) is only for error messages and doesn't have to match the file.
 

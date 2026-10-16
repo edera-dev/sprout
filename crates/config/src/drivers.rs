@@ -10,4 +10,21 @@ pub struct DriverDeclaration {
     /// The filesystem path to the driver.
     /// This file should be an EFI executable that can be located and executed.
     pub path: String,
+    /// What the driver provides.
+    /// This decides which controllers are reconnected after the drivers are loaded.
+    #[serde(default)]
+    pub provides: DriverProvides,
+}
+
+/// What a driver provides to the firmware.
+#[derive(Serialize, Deserialize, Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum DriverProvides {
+    /// The driver can provide anything, so every controller is reconnected.
+    #[default]
+    #[serde(rename = "any")]
+    Any,
+    /// The driver only provides filesystem or disk support,
+    /// so only the controllers that are disks or partitions are reconnected.
+    #[serde(rename = "filesystems")]
+    Filesystems,
 }
