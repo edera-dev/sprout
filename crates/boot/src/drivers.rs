@@ -2,20 +2,20 @@ use crate::context::SproutContext;
 use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::rc::Rc;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use anyhow::{Context, Result};
 use edera_sprout_config::drivers::{DriverDeclaration, DriverProvides};
 use eficore::loader::source::ImageSource;
 use eficore::loader::{ImageLoadRequest, ImageLoader};
 use log::info;
-use uefi::boot::SearchType;
+use uefi::boot::{OpenProtocolAttributes, OpenProtocolParams, SearchType};
 use uefi::proto::media::block::BlockIO;
 use uefi::proto::media::disk::{DiskIo, DiskIo2};
 use uefi::{Handle, Identify};
 
 /// Loads the driver specified by the `driver` declaration.
-fn load_driver(context: Rc<SproutContext>, driver: &DriverDeclaration) -> Result<()> {
+fn load_driver(context: Rc<SproutContext>, driver: &DriverDeclaration) -> Result<Handle> {
     // Acquire the handle and device path of the loaded image.
     let sprout_image = uefi::boot::image_handle();
 
@@ -36,13 +36,31 @@ fn load_driver(context: Rc<SproutContext>, driver: &DriverDeclaration) -> Result
     // Start the driver image, this is expected to return control to sprout.
     // There is no guarantee that the driver will actually return control as it is
     // just a standard EFI image.
+    info!("starting driver image");
     uefi::boot::start_image(*image.handle()).context("unable to start driver image")?;
+    info!("driver image returned");
 
-    Ok(())
+    Ok(*image.handle())
+}
+
+/// Checks whether the handle is a logical partition rather than a whole disk.
+fn is_partition(handle: Handle) -> bool {
+    let params = OpenProtocolParams {
+        handle,
+        agent: uefi::boot::image_handle(),
+        controller: None,
+    };
+    // Opening with GetProtocol does not disturb the existing protocol users.
+    let block = unsafe {
+        uefi::boot::open_protocol::<BlockIO>(params, OpenProtocolAttributes::GetProtocol)
+    };
+    block.is_ok_and(|block| block.media().is_logical_partition())
 }
 
 /// Locates the handles that are disks or partitions.
-/// These are the only controllers that filesystem drivers can bind to.
+/// Filesystem drivers bind to partitions, so whole disks are only returned when
+/// there are no partitions. Reconnecting a whole disk makes the firmware rebuild
+/// its partition handles, which hangs on some NVMe firmware.
 fn locate_storage_handles() -> Result<Vec<Handle>> {
     let mut storage = Vec::new();
     for guid in [&BlockIO::GUID, &DiskIo::GUID, &DiskIo2::GUID] {
@@ -56,7 +74,32 @@ fn locate_storage_handles() -> Result<Vec<Handle>> {
             }
         }
     }
-    Ok(storage)
+    let partitions: Vec<Handle> = storage
+        .iter()
+        .copied()
+        .filter(|handle| is_partition(*handle))
+        .collect();
+    if partitions.is_empty() {
+        return Ok(storage);
+    }
+    Ok(partitions)
+}
+
+/// Describes a handle by its device path, for diagnosing hangs.
+fn describe(handle: Handle) -> String {
+    use uefi::proto::device_path::DevicePath;
+
+    let params = OpenProtocolParams {
+        handle,
+        agent: uefi::boot::image_handle(),
+        controller: None,
+    };
+    match unsafe {
+        uefi::boot::open_protocol::<DevicePath>(params, OpenProtocolAttributes::GetProtocol)
+    } {
+        Ok(path) => path.to_string(),
+        Err(_) => String::from("<no device path>"),
+    }
 }
 
 /// Reconnects handles to their controllers.
@@ -64,7 +107,7 @@ fn locate_storage_handles() -> Result<Vec<Handle>> {
 /// After we load all the drivers, we need to reconnect their handles
 /// so that filesystems are recognized again.
 /// When `provides` is [`DriverProvides::Filesystems`], only disk and partition handles are reconnected.
-fn reconnect(provides: DriverProvides) -> Result<()> {
+fn reconnect(provides: DriverProvides, drivers: &[Handle]) -> Result<()> {
     // Locate the handles to reconnect in the UEFI stack.
     let handles = match provides {
         DriverProvides::Any => uefi::boot::locate_handle_buffer(SearchType::AllHandles)
@@ -75,10 +118,27 @@ fn reconnect(provides: DriverProvides) -> Result<()> {
         DriverProvides::Filesystems => locate_storage_handles()?,
     };
 
-    for handle in handles {
+    // The driver list passed to the firmware must end with a null entry.
+    let driver_list: Vec<Option<Handle>> = drivers
+        .iter()
+        .copied()
+        .map(Some)
+        .chain(core::iter::once(None))
+        .collect();
+
+    let total = handles.len();
+    for (index, handle) in handles.into_iter().enumerate() {
+        info!("reconnecting {}/{}: {}", index + 1, total, describe(handle));
         // Ignore the result as there is nothing we can do if reconnecting a controller fails.
         // This is also likely to fail in some cases but should fail safely.
-        let _ = uefi::boot::connect_controller(handle, &[], None, true);
+        // Filesystem drivers are connected directly so the firmware stack is not rebuilt.
+        let _ = match provides {
+            DriverProvides::Any => uefi::boot::connect_controller(handle, &[], None, true),
+            DriverProvides::Filesystems => {
+                uefi::boot::connect_controller(handle, &driver_list, None, false)
+            }
+        };
+        info!("reconnected {}/{}", index + 1, total);
     }
 
     Ok(())
@@ -100,8 +160,12 @@ pub fn load(
     info!("loading drivers");
 
     // Load all the drivers in no particular order.
+    let mut loaded = Vec::new();
     for (name, driver) in drivers {
-        load_driver(context.clone(), driver).context(format!("unable to load driver: {}", name))?;
+        loaded.push(
+            load_driver(context.clone(), driver)
+                .context(format!("unable to load driver: {}", name))?,
+        );
     }
 
     // Reconnect everything if any driver can provide anything, otherwise only storage.
@@ -113,7 +177,7 @@ pub fn load(
     } else {
         DriverProvides::Any
     };
-    reconnect(provides).context("unable to reconnect drivers")?;
+    reconnect(provides, &loaded).context("unable to reconnect drivers")?;
     info!("loaded drivers");
 
     // We've now loaded all the drivers, so we can return.
