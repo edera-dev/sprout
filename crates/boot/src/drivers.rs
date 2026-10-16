@@ -115,7 +115,12 @@ fn reconnect(provides: DriverProvides, drivers: &[Handle]) -> Result<()> {
             .iter()
             .copied()
             .collect(),
-        DriverProvides::Filesystems => locate_storage_handles()?,
+        DriverProvides::Filesystems => {
+            // Probe in reverse so the first partition is the last to be tried.
+            let mut storage = locate_storage_handles()?;
+            storage.reverse();
+            storage
+        }
     };
 
     // The driver list passed to the firmware must end with a null entry.
